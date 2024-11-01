@@ -95,6 +95,7 @@ Thor(雷神托尔)还支持多种数据库，包括SqlServer、PostgreSql、Sqli
 - [x] 通义千问（阿里云）
 - [x] 腾讯混元大模型
 - [x] 支持百度大模型(ErnieBot)
+- [x] Gitee AI
 
 # 支持数据库
 
@@ -135,6 +136,8 @@ admin admin
   缓存类型 Memory|Redis
 - CACHE_CONNECTION_STRING
   缓存连接字符串 如果是Redis则为Redis连接字符串，Memory则为空
+- HttpClientPoolSize
+  HttpClient连接池大小
 
 使用`docker compose`启动服务：
 
@@ -145,7 +148,7 @@ services:
   ai-dotnet-api-service:
     image: registry.token-ai.cn/thor:latest
     ports:
-      - 18080:5045
+      - 18080:8080
     container_name: ai-dotnet-api-service
     volumes:
       - ./data:/data
@@ -159,7 +162,7 @@ services:
 使用docker run启动服务
 
 ```sh
-docker run -d -p 18080:5045 --name ai-dotnet-api-service --network=gateway -v $PWD/data:/data -e Theme=lobe -e TZ=Asia/Shanghai -e DBType=sqlite -e ConnectionString="data source=/data/token.db" -e LoggerConnectionString="data source=/data/logger.db" registry.token-ai.cn/thor:latest
+docker run -d -p 18080:8080 --name ai-dotnet-api-service --network=gateway -v $PWD/data:/data -e Theme=lobe -e TZ=Asia/Shanghai -e DBType=sqlite -e ConnectionString="data source=/data/token.db" -e LoggerConnectionString="data source=/data/logger.db" registry.token-ai.cn/thor:latest
 ```
 
 ### Sqlite构建
@@ -175,7 +178,7 @@ services:
     image: registry.token-ai.cn/thor:latest
     container_name: ai-dotnet-api-service
     ports:
-      - 18080:5045
+      - 18080:8080
     volumes:
       - ./data:/data
     environment:
@@ -199,7 +202,7 @@ sudo docker compose up -d
 docker run版本
 
 ```shell
-docker run -d -p 18080:5045 --name ai-dotnet-api-service -v $(pwd)/data:/data -e Theme=lobe -e TZ=Asia/Shanghai -e DBType=sqlite -e ConnectionString=data source=/data/token.db -e LoggerConnectionString=data source=/data/logger.db registry.token-ai.cn/thor:latest
+docker run -d -p 18080:8080 --name ai-dotnet-api-service -v $(pwd)/data:/data -e Theme=lobe -e TZ=Asia/Shanghai -e DBType=sqlite -e ConnectionString=data source=/data/token.db -e LoggerConnectionString=data source=/data/logger.db registry.token-ai.cn/thor:latest
 ```
 
 然后访问 http://localhost:18080 即可看到服务启动成功。
@@ -217,7 +220,7 @@ services:
     image: registry.token-ai.cn/thor:latest
     container_name: ai-dotnet-api-service
     ports:
-      - 18080:5045
+      - 18080:8080
     volumes:
       - ./data:/data
     environment:
@@ -243,7 +246,7 @@ docker run版本
 ```shell
 docker run -d \
   --name ai-dotnet-api-service \
-  -p 18080:5045 \
+  -p 18080:8080 \
   -v $(pwd)/data:/data \
   -e TZ=Asia/Shanghai \
   -e DBType=postgresql \
@@ -267,7 +270,7 @@ services:
     image: registry.token-ai.cn/thor:latest
     container_name: ai-dotnet-api-service
     ports:
-      - 18080:5045
+      - 18080:8080
     volumes:
       - ./data:/data
     environment:
@@ -293,7 +296,7 @@ docker run版本
 ```shell
 docker run -d \
   --name ai-dotnet-api-service \
-  -p 18080:5045 \
+  -p 18080:8080 \
   -v $(pwd)/data:/data \
   -e TZ=Asia/Shanghai \
   -e DBType=sqlserver \
@@ -317,7 +320,7 @@ services:
     image: registry.token-ai.cn/thor:latest
     container_name: ai-dotnet-api-service
     ports:
-      - 18080:5045
+      - 18080:8080
     volumes:
       - ./data:/data
     environment:
@@ -342,7 +345,7 @@ docker run版本
 ```shell
 docker run -d \
   --name ai-dotnet-api-service \
-  -p 18080:5045 \
+  -p 18080:8080 \
   -v $(pwd)/data:/data \
   -e TZ=Asia/Shanghai \
   -e DBType=mysql \

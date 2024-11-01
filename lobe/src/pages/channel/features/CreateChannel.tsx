@@ -163,8 +163,9 @@ export default function CreateChannel({
                 input.type === "AzureOpenAI" && <Form.Item<FieldType> name='other' label='版本' style={{ width: '100%' }}>
                     <Select
                         placeholder="请选择版本"
-                        value={input.type}
-                        defaultValue={'2024-06-01'}
+                        value={input.other}
+                        defaultActiveFirstOption={true}
+                        defaultValue={'2024-10-01-preview'}
                         onChange={(v) => {
                             setInput({ ...input, other: v });
                         }}
@@ -173,6 +174,7 @@ export default function CreateChannel({
                         <Option key={'2024-05-01-preview'} value={'2024-05-01-preview'}>2024-05-01-preview</Option>
                         <Option key={'2024-04-01-preview'} value={'2024-04-01-preview'}>2024-04-01-preview</Option>
                         <Option key={'2024-06-01'} value={'2024-06-01'}>2024-06-01</Option>
+                        <Option key={'2024-10-01-preview'} value={'2024-10-01-preview'}>2024-10-01-preview</Option>
                     </Select>
                 </Form.Item>
 
@@ -198,9 +200,9 @@ export default function CreateChannel({
                 name="key"
 
             >
-                <Input.Password 
-                placeholder={getModelPrompt(input.type)} 
-                autoComplete="new-password"
+                <Input.Password
+                    placeholder={getModelPrompt(input.type)}
+                    autoComplete="new-password"
                 />
             </Form.Item>
             <Form.Item<FieldType> name='models' label='模型' rules={[
@@ -213,9 +215,9 @@ export default function CreateChannel({
                     placeholder="请选择模型"
                     defaultActiveFirstOption={true}
                     mode="tags"
-                    value={input.type}
+                    value={input.models}
                     onChange={(v) => {
-                        setInput({ ...input, type: v });
+                        setInput({ ...input, models: v });
                     }}
                     allowClear
                 >

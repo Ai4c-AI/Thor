@@ -19,19 +19,18 @@ namespace Thor.Service.Service;
 /// </summary>
 /// <param name="serviceProvider"></param>
 /// <param name="mapper"></param>
-public sealed class ChannelService(IServiceProvider serviceProvider, IMapper mapper,IServiceCache cache)
-    : ApplicationService(serviceProvider)
+public sealed class ChannelService(IServiceProvider serviceProvider, IMapper mapper, IServiceCache cache)
+    : ApplicationService(serviceProvider), IScopeDependency
 {
     private const string CacheKey = "CacheKey:Channel";
+
     /// <summary>
     /// 获取渠道列表 如果缓存中有则从缓存中获取
     /// </summary>
     public async Task<ChatChannel[]> GetChannelsAsync()
     {
-        return await cache.GetOrCreateAsync(CacheKey, async () =>
-        {
-            return await DbContext.Channels.AsNoTracking().Where(x => !x.Disable).ToArrayAsync();
-        });
+        return await cache.GetOrCreateAsync(CacheKey,
+            async () => { return await DbContext.Channels.AsNoTracking().Where(x => !x.Disable).ToArrayAsync(); });
     }
 
     /// <summary>
@@ -54,9 +53,9 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         var result = mapper.Map<ChatChannel>(channel);
         result.Id = Guid.NewGuid().ToString();
         await DbContext.Channels.AddAsync(result);
-        
+
         await DbContext.SaveChangesAsync();
-        
+
         await cache.RemoveAsync(CacheKey);
     }
 
@@ -96,7 +95,7 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
             .ExecuteDeleteAsync();
 
         await cache.RemoveAsync(CacheKey);
-        
+
         return result > 0;
     }
 
@@ -110,38 +109,33 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
 
     public async ValueTask<bool> UpdateAsync(string id, ChatChannelInput chatChannel)
     {
-        try
+        if (string.IsNullOrWhiteSpace(chatChannel.Key))
         {
-            if (string.IsNullOrWhiteSpace(chatChannel.Key))
-            {
-                var result = await DbContext.Channels.Where(x => x.Id == id)
-                    .ExecuteUpdateAsync(item =>
-                        item.SetProperty(x => x.Type, chatChannel.Type)
-                            .SetProperty(x => x.Name, chatChannel.Name)
-                            .SetProperty(x => x.Address, chatChannel.Address)
-                            .SetProperty(x => x.Other, chatChannel.Other)
-                            .SetProperty(x => x.Extension, chatChannel.Extension)
-                            .SetProperty(x => x.Models, chatChannel.Models));
-                return result > 0;
-            }
-            else
-            {
-                var result = await DbContext.Channels.Where(x => x.Id == id)
-                    .ExecuteUpdateAsync(item =>
-                        item.SetProperty(x => x.Type, chatChannel.Type)
-                            .SetProperty(x => x.Name, chatChannel.Name)
-                            .SetProperty(x => x.Key, chatChannel.Key)
-                            .SetProperty(x => x.Address, chatChannel.Address)
-                            .SetProperty(x => x.Extension, chatChannel.Extension)
-                            .SetProperty(x => x.Other, chatChannel.Other)
-                            .SetProperty(x => x.Models, chatChannel.Models));
-
-                return result > 0;
-            }
-        }
-        finally
-        {
+            var result = await DbContext.Channels.Where(x => x.Id == id)
+                .ExecuteUpdateAsync(item =>
+                    item.SetProperty(x => x.Type, chatChannel.Type)
+                        .SetProperty(x => x.Name, chatChannel.Name)
+                        .SetProperty(x => x.Address, chatChannel.Address)
+                        .SetProperty(x => x.Other, chatChannel.Other)
+                        .SetProperty(x => x.Extension, chatChannel.Extension)
+                        .SetProperty(x => x.Models, chatChannel.Models));
             await cache.RemoveAsync(CacheKey);
+            return result > 0;
+        }
+        else
+        {
+            var result = await DbContext.Channels.Where(x => x.Id == id)
+                .ExecuteUpdateAsync(item =>
+                    item.SetProperty(x => x.Type, chatChannel.Type)
+                        .SetProperty(x => x.Name, chatChannel.Name)
+                        .SetProperty(x => x.Key, chatChannel.Key)
+                        .SetProperty(x => x.Address, chatChannel.Address)
+                        .SetProperty(x => x.Extension, chatChannel.Extension)
+                        .SetProperty(x => x.Other, chatChannel.Other)
+                        .SetProperty(x => x.Models, chatChannel.Models));
+            await cache.RemoveAsync(CacheKey);
+
+            return result > 0;
         }
     }
 
@@ -150,7 +144,7 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         await DbContext.Channels
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.Order, order));
-        
+
         await cache.RemoveAsync(CacheKey);
     }
 
@@ -167,7 +161,7 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         await DbContext.Channels
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.Disable, a => !a.Disable));
-        
+
         await cache.RemoveAsync(CacheKey);
     }
 
@@ -215,11 +209,11 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         if (channel.Type == OpenAIPlatformOptions.PlatformCode)
         {
             // 如果没gpt3.5则搜索是否存在gpt4o模型
-            chatRequest.Model = channel.Models.FirstOrDefault(x =>
+            chatRequest.Model = channel.Models?.FirstOrDefault(x =>
                 x.StartsWith("gpt-3.5", StringComparison.OrdinalIgnoreCase) ||
-                x.StartsWith("gpt-4o", StringComparison.OrdinalIgnoreCase));
+                x.StartsWith("gpt-4o", StringComparison.OrdinalIgnoreCase)) ?? channel.Models!.First();
 
-            if (chatRequest.Model.IsNullOrEmpty())
+            if (string.IsNullOrEmpty(chatRequest.Model))
             {
                 // 获取渠道是否支持gpt-3.5-turbo
                 chatRequest.Model = channel.Models.Order()
@@ -244,18 +238,15 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         }
         else
         {
-            chatRequest.Model = channel.Models.FirstOrDefault();
+            chatRequest.Model = channel.Models.First();
         }
-
 
         if (string.IsNullOrWhiteSpace(chatRequest.Model))
         {
-            chatRequest.Model = channel.Models.FirstOrDefault();
+            chatRequest.Model = channel.Models!.First();
         }
 
-        // 写一个10s的超时
         var token = new CancellationTokenSource();
-        // token.CancelAfter(20000);
 
         var sw = Stopwatch.StartNew();
 
@@ -268,7 +259,7 @@ public sealed class ChannelService(IServiceProvider serviceProvider, IMapper map
         {
             response = await chatCompletionsService.ChatCompletionsAsync(chatRequest, platformOptions,
                 token.Token);
-        }, 3, 500);
+        }, 3).ConfigureAwait(false);
 
         sw.Stop();
 

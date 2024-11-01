@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Header, Input, Tag, } from "@lobehub/ui";
+import { Header, Input, Tag, Tooltip, } from "@lobehub/ui";
 import { IconAvatar, OpenAI } from "@lobehub/icons";
 import { Button, Switch, Table } from "antd";
 import { getCompletionRatio, renderQuota } from "../../utils/render";
 import { getIconByName } from "../../utils/iconutils";
 import { GetModelManagerList } from "../../services/ModelManagerService";
 import { Search } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 
 export default function DesktopLayout() {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [isK, setIsK] = useState<boolean>(false);
@@ -31,12 +34,41 @@ export default function DesktopLayout() {
     }
 
     useEffect(() => {
+        // 更新url地址的query
+        const searchParams = new URLSearchParams(location.search);
+        searchParams.set('model', input.model);
+
+        navigate({
+            search: searchParams.toString(),
+        });
+
+    }, [input.model]);
+
+    useEffect(() => {
+        // 根据query更新input
+        const searchParams = new URLSearchParams(location.search);
+        const model = searchParams.get('model');
+        if (model) {
+            setInput({
+                ...input,
+                model
+            });
+            loadData();
+
+        }
+    }, [location.search]);
+
+    useEffect(() => {
         loadData();
     }, [input.page, input.pageSize]);
 
     return (
-        <>
-
+        <div
+            style={{
+                padding: '20px',
+                overflow: 'auto',
+                height: 'calc(100vh - 220px - 64px)',
+            }}>
             <Header
                 nav={'模型列表'}
 
@@ -100,9 +132,31 @@ export default function DesktopLayout() {
                         dataIndex: 'model'
                     },
                     {
+                        key: 'isRealTime',
+                        title: '实时接口',
+                        dataIndex: 'isVersion2',
+                        width: 90,
+                        render: (value: boolean) => {
+                            return value ? '是' : '否';
+                        }
+                    },
+                    {
                         key: 'description',
                         title: '描述',
-                        dataIndex: 'description'
+                        dataIndex: 'description',
+                        render: (value: any) => {
+                            return <Tooltip title={value}>
+                                <span style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 1,
+                                    WebkitBoxOrient: 'vertical',
+                                }}>
+                                    {value}
+                                </span>
+                            </Tooltip>
+                        }
                     },
                     {
                         key: 'price',
@@ -110,23 +164,43 @@ export default function DesktopLayout() {
                         dataIndex: 'price',
                         render: (_: any, item: any) => {
                             if (isK) {
-                                return (<div>
-                                    <Tag color='cyan'>提示{renderQuota(item.promptRate * 1000,6)}/1K tokens</Tag>
-                                    {item.completionRate ?<><Tag style={{
-                                        marginTop: 8
-                                    }} color='geekblue'>完成{renderQuota(item.completionRate * 1000,6)}/1K tokens</Tag></>:<><Tag style={{
-                                        marginTop: 8
-                                    }} color='geekblue'>完成{renderQuota(getCompletionRatio(item.model) * 1000,6)}/1K tokens</Tag></>}
-                                </div>)
+                                return (<>
+                                    <div>
+                                        <Tag color='cyan'>提示{renderQuota(item.promptRate * 1000, 6)}/1K tokens</Tag>
+                                        {item.completionRate ? <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>完成{renderQuota(item.completionRate * 1000, 6)}/1K tokens</Tag></> : <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>完成{renderQuota(getCompletionRatio(item.model) * 1000, 6)}/1K tokens</Tag></>}
+                                    </div>
+                                    {item.isVersion2 && <div>
+                                        <Tag color='cyan'>音频输入{renderQuota(item.audioPromptRate * 1000)}/1M tokens</Tag>
+                                        {item.completionRate ? <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>音频完成{renderQuota(item.audioOutputRate * 1000)}/1M tokens</Tag></> : <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>音频完成{renderQuota(getCompletionRatio(item.model) * 1000)}/1M tokens</Tag></>}
+                                    </div>}
+                                </>)
                             } else {
-                                return (<div>
-                                    <Tag color='cyan'>提示{renderQuota(item.promptRate * 1000000)}/1M tokens</Tag>
-                                    {item.completionRate ?<><Tag style={{
-                                        marginTop: 8
-                                    }} color='geekblue'>完成{renderQuota(item.completionRate * 1000000)}/1M tokens</Tag></>:<><Tag style={{
-                                        marginTop: 8
-                                    }} color='geekblue'>完成{renderQuota(getCompletionRatio(item.model) * 1000000)}/1M tokens</Tag></>}
-                                </div>)
+                                return (<>
+                                    <div>
+                                        <Tag color='cyan'>提示{renderQuota(item.promptRate * 1000000)}/1M tokens</Tag>
+                                        {item.completionRate ? <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>完成{renderQuota(item.completionRate * 1000000)}/1M tokens</Tag></> : <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>完成{renderQuota(getCompletionRatio(item.model) * 1000000)}/1M tokens</Tag></>}
+                                    </div>
+                                    {item.isVersion2 && <div>
+                                        <Tag color='cyan'>音频输入{renderQuota(item.audioPromptRate * 1000000)}/1M tokens</Tag>
+                                        {item.completionRate ? <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>音频完成{renderQuota(item.audioOutputRate * 1000000)}/1M tokens</Tag></> : <><Tag style={{
+                                            marginTop: 8
+                                        }} color='geekblue'>音频完成{renderQuota(getCompletionRatio(item.model) * 1000000)}/1M tokens</Tag></>}
+                                    </div>}
+                                </>)
                             }
                         }
                     },
@@ -170,6 +244,6 @@ export default function DesktopLayout() {
                     }
                 ]}
             />
-        </>
+        </div>
     );
 }

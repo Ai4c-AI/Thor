@@ -6,24 +6,41 @@ namespace Thor.Service.Service;
 /// 模型管理服务
 /// </summary>
 /// <param name="serviceProvider"></param>
-public class ModelManagerService(IServiceProvider serviceProvider) : ApplicationService(serviceProvider)
+public class ModelManagerService(IServiceProvider serviceProvider)
+    : ApplicationService(serviceProvider), IScopeDependency
 {
     public static ConcurrentDictionary<string, decimal> PromptRate { get; private set; } = new();
     public static ConcurrentDictionary<string, decimal> CompletionRate { get; private set; } = new();
 
+    public static ConcurrentDictionary<string, decimal> AudioPromptRate { get; private set; } = new();
+
+    public static ConcurrentDictionary<string, decimal> AudioOutputRate { get; private set; } = new();
+
     public static async ValueTask LoadingSettings(AIDotNetDbContext context)
     {
-        var settings = await context.ModelManagers.Where(x => x.Enable).ToListAsync();
+        var models = await context.ModelManagers.Where(x => x.Enable).ToListAsync();
 
         PromptRate.Clear();
         CompletionRate.Clear();
 
-        foreach (var setting in settings)
+        foreach (var setting in models)
         {
             PromptRate[setting.Model] = setting.PromptRate;
             if (setting.CompletionRate is > 0)
             {
                 CompletionRate[setting.Model] = setting.CompletionRate.Value;
+            }
+
+            if (!setting.IsVersion2) continue;
+            
+            if (setting.AudioPromptRate is > 0)
+            {
+                AudioPromptRate[setting.Model] = setting.AudioPromptRate.Value;
+            }
+
+            if (setting.AudioOutputRate is > 0)
+            {
+                AudioOutputRate[setting.Model] = setting.AudioOutputRate.Value;
             }
         }
     }
@@ -63,6 +80,8 @@ public class ModelManagerService(IServiceProvider serviceProvider) : Application
         {
             throw new("模型不存在");
         }
+        
+        input.Enable = entity.Enable;
 
         Mapper.Map(input, entity);
 

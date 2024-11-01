@@ -101,6 +101,11 @@ const router = createBrowserRouter([{
   element: <Suspense fallback={<FullscreenLoading title='加载认证页面中' />}>
     <Auth />
   </Suspense>
+},  {
+  path: "/auth/gitee",
+  element: <Suspense fallback={<FullscreenLoading title='加载认证页面中' />}>
+    <Auth />
+  </Suspense>
 }, {
   path: "/share",
   element: <Suspense fallback={<FullscreenLoading title='加载分享页面中' />}>
@@ -117,6 +122,11 @@ const router = createBrowserRouter([{
     </Suspense> },
     {
       path: "/doc",
+      element: <Suspense fallback={<FullscreenLoading title='加载文档页面中' />}>
+        <DocPage />
+      </Suspense>
+    },{
+      path: "/doc/*",
       element: <Suspense fallback={<FullscreenLoading title='加载文档页面中' />}>
         <DocPage />
       </Suspense>
