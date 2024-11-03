@@ -1,16 +1,16 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Thor.Core.DataAccess;
+using Thor.Service.DataAccess;
 using Thor.Service.Domain;
-using Thor.Service.Domain.Core;
-using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Helper;
 
-namespace Thor.Service.DataAccess;
+namespace Thor.Core;
 
-public class AIDotNetDbContext(
-    DbContextOptions<AIDotNetDbContext> options,
-    IUserContext userContext) : DbContext(options)
+public abstract class ThorContext<TContext>(DbContextOptions<TContext> context, IServiceProvider serviceProvider)
+    : BaseContext<TContext>(context, serviceProvider), IThorContext where TContext : BaseContext<TContext>
 {
     public DbSet<User> Users { get; set; }
 
@@ -29,6 +29,7 @@ public class AIDotNetDbContext(
     public DbSet<RateLimitModel> RateLimitModels { get; set; }
 
     public DbSet<ModelManager> ModelManagers { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,9 +72,8 @@ public class AIDotNetDbContext(
                 Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                ReadCommentHandling = JsonCommentHandling.Skip
             }) ?? []);
-            
+
             modelManagers.ForEach(x =>
             {
                 x.Id = Guid.NewGuid();
@@ -86,55 +86,6 @@ public class AIDotNetDbContext(
         catch (Exception e)
         {
             Console.WriteLine("模型默认配置文件错误：" + e);
-        }
-    }
-
-
-    public override int SaveChanges()
-    {
-        OnBeforeSaveChanges();
-        return base.SaveChanges();
-    }
-
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        OnBeforeSaveChanges();
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-
-    private void OnBeforeSaveChanges()
-    {
-        var entries = ChangeTracker.Entries();
-        foreach (var entry in entries)
-        {
-            if (userContext.IsAuthenticated)
-            {
-                switch (entry)
-                {
-                    case { State: EntityState.Added, Entity: ICreatable creatable }:
-                        creatable.Creator ??= userContext.CurrentUserId;
-                        if (creatable.CreatedAt == default)
-                            creatable.CreatedAt = DateTime.Now;
-                        break;
-                    case { State: EntityState.Modified, Entity: IUpdatable entity }:
-                        entity.UpdatedAt ??= DateTime.Now;
-                        entity.Modifier ??= userContext.CurrentUserId;
-                        break;
-                }
-            }
-            else
-            {
-                switch (entry.Entity)
-                {
-                    case ICreatable creatable:
-                        if (creatable.CreatedAt == default)
-                            creatable.CreatedAt = DateTime.Now;
-                        break;
-                    case IUpdatable entity:
-                        entity.UpdatedAt ??= DateTime.Now;
-                        break;
-                }
-            }
         }
     }
 }
