@@ -7,11 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Raccoon.Stack.Rabbit" Version="0.0.1.2" />
+      <ProjectReference Include="..\Thor.BuildingBlocks.Event\Thor.BuildingBlocks.Event.csproj" />
+      <ProjectReference Include="..\Thor.Stack.Rabbit\Thor.Rabbit.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Thor.BuildingBlocks.Event\Thor.BuildingBlocks.Event.csproj" />
+      <PackageReference Include="MessagePack" Version="2.5.187" />
     </ItemGroup>
 
 </Project>
