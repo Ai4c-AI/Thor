@@ -15,7 +15,10 @@ using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
 using Thor.Abstractions.Realtime;
 using Thor.Abstractions.Realtime.Dto;
 using Thor.Core;
+using Thor.Infrastructure;
+using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
+using Thor.Service.Infrastructure;
 
 namespace Thor.Service.Service;
 
@@ -40,7 +43,19 @@ public sealed class ChatService(
     LoggerService loggerService)
     : ApplicationService(serviceProvider), IScopeDependency
 {
+    /// <summary>
+    ///  按量计费模型倍率模板
+    /// </summary>
     private const string ConsumerTemplate = "模型倍率：{0} 补全倍率：{1}";
+
+    /// <summary>
+    /// 按次计费模型倍率模板
+    /// </summary>
+    private const string ConsumerTemplateOnDemand = "按次数计费费用：{0}";
+
+    /// <summary>
+    /// 实时对话计费模型倍率模板
+    /// </summary>
     private const string RealtimeConsumerTemplate = "模型倍率：文本提示词倍率:{0} 文本完成倍率:{1} 音频请求倍率:{2} 音频完成倍率:{3}  实时对话";
 
 
@@ -100,11 +115,14 @@ public sealed class ChatService(
             using var image =
                 Activity.Current?.Source.StartActivity("文字生成图片");
 
-            var (token, user) = await tokenService.CheckTokenAsync(context);
+            var organizationId = string.Empty;
+            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
+            {
+                organizationId = organizationIdHeader.ToString();
+            }
+
 
             request.Model = TokenService.ModelMap(request.Model);
-
-            TokenService.CheckModel(request.Model, token, context);
 
             if (string.IsNullOrEmpty(request?.Model)) request.Model = "dall-e-2";
 
@@ -114,9 +132,14 @@ public sealed class ChatService(
 
             var rate = ModelManagerService.PromptRate[request.Model];
 
+            var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+
+            TokenService.CheckModel(request.Model, token, context);
+
+
             request.N ??= 1;
 
-            var quota = (int)(rate * imageCostRatio * 1000) * request.N;
+            var quota = (int)(rate.PromptRate * imageCostRatio * 1000) * request.N;
 
             if (request == null) throw new Exception("模型校验异常");
 
@@ -152,8 +175,9 @@ public sealed class ChatService(
             sw.Stop();
 
             await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate, 0), request.Model,
-                0, 0, quota ?? 0, token?.Name, user?.UserName, user?.Id, channel.Id,
-                channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds);
+                0, 0, quota ?? 0, token?.Key, user?.UserName, user?.Id, channel.Id,
+                channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
+                organizationId);
 
             await userService.ConsumeAsync(user!.Id, quota ?? 0, 0, token?.Key, channel.Id, request.Model);
         }
@@ -181,85 +205,93 @@ public sealed class ChatService(
             using var embedding =
                 Activity.Current?.Source.StartActivity("向量模型调用");
 
+            var organizationId = string.Empty;
+            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
+            {
+                organizationId = organizationIdHeader.ToString();
+            }
+
             input.Model = TokenService.ModelMap(input.Model);
 
             await rateLimitModelService.CheckAsync(input!.Model, context);
 
-            var (token, user) = await tokenService.CheckTokenAsync(context);
-            TokenService.CheckModel(input.Model, token, context);
-
-            // 获取渠道 通过算法计算权重
-            var channel = CalculateWeight(await channelService.GetChannelsContainsModelAsync(input.Model), input.Model);
-
-            if (channel == null) throw new NotModelException(input.Model);
-
-            // 获取渠道指定的实现类型的服务
-            var embeddingService = GetKeyedService<IThorTextEmbeddingService>(channel.Type);
-
-            if (embeddingService == null) throw new Exception($"并未实现：{channel.Type} 的服务");
-
-            var embeddingCreateRequest = new EmbeddingCreateRequest
+            if (ModelManagerService.PromptRate.TryGetValue(input.Model, out var rate))
             {
-                Model = input.Model,
-                EncodingFormat = input.EncodingFormat
-            };
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+                TokenService.CheckModel(input.Model, token, context);
 
-            int requestToken;
-            if (input.Input is JsonElement str)
-            {
-                if (str.ValueKind == JsonValueKind.String)
+                // 获取渠道 通过算法计算权重
+                var channel = CalculateWeight(await channelService.GetChannelsContainsModelAsync(input.Model),
+                    input.Model);
+
+                if (channel == null) throw new NotModelException(input.Model);
+
+                // 获取渠道指定的实现类型的服务
+                var embeddingService = GetKeyedService<IThorTextEmbeddingService>(channel.Type);
+
+                if (embeddingService == null) throw new Exception($"并未实现：{channel.Type} 的服务");
+
+                var embeddingCreateRequest = new EmbeddingCreateRequest
                 {
-                    embeddingCreateRequest.Input = str.ToString();
-                    requestToken = TokenHelper.GetTotalTokens(str.ToString());
-                }
-                else if (str.ValueKind == JsonValueKind.Array)
+                    Model = input.Model,
+                    EncodingFormat = input.EncodingFormat
+                };
+
+                int requestToken;
+                if (input.Input is JsonElement str)
                 {
-                    var inputString = str.EnumerateArray().Select(x => x.ToString()).ToArray();
-                    embeddingCreateRequest.InputAsList = inputString.ToList();
-                    requestToken = TokenHelper.GetTotalTokens(inputString);
+                    if (str.ValueKind == JsonValueKind.String)
+                    {
+                        embeddingCreateRequest.Input = str.ToString();
+                        requestToken = TokenHelper.GetTotalTokens(str.ToString());
+                    }
+                    else if (str.ValueKind == JsonValueKind.Array)
+                    {
+                        var inputString = str.EnumerateArray().Select(x => x.ToString()).ToArray();
+                        embeddingCreateRequest.InputAsList = inputString.ToList();
+                        requestToken = TokenHelper.GetTotalTokens(inputString);
+                    }
+                    else
+                    {
+                        throw new Exception("输入格式错误");
+                    }
                 }
                 else
                 {
                     throw new Exception("输入格式错误");
                 }
-            }
-            else
-            {
-                throw new Exception("输入格式错误");
-            }
 
-            var sw = Stopwatch.StartNew();
+                var sw = Stopwatch.StartNew();
 
-            var stream = await embeddingService.EmbeddingAsync(embeddingCreateRequest, new ThorPlatformOptions
-            {
-                ApiKey = channel.Key,
-                Address = channel.Address,
-                Other = channel.Other
-            }, context.RequestAborted);
-            sw.Stop();
+                var stream = await embeddingService.EmbeddingAsync(embeddingCreateRequest, new ThorPlatformOptions
+                {
+                    ApiKey = channel.Key,
+                    Address = channel.Address,
+                    Other = channel.Other
+                }, context.RequestAborted);
+                sw.Stop();
 
-            if (ModelManagerService.PromptRate.TryGetValue(input.Model, out var rate))
-            {
-                var quota = requestToken * rate;
+
+                var quota = requestToken * rate.PromptRate;
 
                 var completionRatio = GetCompletionRatio(input.Model);
-                quota += rate * completionRatio;
+                quota += rate.PromptRate * completionRatio;
 
                 // 将quota 四舍五入
                 quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
                 await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate, completionRatio),
                     input.Model,
-                    requestToken, 0, (int)quota, token?.Name, user?.UserName, user?.Id, channel.Id,
-                    channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds);
+                    requestToken, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
+                    channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
+                    organizationId);
 
                 await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
                     input.Model);
+                stream.ConvertEmbeddingData(input.EncodingFormat);
+
+                await context.Response.WriteAsJsonAsync(stream);
             }
-
-            stream.ConvertEmbeddingData(input.EncodingFormat);
-
-            await context.Response.WriteAsJsonAsync(stream);
         }
         catch (RateLimitException)
         {
@@ -292,8 +324,6 @@ public sealed class ChatService(
 
             await rateLimitModelService.CheckAsync(input!.Model, context);
 
-            var (token, user) = await tokenService.CheckTokenAsync(context);
-            TokenService.CheckModel(input.Model, token, context);
 
             // 获取渠道 通过算法计算权重
             var channel = CalculateWeight(await channelService.GetChannelsContainsModelAsync(input.Model), input.Model);
@@ -306,16 +336,19 @@ public sealed class ChatService(
 
             if (ModelManagerService.PromptRate.TryGetValue(input.Model, out var rate))
             {
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+                TokenService.CheckModel(input.Model, token, context);
+
                 if (input.Stream == false)
                 {
                     var sw = Stopwatch.StartNew();
                     var (requestToken, responseToken) =
-                        await CompletionsHandlerAsync(context, input, channel, openService, user, rate);
+                        await CompletionsHandlerAsync(context, input, channel, openService, user, rate.PromptRate);
 
-                    var quota = requestToken * rate;
+                    var quota = requestToken * rate.PromptRate;
 
                     var completionRatio = GetCompletionRatio(input.Model);
-                    quota += responseToken * rate * completionRatio;
+                    quota += responseToken * rate.PromptRate * completionRatio;
 
                     // 将quota 四舍五入
                     quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
@@ -324,7 +357,7 @@ public sealed class ChatService(
 
                     await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate, completionRatio),
                         input.Model,
-                        requestToken, responseToken, (int)quota, token?.Name, user?.UserName, user?.Id, channel.Id,
+                        requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                         channel.Name, context.GetIpAddress(), context.GetUserAgent(), false,
                         (int)sw.ElapsedMilliseconds);
 
@@ -390,14 +423,16 @@ public sealed class ChatService(
 
         try
         {
+            var organizationId = string.Empty;
+            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
+            {
+                organizationId = organizationIdHeader.ToString();
+            }
+
             request.Model = TokenService.ModelMap(request.Model);
 
             var model = request.Model;
             await rateLimitModelService.CheckAsync(model, context);
-
-            var (token, user) = await tokenService.CheckTokenAsync(context);
-
-            TokenService.CheckModel(request.Model, token, context);
 
             // 获取渠道通过算法计算权重
             var channel = CalculateWeight(await channelService.GetChannelsContainsModelAsync(model), model);
@@ -407,8 +442,6 @@ public sealed class ChatService(
                 throw new NotModelException(model);
             }
 
-            // 记录请求模型 / 请求用户
-            logger.LogInformation("请求模型：{model} 请求用户：{user}", model, user?.UserName);
 
             // 获取渠道指定的实现类型的服务
             var chatCompletionsService = GetKeyedService<IThorChatCompletionsService>(channel.Type);
@@ -420,6 +453,13 @@ public sealed class ChatService(
 
             if (ModelManagerService.PromptRate.TryGetValue(model, out var rate))
             {
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+
+                TokenService.CheckModel(request.Model, token, context);
+
+                // 记录请求模型 / 请求用户
+                logger.LogInformation("请求模型：{model} 请求用户：{user}", model, user?.UserName);
+
                 int requestToken;
                 var responseToken = 0;
 
@@ -432,7 +472,7 @@ public sealed class ChatService(
 
                     (requestToken, responseToken) =
                         await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate);
+                            rate.PromptRate);
                 }
                 else
                 {
@@ -441,28 +481,49 @@ public sealed class ChatService(
 
                     (requestToken, responseToken) =
                         await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate);
+                            rate.PromptRate);
                 }
 
-                var quota = requestToken * rate;
+                var quota = requestToken * rate.PromptRate;
 
                 var completionRatio = GetCompletionRatio(model);
-                quota += responseToken * rate * completionRatio;
+                quota += responseToken * rate.PromptRate * completionRatio;
 
                 // 将quota 四舍五入
                 quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
                 sw.Stop();
 
-                await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate, completionRatio),
-                    model,
-                    requestToken, responseToken, (int)quota, token?.Name, user?.UserName, user?.Id, channel.Id,
-                    channel.Name, context.GetIpAddress(), context.GetUserAgent(),
-                    request.Stream is true,
-                    (int)sw.ElapsedMilliseconds);
+                // 判断是否按次
+                if (rate.QuotaType == ModelQuotaType.OnDemand)
+                {
+                    await loggerService.CreateConsumeAsync(
+                        string.Format(ConsumerTemplate, rate.PromptRate, completionRatio),
+                        model,
+                        requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
+                        channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                        request.Stream is true,
+                        (int)sw.ElapsedMilliseconds, organizationId);
 
-                await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
-                    model);
+                    await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
+                        model);
+                }
+                else
+                {
+                    // 费用
+                    await loggerService.CreateConsumeAsync(
+                        string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate)),
+                        model,
+                        requestToken, responseToken, (int)rate.PromptRate, token?.Key, user?.UserName, user?.Id,
+                        channel.Id,
+                        channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                        request.Stream is true,
+                        (int)sw.ElapsedMilliseconds, organizationId);
+
+                    await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key,
+                        channel.Id,
+                        model);
+                }
             }
 
             else
@@ -476,6 +537,7 @@ public sealed class ChatService(
         }
         catch (ThorRateLimitException)
         {
+            logger.LogWarning("对话模型请求限流：{rateLimit}", rateLimit);
             rateLimit++;
             // TODO：限流重试次数
             if (rateLimit > 3)
@@ -486,6 +548,15 @@ public sealed class ChatService(
             {
                 goto limitGoto;
             }
+        }
+        catch (InsufficientQuotaException insufficientQuotaException)
+        {
+            if (context.Response.StatusCode != 402)
+            {
+                context.Response.StatusCode = 402;
+            }
+
+            await context.WriteErrorAsync(insufficientQuotaException.Message, "402");
         }
         catch (RateLimitException)
         {
@@ -503,12 +574,21 @@ public sealed class ChatService(
             // else
             await context.WriteErrorAsync(error.Message, error.Code);
         }
+        catch (NotModelException modelException)
+        {
+            context.Response.StatusCode = 400;
+            // if (request.Stream == true)
+            //     await context.WriteStreamErrorAsync(error.Message, error.Code);
+            // else
+            await context.WriteErrorAsync(modelException.Message, "400");
+        }
         catch (Exception e)
         {
             logger.LogError("对话模型请求异常：{e}", e);
             // if (request.Stream == true)
             //     await context.WriteStreamErrorAsync(e.Message);
             // else
+            context.Response.StatusCode = 400;
             await context.WriteErrorAsync(e.Message, "500");
         }
     }
@@ -517,6 +597,12 @@ public sealed class ChatService(
     {
         try
         {
+            var organizationId = string.Empty;
+            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
+            {
+                organizationId = organizationIdHeader.ToString();
+            }
+
             var model = context.Request.Query["model"].ToString();
 
             using var chatCompletions =
@@ -526,9 +612,6 @@ public sealed class ChatService(
 
             await rateLimitModelService.CheckAsync(model, context);
 
-            var (token, user) = await tokenService.CheckTokenAsync(context);
-
-            TokenService.CheckModel(model, token, context);
 
             // 获取渠道通过算法计算权重
             var channel = CalculateWeight(await channelService.GetChannelsContainsModelAsync(model), model);
@@ -538,8 +621,6 @@ public sealed class ChatService(
                 throw new NotModelException(model);
             }
 
-            // 记录请求模型 / 请求用户
-            logger.LogInformation("请求模型：{model} 请求用户：{user}", model, user?.UserName);
 
             // 获取渠道指定的实现类型的服务
             var realtimeService = GetKeyedService<IThorRealtimeService>(channel.Type);
@@ -551,6 +632,12 @@ public sealed class ChatService(
 
             if (ModelManagerService.PromptRate.TryGetValue(model, out var rate))
             {
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+
+                TokenService.CheckModel(model, token, context);
+                // 记录请求模型 / 请求用户
+                logger.LogInformation("请求模型：{model} 请求用户：{user}", model, user?.UserName);
+
                 decimal requestToken = 0;
                 decimal audioRequestToken = 0;
                 decimal responseToken = 0;
@@ -659,13 +746,14 @@ public sealed class ChatService(
                         return;
                     }
 
-                    var quota = requestToken * rate;
+                    var quota = requestToken * rate.PromptRate;
 
                     var completionRatio = GetCompletionRatio(model);
-                    quota += responseToken * rate * completionRatio;
+                    quota += responseToken * rate.PromptRate * completionRatio;
 
-                    var audioQuota = audioRequestToken * ModelManagerService.AudioPromptRate[model];
-                    var audioCompletionRatio = audioResponseTokens * ModelManagerService.AudioPromptRate[model];
+                    var audioQuota = audioRequestToken * (ModelManagerService.PromptRate[model].AudioPromptRate ?? 0);
+                    var audioCompletionRatio = audioResponseTokens *
+                                               (ModelManagerService.PromptRate[model].AudioOutputRate ?? 0);
 
                     quota += audioQuota;
                     quota += audioCompletionRatio;
@@ -677,15 +765,16 @@ public sealed class ChatService(
 
                     await loggerService.CreateConsumeAsync(
                         string.Format(RealtimeConsumerTemplate, rate, completionRatio,
-                            ModelManagerService.AudioPromptRate[model], ModelManagerService.AudioPromptRate[model]),
+                            (ModelManagerService.PromptRate[model].AudioPromptRate),
+                            ModelManagerService.PromptRate[model].AudioOutputRate),
                         model,
                         (int)requestToken + (int)audioRequestToken, (int)responseToken + (int)audioResponseTokens,
-                        (int)quota, token?.Name,
+                        (int)quota, token?.Key,
                         user?.UserName, user?.Id,
                         channel.Id,
                         channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                         true,
-                        (int)sw.ElapsedMilliseconds);
+                        (int)sw.ElapsedMilliseconds, organizationId);
 
                     await userService.ConsumeAsync(user!.Id, (long)quota, (int)requestToken, token?.Key, channel.Id,
                         model);
@@ -734,6 +823,7 @@ public sealed class ChatService(
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
+
         // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
         if (request.Messages.Any(x => x.Contents != null))
         {
@@ -767,6 +857,7 @@ public sealed class ChatService(
                 }
             }
 
+
             var quota = requestToken * rate;
 
             // 判断请求token数量是否超过额度
@@ -776,13 +867,36 @@ public sealed class ChatService(
 
             ThorChatCompletionsResponse result = null;
 
-            await circuitBreaker.ExecuteAsync(
+            var err = await circuitBreaker.ExecuteAsync(
                 async () => { result = await openService.ChatCompletionsAsync(request, platformOptions); }, 3);
+
+            if (err is ThorRateLimitException)
+            {
+                throw new ThorRateLimitException();
+            }
+
+            if (err is UnauthorizedAccessException)
+            {
+                throw new UnauthorizedAccessException("未授权");
+            }
 
             await context.Response.WriteAsJsonAsync(result);
 
-            responseToken =
-                TokenHelper.GetTotalTokens(result?.Choices?.Select(x => x.Delta?.Content).ToArray());
+            if (result?.Usage?.PromptTokens is not null && result.Usage.PromptTokens > 0)
+            {
+                requestToken = result.Usage.PromptTokens.Value;
+            }
+
+            // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
+            if (result?.Usage?.CompletionTokens is not null && result.Usage.CompletionTokens > 0)
+            {
+                responseToken = result.Usage.CompletionTokens.Value;
+            }
+            else
+            {
+                responseToken =
+                    TokenHelper.GetTotalTokens(result?.Choices?.Select(x => x.Delta?.Content).ToArray());
+            }
         }
         else
         {
@@ -798,12 +912,40 @@ public sealed class ChatService(
 
             ThorChatCompletionsResponse result = null;
 
-            await circuitBreaker.ExecuteAsync(
+            var err = await circuitBreaker.ExecuteAsync(
                 async () => { result = await openService.ChatCompletionsAsync(request, platformOptions); }, 3);
+
+            if (err is ThorRateLimitException)
+            {
+                throw new ThorRateLimitException();
+            }
+
+            if (err is UnauthorizedAccessException)
+            {
+                throw new UnauthorizedAccessException("未授权");
+            }
 
             await context.Response.WriteAsJsonAsync(result);
 
             responseToken = TokenHelper.GetTokens(result.Choices.FirstOrDefault()?.Delta.Content ?? string.Empty);
+        }
+
+        if (request.ResponseFormat?.JsonSchema is not null)
+        {
+            requestToken += TokenHelper.GetTotalTokens(request.ResponseFormat.JsonSchema.Name,
+                request.ResponseFormat.JsonSchema.Description ?? string.Empty,
+                JsonSerializer.Serialize(request.ResponseFormat.JsonSchema.Schema));
+        }
+
+        if (request.Tools != null && request.Tools.Count != 0)
+        {
+            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x.Function?.Name))
+                .Select(x => x.Function!.Name).ToArray());
+            requestToken += TokenHelper.GetTotalTokens(request.Tools
+                .Where(x => !string.IsNullOrEmpty(x.Function?.Description))
+                .Select(x => x.Function!.Description!).ToArray());
+            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x.Function?.Type))
+                .Select(x => x.Function!.Type!).ToArray());
         }
 
         return (requestToken, responseToken);
@@ -834,8 +976,6 @@ public sealed class ChatService(
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
         var responseMessage = new StringBuilder();
-
-        context.SetEventStreamHeaders();
 
         if (input.Messages.Any(x => x.Contents != null))
         {
@@ -887,12 +1027,39 @@ public sealed class ChatService(
             if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
         }
 
+        if (input.ResponseFormat?.JsonSchema is not null)
+        {
+            requestToken += TokenHelper.GetTotalTokens(input.ResponseFormat.JsonSchema.Name,
+                input.ResponseFormat.JsonSchema.Description ?? string.Empty,
+                JsonSerializer.Serialize(input.ResponseFormat.JsonSchema.Schema));
+        }
+
+        if (input.Tools != null && input.Tools.Count != 0)
+        {
+            requestToken += TokenHelper.GetTotalTokens(input.Tools.Where(x => !string.IsNullOrEmpty(x.Function?.Name))
+                .Select(x => x.Function!.Name).ToArray());
+            requestToken += TokenHelper.GetTotalTokens(input.Tools
+                .Where(x => !string.IsNullOrEmpty(x.Function?.Description))
+                .Select(x => x.Function!.Description!).ToArray());
+            requestToken += TokenHelper.GetTotalTokens(input.Tools.Where(x => !string.IsNullOrEmpty(x.Function?.Type))
+                .Select(x => x.Function!.Type!).ToArray());
+        }
+
+        // 是否第一次输出
+        bool isFirst = true;
+
         var circuitBreaker = new CircuitBreaker(3, TimeSpan.FromSeconds(10));
-        await circuitBreaker.ExecuteAsync(
+        var err = await circuitBreaker.ExecuteAsync(
             async () =>
             {
                 await foreach (var item in openService.StreamChatCompletionsAsync(input, platformOptions))
                 {
+                    if (isFirst)
+                    {
+                        context.SetEventStreamHeaders();
+                        isFirst = false;
+                    }
+
                     if (item.Error != null)
                     {
                         await context.WriteStreamErrorAsync(item.Error.Message);
@@ -928,6 +1095,16 @@ public sealed class ChatService(
                     await context.WriteAsEventStreamDataAsync(item).ConfigureAwait(false);
                 }
             }, 3);
+
+        if (err is ThorRateLimitException)
+        {
+            throw new ThorRateLimitException();
+        }
+
+        if (err is UnauthorizedAccessException)
+        {
+            throw new UnauthorizedAccessException();
+        }
 
         await context.WriteAsEventStreamEndAsync();
 
@@ -974,7 +1151,8 @@ public sealed class ChatService(
     /// <returns></returns>
     private decimal GetCompletionRatio(string name)
     {
-        if (ModelManagerService.CompletionRate?.TryGetValue(name, out var ratio) == true) return ratio;
+        if (ModelManagerService.PromptRate?.TryGetValue(name, out var ratio) == true)
+            return (decimal)(ratio.CompletionRate ?? 0);
 
         if (name.StartsWith("gpt-3.5"))
         {

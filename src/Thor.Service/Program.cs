@@ -8,7 +8,7 @@ using Thor.Abstractions.Chats.Dtos;
 using Thor.Abstractions.Embeddings.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
 using Thor.AzureOpenAI.Extensions;
-using Thor.Claudia.Extensions;
+using Thor.Claude.Extensions;
 using Thor.Core.DataAccess;
 using Thor.Core.Extensions;
 using Thor.ErnieBot.Extensions;
@@ -19,6 +19,7 @@ using Thor.MetaGLM.Extensions;
 using Thor.Moonshot.Extensions;
 using Thor.Ollama.Extensions;
 using Thor.OpenAI.Extensions;
+using Thor.AWSClaude.Extensions;
 using Thor.Provider;
 using Thor.Qiansail.Extensions;
 using Thor.RabbitMQEvent;
@@ -105,6 +106,7 @@ try
         .AddMetaGLMService()
         .AddHunyuanService()
         .AddClaudiaService()
+        .AddAWSClaudeService()
         .AddOllamaService()
         .AddAzureOpenAIService()
         .AddErnieBotService()
@@ -128,7 +130,7 @@ try
     {
         AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
         AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
-        
+
         if (dbType.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase) ||
             dbType.Equals("pgsql", StringComparison.OrdinalIgnoreCase))
         {
@@ -158,8 +160,6 @@ try
 
     builder.AddServiceDefaults();
 
-    builder.Services.AddResponseCompression();
-
     builder.Services.AddWebSockets(options =>
     {
         options.AllowedOrigins.Add("*");
@@ -181,13 +181,20 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
+    app.UseStaticFiles();
+
     app.Use((async (context, next) =>
     {
         if (context.Request.Path == "/")
         {
             if (string.IsNullOrEmpty(ChatCoreOptions.Master))
             {
-                context.Request.Path = "/index.html";
+                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
+                if (File.Exists(path))
+                {
+                    await context.Response.SendFileAsync(path);
+                    return;
+                }
             }
             else
             {
@@ -199,27 +206,81 @@ try
         context.Response.Headers["AI-Gateway-Versions"] = "1.0.0.4";
         context.Response.Headers["AI-Gateway-Name"] = "Thor";
 
+        if (context.Request.Path.Value?.EndsWith(".js") == true)
+        {
+            var path = context.Request.Path.Value;
+
+            // 判断是否存在.br文件
+            var brPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".br");
+            if (File.Exists(brPath))
+            {
+                context.Response.Headers.Append("Content-Encoding", "br");
+                context.Response.Headers.Append("Content-Type", "application/javascript");
+
+                await context.Response.SendFileAsync(brPath);
+
+                return;
+            }
+
+            // 判断是否存在.gz文件
+            var gzPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".gz");
+            if (File.Exists(gzPath))
+            {
+                context.Response.Headers.Append("Content-Encoding", "gzip");
+                context.Response.Headers.Append("Content-Type", "application/javascript");
+                await context.Response.SendFileAsync(gzPath);
+                return;
+            }
+        }
+        else if (context.Request.Path.Value?.EndsWith(".css") == true)
+        {
+            // 判断是否存在.br文件
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
+                context.Request.Path.Value.TrimStart('/'));
+            if (File.Exists(path))
+            {
+                context.Response.Headers.Append("Content-Type", "text/css");
+                await context.Response.SendFileAsync(path);
+                return;
+            }
+        }
+
         await next(context);
 
         if (context.Response.StatusCode == 404)
         {
             if (string.IsNullOrEmpty(ChatCoreOptions.Master))
             {
-                context.Request.Path = "/index.html";
+                // 判断是否存在文件
+                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
+                    context.Request.Path.Value.TrimStart('/'));
+
+                if (File.Exists(path))
+                {
+                    context.Response.StatusCode = 200;
+                    context.Response.Headers.Append("Content-Type",
+                        HttpContextExtensions.GetContentType(Path.GetExtension(path)));
+                    await context.Response.SendFileAsync(path);
+                    return;
+                }
+
+                // 返回index.html
+                path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
+
+                if (File.Exists(path))
+                {
+                    context.Response.StatusCode = 200;
+                    await context.Response.SendFileAsync(path);
+                    return;
+                }
             }
             else
             {
                 context.Response.Redirect(ChatCoreOptions.Master);
                 return;
             }
-
-            await next(context);
         }
     }));
-
-    app.UseResponseCompression();
-
-    app.UseStaticFiles();
 
     app.UseOpenTelemetry();
 
@@ -235,7 +296,6 @@ try
 
     app.MapPost("/api/v1/authorize/token", async (AuthorizeService service, [FromBody] LoginInput input) =>
         await service.TokenAsync(input))
-        .WithGroupName("Token")
         .AddEndpointFilter<ResultFilter>()
         .WithDescription("Get token")
         .WithTags("Authorize")
@@ -243,7 +303,6 @@ try
 
     app.MapPost("/api/v1/authorize/github", async (AuthorizeService service, string code) =>
             await service.GithubAsync(code))
-        .WithGroupName("Token")
         .AddEndpointFilter<ResultFilter>()
         .WithDescription("Github login")
         .WithTags("Authorize")
@@ -251,9 +310,15 @@ try
 
     app.MapPost("/api/v1/authorize/gitee", async (AuthorizeService service, string code, string redirectUri) =>
             await service.GiteeAsync(code, redirectUri))
-        .WithGroupName("Token")
         .AddEndpointFilter<ResultFilter>()
         .WithDescription("Github login")
+        .WithTags("Authorize")
+        .WithOpenApi();
+
+    app.MapPost("/api/v1/authorize/casdoor", async (AuthorizeService service, string code) =>
+            await service.CasdoorAsync(code))
+        .AddEndpointFilter<ResultFilter>()
+        .WithDescription("Casdoor login")
         .WithTags("Authorize")
         .WithOpenApi();
 
@@ -368,8 +433,8 @@ try
     log.MapGet(string.Empty,
             async (LoggerService service, int page, int pageSize, ThorChatLoggerType? type, string? model,
                     DateTime? startTime,
-                    DateTime? endTime, string? keyword) =>
-                await service.GetAsync(page, pageSize, type, model, startTime, endTime, keyword))
+                    DateTime? endTime, string? keyword, string? organizationId) =>
+                await service.GetAsync(page, pageSize, type, model, startTime, endTime, keyword, organizationId))
         .WithDescription("获取日志")
         .WithDisplayName("获取日志")
         .WithOpenApi();
@@ -663,7 +728,6 @@ try
 
     app.MapGet("/v1/models", async (HttpContext context) => { return await ModelService.GetAsync(context); })
         .WithDescription("获取模型列表")
-        .RequireAuthorization()
         .WithOpenApi();
 
     app.Map("/v1/realtime", (applicationBuilder =>

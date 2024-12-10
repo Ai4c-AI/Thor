@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 using Thor.Service.Options;
 
@@ -23,7 +25,7 @@ public sealed class TokenService(
 
         token.Id = Guid.NewGuid().ToString("N");
 
-        token.Key = "sk-" + StringHelper.GenerateRandomString(38);
+        token.Key = "sk-" + StringHelper.GenerateRandomString(50);
 
         await DbContext.Tokens.AddAsync(token);
     }
@@ -90,7 +92,7 @@ public sealed class TokenService(
     {
         if (token == null) return;
 
-        if (token.LimitModels.Count > 0 && !token.LimitModels.Contains(model))
+        if (token.LimitModels.Count(x => !string.IsNullOrEmpty(x)) > 0 && !token.LimitModels.Contains(model))
         {
             throw new Exception("当前 Token 无权访问该模型");
         }
@@ -110,22 +112,25 @@ public sealed class TokenService(
     ///     检验账号额度是否足够
     /// </summary>
     /// <param name="context"></param>
+    /// <param name="value"></param>
     /// <returns></returns>
     /// <exception cref="UnauthorizedAccessException"></exception>
     /// <exception cref="InsufficientQuotaException"></exception>
-    public async ValueTask<(Token?, User)> CheckTokenAsync(HttpContext context)
+    public async ValueTask<(Token?, User)> CheckTokenAsync(HttpContext context, ModelManager value)
     {
         var key = context.Request.Headers.Authorization.ToString().Replace("Bearer ", "").Trim();
 
         if (string.IsNullOrEmpty(key))
         {
-            var protocol = context.Request.Headers.SecWebSocketProtocol.ToString().Split(",").Select(x=>x.Trim());
-            
-            var apiKey = protocol.FirstOrDefault(x => x.StartsWith("openai-insecure-api-key.", StringComparison.OrdinalIgnoreCase))?.Replace("openai-insecure-api-key.","");
-            if(!string.IsNullOrEmpty(apiKey))
+            var protocol = context.Request.Headers.SecWebSocketProtocol.ToString().Split(",").Select(x => x.Trim());
+
+            var apiKey = protocol
+                .FirstOrDefault(x => x.StartsWith("openai-insecure-api-key.", StringComparison.OrdinalIgnoreCase))
+                ?.Replace("openai-insecure-api-key.", "");
+            if (!string.IsNullOrEmpty(apiKey))
                 key = apiKey;
         }
-        
+
         var requestQuota = SettingService.GetIntSetting(SettingExtensions.GeneralSetting.RequestQuota);
 
         if (requestQuota <= 0) requestQuota = 5000;
@@ -145,7 +150,7 @@ public sealed class TokenService(
                     throw new UnauthorizedAccessException();
                 }
 
-                user = await userService.GetAsync(userDto.Id, false).ConfigureAwait(false);
+                user = await userService.GetAsync(userDto.Id).ConfigureAwait(false);
                 token = null;
             }
             catch (Exception e)
@@ -182,7 +187,7 @@ public sealed class TokenService(
                 throw new InsufficientQuotaException("当前 Token 额度不足，请充值 Token 额度");
             }
 
-            user = await userService.GetAsync(token.Creator, false).ConfigureAwait(false);
+            user = await userService.GetAsync(token.Creator).ConfigureAwait(false);
         }
 
         if (user == null)
@@ -199,9 +204,10 @@ public sealed class TokenService(
             throw new UnauthorizedAccessException("账号已禁用");
         }
 
-        // 判断额度是否足够
-        if (user.ResidualCredit >= requestQuota)
+        if ((value.QuotaType == ModelQuotaType.ByCount && user.ResidualCredit >= value.PromptRate) || user.ResidualCredit >= requestQuota)
+        {
             return (token, user);
+        }
 
         logger.LogWarning("用户额度不足");
         context.Response.StatusCode = 402;
@@ -217,6 +223,8 @@ public sealed class TokenService(
         if (ChatCoreOptions.ModelMapping?.Enable == true &&
             ChatCoreOptions.ModelMapping.Models.TryGetValue(model, out var models) && models.Length > 0)
         {
+            using var modelMap =
+                Activity.Current?.Source.StartActivity("模型映射转换");
             // 随机字符串
             // 所有权重值之和
             var total = models.Sum(x => x.Order);
@@ -228,11 +236,14 @@ public sealed class TokenService(
                 value -= chatChannel.Order;
                 if (value <= 0)
                 {
+                    modelMap?.SetTag("Model", chatChannel.Model);
                     return chatChannel.Model;
                 }
             }
 
-            return models.Last().Model;
+            modelMap?.SetTag("Model", models.LastOrDefault()?.Model ?? model);
+
+            return models.LastOrDefault()?.Model ?? model;
         }
 
         return model;

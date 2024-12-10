@@ -21,9 +21,67 @@ public static class StatisticsService
 
         #region 统计数据
 
-        // 获取七天的日期范围
-        var today = DateTime.Now.Date;
         var sevenDaysAgo = DateTime.Now.Date.AddDays(-7);
+
+        if (userContext.IsAdmin)
+        {
+            var result = await dbContext.Loggers.Where(x =>
+                    (x.Type == ThorChatLoggerType.CreateUser || x.Type == ThorChatLoggerType.Recharge) &&
+                    x.CreatedAt > sevenDaysAgo)
+                .ToListAsync();
+
+            var user = result.Where(x => x.Type == ThorChatLoggerType.CreateUser)
+                .GroupBy(x => x.CreatedAt.ToString("yyyy-MM-dd"))
+                .Select(x => new StatisticsNumberDto
+                {
+                    Name = x.Key,
+                    Value = x.Count()
+                });
+            var recharge = result.Where(x => x.Type == ThorChatLoggerType.Recharge)
+                .GroupBy(x => x.CreatedAt.ToString("yyyy-MM-dd"))
+                .Select(x => new StatisticsNumberDto
+                {
+                    Name = x.Key,
+                    Value = x.Sum(x => x.Quota)
+                });
+
+            statisticsDto.UserNewData = new List<StatisticsNumberDto>();
+            statisticsDto.RechargeData = new List<StatisticsNumberDto>();
+
+            foreach (var dateTime in Enumerable.Range(0, 7).Select(days => DateTime.Now.Date.AddDays(-days))
+                         .Order()
+                         .ToList())
+            {
+                var item = user.FirstOrDefault(x => x.Name == dateTime.ToString("yyyy-MM-dd"));
+                var rechargeItem = recharge.FirstOrDefault(x => x.Name == dateTime.ToString("yyyy-MM-dd"));
+                if (item == null)
+                {
+                    statisticsDto.UserNewData.Add(new StatisticsNumberDto()
+                    {
+                        Name = dateTime.ToString("yyyy-MM-dd"),
+                        Value = 0
+                    });
+                }
+                else
+                {
+                    statisticsDto.UserNewData.Add(item);
+                }
+
+                if (rechargeItem == null)
+                {
+                    statisticsDto.RechargeData.Add(new StatisticsNumberDto()
+                    {
+                        Name = dateTime.ToString("yyyy-MM-dd"),
+                        Value = 0
+                    });
+                }
+                else
+                {
+                    statisticsDto.RechargeData.Add(rechargeItem);
+                }
+            }
+        }
+
 
         var userQuery = dbContext.StatisticsConsumesNumbers
             .Where(log => log.CreatedAt >= sevenDaysAgo);
@@ -192,6 +250,10 @@ public static class StatisticsService
 
         #endregion
 
+        statisticsDto.Consumes = statisticsDto.Consumes.OrderBy(x => x.DateTime)
+            .ThenByDescending(x => x.Value)
+            .ToList();
+
         // 消费总额
         statisticsDto.CurrentConsumedCredit = await dbContext.StatisticsConsumesNumbers
             .Where(x => userContext.IsAdmin || (x.Creator == userContext.CurrentUserId &&
@@ -217,5 +279,4 @@ public static class StatisticsService
 
         return statisticsDto;
     }
-
 }

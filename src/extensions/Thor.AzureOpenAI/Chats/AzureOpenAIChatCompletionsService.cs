@@ -1,7 +1,8 @@
-﻿using System.Net;
+﻿using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Thor.Abstractions;
 using Thor.Abstractions.Chats;
 using Thor.Abstractions.Chats.Dtos;
@@ -17,15 +18,18 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        using var openai =
+            Activity.Current?.Source.StartActivity("Azure OpenAI 对话补全");
         var url = AzureOpenAIFactory.GetAddress(options, chatCompletionCreate.Model);
-
-        chatCompletionCreate.Model = null;
 
         var response =
             await HttpClientFactory.HttpClient.PostJsonAsync(url, chatCompletionCreate, options.ApiKey, "Api-Key");
 
+        openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/chat/completions");
+        openai?.SetTag("Model", chatCompletionCreate.Model);
+        openai?.SetTag("Response", response.StatusCode.ToString());
         // 如果限流则抛出限流异常
-        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
         {
             throw new ThorRateLimitException();
         }
@@ -48,15 +52,16 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
         ThorChatCompletionsRequest chatCompletionCreate, ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        using var openai =
+            Activity.Current?.Source.StartActivity("Azure OpenAI 对话流式补全");
         var url = AzureOpenAIFactory.GetAddress(options, chatCompletionCreate.Model);
-
-        chatCompletionCreate.Model = null;
 
         var response = await HttpClientFactory.HttpClient.HttpRequestRaw(url,
             chatCompletionCreate, options.ApiKey, "Api-Key");
 
-        using var stream = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken));
-
+        openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/chat/completions");
+        openai?.SetTag("Model", chatCompletionCreate.Model);
+        openai?.SetTag("Response", response.StatusCode.ToString());
 
         if (response.StatusCode >= HttpStatusCode.BadRequest)
         {

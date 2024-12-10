@@ -17,7 +17,7 @@ namespace Thor.Provider.SqlServer.Logger
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.10")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -57,6 +57,9 @@ namespace Thor.Provider.SqlServer.Logger
                     b.Property<string>("Modifier")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("OrganizationId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<int>("PromptTokens")
                         .HasColumnType("int");
 
@@ -92,6 +95,8 @@ namespace Thor.Provider.SqlServer.Logger
                     b.HasIndex("Creator");
 
                     b.HasIndex("ModelName");
+
+                    b.HasIndex("OrganizationId");
 
                     b.HasIndex("TokenName");
 
