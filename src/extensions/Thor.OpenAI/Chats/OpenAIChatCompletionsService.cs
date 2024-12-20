@@ -2,7 +2,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Thor.Abstractions;
@@ -22,7 +21,7 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         using var openai =
             Activity.Current?.Source.StartActivity("OpenAI 对话补全");
         
-        var response = await HttpClientFactory.HttpClient.PostJsonAsync(
+        var response = await HttpClientFactory.GetHttpClient(options.Address).PostJsonAsync(
             options?.Address.TrimEnd('/') + "/v1/chat/completions",
             chatCompletionCreate, options.ApiKey).ConfigureAwait(false);
 
@@ -36,7 +35,7 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         }
 
         // 如果限流则抛出限流异常
-        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
         {
             throw new ThorRateLimitException();
         }
@@ -63,7 +62,7 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         using var openai =
             Activity.Current?.Source.StartActivity("OpenAI 对话流式补全");
         
-        var response = await HttpClientFactory.HttpClient.HttpRequestRaw(
+        var response = await HttpClientFactory.GetHttpClient(options.Address).HttpRequestRaw(
             options?.Address.TrimEnd('/') + "/v1/chat/completions",
             chatCompletionCreate, options.ApiKey);
         
@@ -82,7 +81,7 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         }
 
         // 如果限流则抛出限流异常
-        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
         {
             throw new ThorRateLimitException();
         }
