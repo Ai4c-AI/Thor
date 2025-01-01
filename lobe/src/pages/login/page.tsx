@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState ,useEffect} from 'react';
 import { message, Input, Button } from 'antd';
 import { EyeInvisibleOutlined, EyeTwoTone, GithubOutlined, } from '@ant-design/icons';
 import { GridShowcase, Tooltip } from '@lobehub/ui';
@@ -48,6 +48,14 @@ const Login = memo(() => {
         handleAuthRedirect(`https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${location.origin}/auth&response_type=code`);
     };
 
+    useEffect(() => {
+        localStorage.removeItem('redirect_uri');
+        if (redirect_uri) {
+            const url = new URL(redirect_uri);
+            localStorage.setItem('redirect_uri', url.toString());
+        }
+    }, [redirect_uri]);
+    
     const handleLogin = async () => {
         try {
             setLoading(true);
@@ -56,7 +64,7 @@ const Login = memo(() => {
                 localStorage.setItem('token', token.data.token);
                 localStorage.setItem('role', token.data.role);
                 message.success({ title: '登录成功', content: '即将跳转到首页' } as any);
-                if (redirect_uri && redirect_uri.startsWith('http')) {
+                if (redirect_uri) {
                     const url = new URL(redirect_uri);
                     url.searchParams.append('token', token.data.token);
                     handleAuthRedirect(url.toString());

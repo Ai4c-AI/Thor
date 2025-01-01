@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Text;
 
 namespace Thor.Abstractions;
 
@@ -49,15 +50,17 @@ public static class HttpClientFactory
             {
                 clients.Add(new HttpClient(new SocketsHttpHandler
                 {
-                    PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-                    PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(30),
+                    PooledConnectionIdleTimeout = TimeSpan.FromMinutes(30),
                     EnableMultipleHttp2Connections = true,
-                    ConnectTimeout = TimeSpan.FromMinutes(10),
-                    KeepAlivePingTimeout = TimeSpan.FromMinutes(10),
-                    ResponseDrainTimeout = TimeSpan.FromMinutes(10),
+                    ConnectTimeout = TimeSpan.FromMinutes(30),
+                    KeepAlivePingTimeout = TimeSpan.FromMinutes(30),
+                    ResponseDrainTimeout = TimeSpan.FromMinutes(30),
+                    MaxAutomaticRedirections = 2,
+                    Expect100ContinueTimeout = TimeSpan.FromMinutes(30),
                 })
                 {
-                    Timeout = TimeSpan.FromMinutes(10),
+                    Timeout = TimeSpan.FromMinutes(30),
                     DefaultRequestHeaders =
                     {
                         { "User-Agent", "Thor" },
