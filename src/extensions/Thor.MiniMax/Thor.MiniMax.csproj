@@ -7,11 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Thor.Core\Thor.Core.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.1" />
+      <ProjectReference Include="..\..\Thor.Abstractions\Thor.Abstractions.csproj" />
     </ItemGroup>
 
 </Project>
