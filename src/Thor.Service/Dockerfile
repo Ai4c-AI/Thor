@@ -6,7 +6,7 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-FROM node as lobe
+FROM node:20.18-alpine3.21 as lobe
 WORKDIR /src
 COPY lobe .
 RUN yarn
