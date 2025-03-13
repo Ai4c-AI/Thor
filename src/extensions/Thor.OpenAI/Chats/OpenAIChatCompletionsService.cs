@@ -45,7 +45,8 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         if (response.StatusCode >= HttpStatusCode.BadRequest)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            logger.LogError("OpenAI对话异常 , StatusCode: {StatusCode} Response: {Response}", response.StatusCode, error);
+            logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}", options.Address,
+                response.StatusCode, error);
 
             throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
         }
@@ -91,7 +92,8 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         // 大于等于400的状态码都认为是异常
         if (response.StatusCode >= HttpStatusCode.BadRequest)
         {
-            logger.LogError("OpenAI对话异常 , StatusCode: {StatusCode} ", response.StatusCode);
+            logger.LogError("OpenAI对话异常 , StatusCode: {StatusCode} 错误响应内容：{Content}", response.StatusCode,
+                await response.Content.ReadAsStringAsync(cancellationToken));
 
             throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
         }
@@ -100,6 +102,8 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
 
         using StreamReader reader = new(await response.Content.ReadAsStreamAsync(cancellationToken));
         string? line = string.Empty;
+        var first = true;
+        var isThink = false;
         while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
         {
             line += Environment.NewLine;
@@ -110,34 +114,62 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
                     line);
 
                 throw new BusinessException("OpenAI对话异常", line);
-
-                // 如果是json数据则直接返回
-                // yield return JsonSerializer.Deserialize<ThorChatCompletionsResponse>(line,
-                //     ThorJsonSerializer.DefaultOptions);
-
-                break;
             }
 
-            if (line.StartsWith("data:"))
-                line = line["data:".Length..];
+            if (line.StartsWith(OpenAIConstant.Data))
+                line = line[OpenAIConstant.Data.Length..];
 
             line = line.Trim();
 
-            if (line == "[DONE]")
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            if (line == OpenAIConstant.Done)
             {
                 break;
             }
 
-            if (line.StartsWith(":"))
+            if (line.StartsWith(':'))
             {
                 continue;
             }
 
 
-            if (string.IsNullOrWhiteSpace(line)) continue;
-
             var result = JsonSerializer.Deserialize<ThorChatCompletionsResponse>(line,
                 ThorJsonSerializer.DefaultOptions);
+
+            var content = result?.Choices?.FirstOrDefault()?.Delta;
+
+            if (first && string.IsNullOrWhiteSpace(content?.Content) && string.IsNullOrEmpty(content?.ReasoningContent))
+            {
+                continue;
+            }
+
+            if (first && content.Content == OpenAIConstant.ThinkStart)
+            {
+                isThink = true;
+                continue;
+                // 需要将content的内容转换到其他字段
+            }
+
+            if (isThink && content.Content.Contains(OpenAIConstant.ThinkEnd))
+            {
+                isThink = false;
+                // 需要将content的内容转换到其他字段
+                continue;
+            }
+
+            if (isThink)
+            {
+                // 需要将content的内容转换到其他字段
+                foreach (var choice in result.Choices)
+                {
+                    choice.Delta.ReasoningContent = choice.Delta.Content;
+                    choice.Delta.Content = string.Empty;
+                }
+            }
+
+            first = false;
+
             yield return result;
         }
     }

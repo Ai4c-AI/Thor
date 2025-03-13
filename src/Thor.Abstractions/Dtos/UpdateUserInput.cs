@@ -2,11 +2,12 @@
 
 public class UpdateUserInput
 {
+    public string Id { get; set ;}
+
     public string Email { get; set; } = null!;
 
     /// <summary>
-    /// 头像
+    /// Groups
     /// </summary>
-    public string? Avatar { get; set; }
-    
+    public string[] Groups { get; set; } = [];
 }

@@ -95,13 +95,17 @@ Thor(雷神托尔)还支持多种数据库，包括SqlServer、PostgreSql、Sqli
 - [x] 星火大模型（支持function）
 - [x] Claudia （支持function）
 - [x] 智谱AI (支持function)
-- [x] AzureOpenAI（支持function）
+- [x] 微软Azure（支持function）
 - [x] Ollama（支持function）
 - [x] 通义千问（阿里云）（支持function）
 - [x] 腾讯混元大模型
 - [x] 支持百度大模型(ErnieBot)
-- [x] Gitee AI
+- [x] Gitee AI (支持function)
 - [x] MiniMax AI（支持function）
+- [x] SiliconFlow AI（支持function）
+- [x] DeepSeek AI（支持function）
+- [x] 火山引擎 （支持function） 
+- [x] 亚马逊 （支持function） 
 
 # 支持数据库
 
@@ -130,6 +134,8 @@ admin admin
 
 ### 注意事项
 需要注意的是，如果克隆项目后，项目根目录缺少`data`时，需要手动创建，`docker compose up` 时，需要挂载本地目录`data`。
+
+### **国内用户请切换registry.cn-shenzhen.aliyuncs.com/tokengo/thor镜像**
 
 ### 环境变量
 

@@ -13,7 +13,7 @@ using Thor.OpenAI.Embeddings;
 using Thor.OpenAI.Images;
 using Thor.OpenAI.Realtime;
 
-namespace Thor.OpenAI.Extensions;
+namespace Thor.DeepSeek.Extensions;
 
 public static class OpenAIServiceCollectionExtensions
 {
@@ -71,7 +71,7 @@ public static class OpenAIServiceCollectionExtensions
         services.AddHttpClient(OpenAIPlatformOptions.PlatformCode,
                 options =>
                 {
-                    options.Timeout = TimeSpan.FromMinutes(6);
+                    options.Timeout = TimeSpan.FromMinutes(10);
 
                     options.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Mozilla", "5.0"));
                 })

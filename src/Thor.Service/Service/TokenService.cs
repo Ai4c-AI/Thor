@@ -1,8 +1,6 @@
-﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
-using Thor.Service.Options;
 
 namespace Thor.Service.Service;
 
@@ -13,7 +11,7 @@ public sealed class TokenService(
     ILogger<TokenService> logger)
     : ApplicationService(serviceProvider), IScopeDependency
 {
-    public async ValueTask CreateAsync(TokenInput input, string? createId = null)
+    public async ValueTask<string> CreateAsync(TokenInput input, string? createId = null)
     {
         if (input.ExpiredTime < DateTime.Now) throw new Exception("过期时间不能小于当前时间");
 
@@ -28,6 +26,8 @@ public sealed class TokenService(
         token.Key = "sk-" + StringHelper.GenerateRandomString(38);
 
         await DbContext.Tokens.AddAsync(token);
+
+        return token.Key;
     }
 
     public async Task<Token?> GetAsync(long id)
@@ -225,40 +225,5 @@ public sealed class TokenService(
         logger.LogWarning("用户额度不足");
         context.Response.StatusCode = 402;
         throw new InsufficientQuotaException("额度不足");
-    }
-
-    /// <summary>
-    /// 模型转换映射
-    /// </summary>
-    /// <returns></returns>
-    public static string ModelMap(string model)
-    {
-        if (ChatCoreOptions.ModelMapping?.Enable == true &&
-            ChatCoreOptions.ModelMapping.Models.TryGetValue(model, out var models) && models.Length > 0)
-        {
-            using var modelMap =
-                Activity.Current?.Source.StartActivity("模型映射转换");
-            // 随机字符串
-            // 所有权重值之和
-            var total = models.Sum(x => x.Order);
-
-            var value = Convert.ToInt32(Random.Shared.NextDouble() * total);
-
-            foreach (var chatChannel in models)
-            {
-                value -= chatChannel.Order;
-                if (value <= 0)
-                {
-                    modelMap?.SetTag("Model", chatChannel.Model);
-                    return chatChannel.Model;
-                }
-            }
-
-            modelMap?.SetTag("Model", models.LastOrDefault()?.Model ?? model);
-
-            return models.LastOrDefault()?.Model ?? model;
-        }
-
-        return model;
     }
 }

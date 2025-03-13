@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getModels, getTypes } from "../../../services/ModelService";
 import { Add } from "../../../services/ChannelService";
-import { message, Drawer } from "antd";
+import { message, Drawer, Checkbox } from "antd";
 import { Button, Select, Form, Input } from "antd";
 import { getModelPrompt } from "../../../utils/render";
 
@@ -27,6 +27,8 @@ export default function CreateChannel({
     other: "",
     key: "",
     models: [],
+    groups: [],
+    cache: false
   });
 
   type FieldType = {
@@ -36,6 +38,8 @@ export default function CreateChannel({
     other?: string;
     key?: string;
     models: string[];
+    groups: string[];
+    cache?: boolean;
   };
 
   function loading() {
@@ -67,6 +71,12 @@ export default function CreateChannel({
   }, [visible]);
 
   function handleSubmit(values: any) {
+    if (input.type === "Claude" && input.cache) {
+      values.other = "true";
+    } else if (input.type === "Claude" && !input.cache) {
+      values.other = "false";
+    }
+
     // 判断是否选择了模型
     if (!values.models || values.models.length === 0) {
       message.error({
@@ -230,6 +240,39 @@ export default function CreateChannel({
             </Select>
           </Form.Item>
         )}
+        {input.type === "Claude" && (
+          <Form.Item<FieldType>
+            name="cache"
+            label="是否启用缓存"
+          >
+            <Checkbox
+              checked={input.cache}
+              onChange={(v) => {
+                setInput({ ...input, cache: v.target.checked });
+              }}
+            >
+            </Checkbox>
+          </Form.Item>
+        )}
+        {input.type === "ErnieBot" && (
+          <Form.Item<FieldType>
+            name="other"
+            label="AppId"
+            rules={[
+              {
+                required: true,
+                message: "AppId不能为空",
+              },
+            ]}
+          >
+            <Input
+              value={input.other}
+              onChange={(v) => {
+                setInput({ ...input, other: v.target.value });
+              }}
+              placeholder="请输入AppId"
+            />
+          </Form.Item>)}
         <Form.Item<FieldType> label="密钥" name="key">
           <Input.Password
             placeholder={getModelPrompt(input.type)}
@@ -237,6 +280,31 @@ export default function CreateChannel({
           />
         </Form.Item>
         <Form.Item<FieldType>
+          name="groups"
+          label="组"
+          style={{ width: "100%" }}
+        >
+          <Select
+            placeholder="请选择组"
+            mode="tags"
+            // 提供默认的选项
+            options={[
+              {
+                label: "default",
+                value: "default"
+              },
+              {
+                label: "vip",
+                value: "vip"
+              }
+            ]}
+            value={input.groups}
+            onChange={(v) => {
+              setInput({ ...input, groups: v });
+            }}
+          />
+        </Form.Item>
+        <Form.Item
           name="models"
           label="模型"
           rules={[

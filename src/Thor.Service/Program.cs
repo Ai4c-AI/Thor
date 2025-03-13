@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebSockets;
 using Serilog;
 using Thor.Abstractions.Chats.Dtos;
+using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Embeddings.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
 using Thor.AzureOpenAI.Extensions;
@@ -18,7 +19,7 @@ using Thor.LocalMemory.Cache;
 using Thor.MetaGLM.Extensions;
 using Thor.Moonshot.Extensions;
 using Thor.Ollama.Extensions;
-using Thor.OpenAI.Extensions;
+using Thor.DeepSeek.Extensions;
 using Thor.AWSClaude.Extensions;
 using Thor.MiniMax.Extensions;
 using Thor.Provider;
@@ -32,7 +33,9 @@ using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Middlewares;
 using Thor.Service.Options;
 using Thor.Service.Service;
+using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
+using Thor.VolCenGine.Extensions;
 using Product = Thor.Service.Domain.Product;
 
 try
@@ -113,7 +116,10 @@ try
         .AddAzureOpenAIService()
         .AddErnieBotService()
         .AddGiteeAIService()
-        .AddMiniMaxService();
+        .AddMiniMaxService()
+        .AddVolCenGineService()
+        .AddSiliconFlowService()
+        .AddDeepSeekService();
 
     builder.Services
         .AddCors(options =>
@@ -328,7 +334,6 @@ try
     #region Token
 
     var token = app.MapGroup("/api/v1/token")
-        .WithGroupName("Token")
         .AddEndpointFilter<ResultFilter>()
         .RequireAuthorization()
         .WithTags("Token");
@@ -365,7 +370,6 @@ try
     #region Channel
 
     var channel = app.MapGroup("/api/v1/channel")
-        .WithGroupName("Channel")
         .WithTags("Channel")
         .AddEndpointFilter<ResultFilter>()
         .RequireAuthorization(new AuthorizeAttribute()
@@ -405,7 +409,6 @@ try
     #region Model
 
     var model = app.MapGroup("/api/v1/model")
-        .WithGroupName("Model")
         .WithTags("Model")
         .AddEndpointFilter<ResultFilter>()
         .RequireAuthorization();
@@ -428,7 +431,6 @@ try
     #region Logger
 
     var log = app.MapGroup("/api/v1/logger")
-        .WithGroupName("Logger")
         .WithTags("Logger")
         .AddEndpointFilter<ResultFilter>()
         .RequireAuthorization();
@@ -455,7 +457,6 @@ try
     #region User
 
     var user = app.MapGroup("/api/v1/user")
-        .WithGroupName("User")
         .WithTags("User")
         .AddEndpointFilter<ResultFilter>();
 
@@ -493,6 +494,10 @@ try
             Roles = RoleConstant.Admin
         });
 
+    user.MapPut("/info", async (UserService service, UpdateUserInfoInput input) =>
+            await service.UpdateInfoAsync(input))
+        .RequireAuthorization();
+
     user.MapPost("/enable/{id}", async (UserService service, string id) =>
             await service.EnableAsync(id))
         .RequireAuthorization(new AuthorizeAttribute()
@@ -503,6 +508,39 @@ try
     user.MapPut("/update-password", async (UserService service, UpdatePasswordInput input) =>
             await service.UpdatePasswordAsync(input))
         .RequireAuthorization();
+
+    #endregion
+
+    #region ModelMapService
+
+    var modelMap = app.MapGroup("/api/v1/modelmap")
+        .WithTags("ModelMap")
+        .AddEndpointFilter<ResultFilter>()
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        });
+
+    // Complete the modelMap group with HTTP endpoints
+    modelMap.MapGet(string.Empty, async (ModelMapService service) =>
+            await service.GetListAsync())
+        .WithDescription("获取模型映射列表")
+        .WithOpenApi();
+
+    modelMap.MapPost(string.Empty, async (ModelMapService service, ModelMap modelMap) =>
+            await service.CreateAsync(modelMap))
+        .WithDescription("创建模型映射")
+        .WithOpenApi();
+
+    modelMap.MapPut(string.Empty, async (ModelMapService service, ModelMap modelMap) =>
+            await service.UpdateAsync(modelMap))
+        .WithDescription("更新模型映射")
+        .WithOpenApi();
+
+    modelMap.MapDelete("{id}", async (ModelMapService service, Guid id) =>
+            await service.DeleteAsync(id))
+        .WithDescription("删除模型映射")
+        .WithOpenApi();
 
     #endregion
 
