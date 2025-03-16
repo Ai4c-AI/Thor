@@ -9,7 +9,8 @@ import { ResultDto, User } from '..';
  */
 export const useActiveTabKey = () => {
     const pathname = window.location.pathname;
-    return pathname.split('/').find(Boolean)! as SidebarTabKey;
+    var key = pathname.split('/').find(Boolean)! as SidebarTabKey;
+    return key;
 };
 
 export const useActiveUser = () => {

@@ -21,6 +21,7 @@ using Thor.Moonshot.Extensions;
 using Thor.Ollama.Extensions;
 using Thor.DeepSeek.Extensions;
 using Thor.AWSClaude.Extensions;
+using Thor.Domain.Users;
 using Thor.MiniMax.Extensions;
 using Thor.Provider;
 using Thor.Qiansail.Extensions;
@@ -380,8 +381,8 @@ try
     channel.MapPost("", async (ChannelService service, ChatChannelInput input) =>
         await service.CreateAsync(input));
 
-    channel.MapGet("list", async (ChannelService service, int page, int pageSize) =>
-        await service.GetAsync(page, pageSize));
+    channel.MapGet("list", async (ChannelService service, int page, int pageSize,string? keyword) =>
+        await service.GetAsync(page, pageSize, keyword));
 
     channel.MapDelete("{id}", async (ChannelService service, string id) =>
         await service.RemoveAsync(id));
@@ -450,6 +451,13 @@ try
                 await service.ViewConsumptionAsync(type, model, startTime, endTime, keyword))
         .WithDescription("查看消耗")
         .WithDisplayName("查看消耗")
+        .WithOpenApi();
+
+    log.MapGet("model-hot",
+            async (LoggerService service) =>
+                await service.GetModelHotAsync())
+        .WithDescription("获取模型热度")
+        .WithDisplayName("获取模型热度")
         .WithOpenApi();
 
     #endregion
@@ -540,6 +548,65 @@ try
     modelMap.MapDelete("{id}", async (ModelMapService service, Guid id) =>
             await service.DeleteAsync(id))
         .WithDescription("删除模型映射")
+        .WithOpenApi();
+
+    #endregion
+
+    #region UserGroup
+
+    var userGroup = app.MapGroup("/api/v1/userGroup")
+        .WithTags("UserGroup")
+        .AddEndpointFilter<ResultFilter>();
+
+    userGroup.MapPost(string.Empty, async (UserGroupService service, UserGroup userGroup) =>
+            await service.CreateAsync(userGroup))
+        .WithDescription("创建用户分组")
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithOpenApi();
+
+    userGroup.MapGet(string.Empty, async (UserGroupService service) =>
+            await service.GetListAsync())
+        .WithDescription("获取用户分组列表")
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithOpenApi();
+
+    userGroup.MapPut(string.Empty, async (UserGroupService service, UserGroup userGroup) =>
+            await service.UpdateAsync(userGroup))
+        .WithDescription("更新用户分组")
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithOpenApi();
+
+    userGroup.MapDelete("{id}", async (UserGroupService service, Guid id) =>
+            await service.DeleteAsync(id))
+        .WithDescription("删除用户分组")
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithOpenApi();
+
+    userGroup.MapPut("/enable/{id}", async (UserGroupService service, Guid id, bool enable) =>
+            await service.EnableAsync(id, enable))
+        .WithDescription("启用/禁用用户分组")
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithOpenApi();
+
+    userGroup.MapGet("user", async (UserGroupService service) =>
+            await service.GetCurrentUserGroupAsync())
+        .WithDescription("获取用户分组")
+        .RequireAuthorization()
         .WithOpenApi();
 
     #endregion
@@ -730,9 +797,9 @@ try
         .WithTags("System")
         .AddEndpointFilter<ResultFilter>();
 
-    system.MapPost("share", async (SystemService service, string userId, HttpContext context) =>
-            await service.ShareAsync(userId, context))
-        .WithDescription("触发分享获取奖励")
+    system.MapGet("info", async (SystemService service) =>
+            await service.InviteInfo())
+        .WithDescription("获取邀请信息")
         .WithOpenApi();
 
     #endregion

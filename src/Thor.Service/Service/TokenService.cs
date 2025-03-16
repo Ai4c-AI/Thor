@@ -17,6 +17,10 @@ public sealed class TokenService(
 
         if (input is { UnlimitedExpired: false, ExpiredTime: null }) throw new Exception("请选择过期时间");
 
+        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
+
+        if (input.Groups.Length > 1) throw new Exception("token只能属于一个分组");
+
         var token = Mapper.Map<Token>(input);
 
         if (!string.IsNullOrEmpty(createId)) token.Creator = createId;
@@ -59,6 +63,12 @@ public sealed class TokenService(
 
     public async ValueTask<bool> UpdateAsync(Token input)
     {
+        
+        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
+
+        if (input.Groups.Length > 1) throw new Exception("token只能属于一个分组");
+
+        
         var result = await DbContext.Tokens.Where(x => x.Id == input.Id)
             .ExecuteUpdateAsync(item =>
                 item.SetProperty(x => x.Name, input.Name)
@@ -68,6 +78,7 @@ public sealed class TokenService(
                     .SetProperty(x => x.UnlimitedExpired, input.UnlimitedExpired)
                     .SetProperty(x => x.LimitModels, input.LimitModels)
                     .SetProperty(x => x.WhiteIpList, input.WhiteIpList)
+                    .SetProperty(x => x.Groups, input.Groups)
             );
 
         return result > 0;
@@ -94,7 +105,9 @@ public sealed class TokenService(
 
         if (token.LimitModels.Count(x => !string.IsNullOrEmpty(x)) > 0 && !token.LimitModels.Contains(model))
         {
-            throw new Exception("当前 Token 无权访问该模型");
+            // token脱敏
+            throw new Exception(
+                $"当前 {string.Concat("****", token.Key.AsSpan(token.Key.Length - 5, 5))}Token 无权访问{model}模型,请修改Token权限，当前token可访问模型：{string.Join(",", token.LimitModels)}");
         }
 
         if (token.WhiteIpList.Count <= 0) return;
@@ -103,7 +116,7 @@ public sealed class TokenService(
 
         if (string.IsNullOrEmpty(ip) || !token.WhiteIpList.Contains(ip))
         {
-            throw new Exception("当前IP: " + ip + " 无权访问该模型");
+            throw new Exception($"当前IP:{ip}无权访问模型{model}");
         }
     }
 
