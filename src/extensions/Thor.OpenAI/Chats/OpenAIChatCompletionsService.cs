@@ -92,10 +92,11 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         // 大于等于400的状态码都认为是异常
         if (response.StatusCode >= HttpStatusCode.BadRequest)
         {
+            var error = await response.Content.ReadAsStringAsync();
             logger.LogError("OpenAI对话异常 , StatusCode: {StatusCode} 错误响应内容：{Content}", response.StatusCode,
-                await response.Content.ReadAsStringAsync(cancellationToken));
+                error);
 
-            throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
+            throw new BusinessException("OpenAI对话异常：" + error, response.StatusCode.ToString());
         }
 
         using var stream = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken));
@@ -137,28 +138,28 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
             var result = JsonSerializer.Deserialize<ThorChatCompletionsResponse>(line,
                 ThorJsonSerializer.DefaultOptions);
 
-            var content = result?.Choices?.FirstOrDefault()?.Delta;
-
-            if (first && string.IsNullOrWhiteSpace(content?.Content) && string.IsNullOrEmpty(content?.ReasoningContent))
+            if (result == null)
             {
                 continue;
             }
 
-            if (first && content.Content == OpenAIConstant.ThinkStart)
+            var content = result?.Choices?.FirstOrDefault()?.Delta;
+
+            if (first && content?.Content == OpenAIConstant.ThinkStart)
             {
                 isThink = true;
                 continue;
                 // 需要将content的内容转换到其他字段
             }
 
-            if (isThink && content.Content.Contains(OpenAIConstant.ThinkEnd))
+            if (isThink && content?.Content?.Contains(OpenAIConstant.ThinkEnd) == true)
             {
                 isThink = false;
                 // 需要将content的内容转换到其他字段
                 continue;
             }
 
-            if (isThink)
+            if (isThink && result?.Choices != null)
             {
                 // 需要将content的内容转换到其他字段
                 foreach (var choice in result.Choices)

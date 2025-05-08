@@ -16,13 +16,14 @@ export default function MobilePage() {
             label: '模型',
         },
         {
-            key: 'doc',
-            label: '文档',
-        },
-        {
             key: 'panel',
             label: '面板',
-        }]
+        },
+        {
+            key: 'api_doc',
+            label: 'API文档',
+        }
+    ]
 
     const [opened, setOpened] = useState(false);
     return (
@@ -50,6 +51,10 @@ export default function MobilePage() {
                                     break;
                                 case 'welcome':
                                     navigate('/');
+                                    break;
+                                case 'api_doc':
+                                    window.open('https://thor-ai.apifox.cn', '_blank');
+                                    break;
                             }
                         }}
                         items={items} opened={opened} setOpened={setOpened} />

@@ -16,8 +16,6 @@
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.412" />
     <PackageReference Include="Casdoor.AspNetCore" Version="1.16.0" />
     <PackageReference Include="Casdoor.Client" Version="1.16.0" />
-    <PackageReference Include="Gnarly" Version="1.0.7" />
-    <PackageReference Include="Gnarly.Data" Version="1.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2">
@@ -28,6 +26,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.3" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
     <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.1.1" />
     <PackageReference Include="SharpToken" Version="2.0.3" />
@@ -50,6 +49,7 @@
     <ProjectReference Include="..\extensions\Thor.Claude\Thor.Claude.csproj" />
     <ProjectReference Include="..\extensions\Thor.DeepSeek\Thor.DeepSeek.csproj" />
     <ProjectReference Include="..\extensions\Thor.ErnieBot\Thor.ErnieBot.csproj" />
+    <ProjectReference Include="..\extensions\Thor.GCPClaude\Thor.GCPClaude.csproj" />
     <ProjectReference Include="..\extensions\Thor.GiteeAI\Thor.GiteeAI.csproj" />
     <ProjectReference Include="..\extensions\Thor.Hunyuan\Thor.Hunyuan.csproj" />
     <ProjectReference Include="..\extensions\Thor.MetaGLM\Thor.MetaGLM.csproj" />
@@ -80,6 +80,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Logs\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
@@ -87,6 +88,12 @@
     <Content Include="..\..\.dockerignore">
       <Link>.dockerignore</Link>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="install-service.bat">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

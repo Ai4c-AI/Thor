@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Thor.Domain.Chats;
 using Thor.Domain.Users;
 using Thor.Service.Domain;
 
@@ -162,12 +163,18 @@ public static class EntityConfigExtensions
             options.Property(x => x.Tags)
                 .HasConversion(item => JsonSerializer.Serialize(item, JsonSerializerOptions),
                     item => JsonSerializer.Deserialize<List<string>>(item, JsonSerializerOptions));
+
+            options.Property(x => x.Extension)
+                .HasConversion(item => JsonSerializer.Serialize(item, JsonSerializerOptions),
+                    item => string.IsNullOrEmpty(item)
+                        ? new Dictionary<string, string>()
+                        : JsonSerializer.Deserialize<Dictionary<string, string>>(item, JsonSerializerOptions));
         });
 
         modelBuilder.Entity<UserGroup>(options =>
         {
             options.ToTable("UserGroups");
-            
+
             options.HasKey(x => x.Id);
 
             options.HasIndex(x => x.Code).IsUnique();
@@ -176,7 +183,7 @@ public static class EntityConfigExtensions
 
             options.HasIndex(x => x.Creator);
         });
-        
+
         return modelBuilder;
     }
 

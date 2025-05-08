@@ -1,26 +1,49 @@
 import { useEffect, useState } from "react";
-import { message, Card, Tabs, Button, Input, Badge } from 'antd';
+import { message, Card, Tabs, Button, Input, Badge, Typography, Space, Empty, Alert, theme } from 'antd';
 import { GeneralSetting, InitSetting, IsEnableAlipay } from "../../services/SettingService";
 import { Use } from "../../services/RedeemCodeService";
 import { getProduct, startPayload } from "../../services/ProductService";
 import QRCode from "qrcode.react";
 import { renderQuota } from "../../utils/render";
 import { GradientButton, Modal, Tag } from "@lobehub/ui";
+import { AlipayOutlined, BarcodeOutlined, CheckCircleOutlined, ClockCircleOutlined, GiftOutlined, InfoCircleOutlined, InboxOutlined, MobileOutlined, QuestionCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { useTranslation } from 'react-i18next';
 
+const { Title, Text, Paragraph } = Typography;
+const { useToken } = theme;
 
 interface IPayProps {
     user: any
 }
+
 export default function Pay({
     user
 }: IPayProps) {
+    const { t } = useTranslation();
+    const { token } = useToken();
     const [code, setCode] = useState('');
     const [products, setProducts] = useState([] as any[]);
     const [qrCode, setQrCode] = useState('');
+    const [countdown, setCountdown] = useState(300); // 5分钟倒计时
 
     useEffect(() => {
         loadProducts();
     }, []);
+
+    useEffect(() => {
+        let timer: any = null;
+        if (qrCode && countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown(prev => prev - 1);
+            }, 1000);
+        } else if (countdown === 0) {
+            setQrCode('');
+            setCountdown(300);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [qrCode, countdown]);
 
     function loadProducts() {
         getProduct()
@@ -35,13 +58,13 @@ export default function Pay({
      */
     function useCode() {
         if (code === '') return message.error({
-            content: '兑换码不能为空'
+            content: t('payment.emptyRedeemCode')
         });
 
         Use(code)
             .then((res) => {
                 res.success ? message.success({
-                    content: '兑换成功',
+                    content: t('payment.redeemSuccess')
                 }) : message.error({
                     content: res.message
                 });
@@ -64,159 +87,240 @@ export default function Pay({
             });
     }
 
-    return <Card
-        title={
-            <span style={{
-                fontSize: 24
-            }}>
-                账号钱包 <Tag color='amber'>{renderQuota(user.residualCredit, 2)}</Tag>
-            </span>}
-        style={{
-            width: '100%',
-            textAlign: 'center',
-        }}>
-        <Tabs type='card'
-            items={[
-                {
-                    key: '1',
-                    label: '支付宝支付',
-                    children: IsEnableAlipay() == false ? <>
-                        <div>
-                            未启用支付宝支付
-                        </div>
-                    </> :
-                        <div style={{
-                            marginTop: 16,
-                            marginBottom: 16,
-                            overflow: 'auto',
-                            height: 'calc(100vh - 440px)',
-                        }}>
-                            {
-                                products.length > 0 ? (
+    const cardStyle = {
+        width: '100%',
+        borderRadius: token.borderRadiusLG,
+        overflow: 'hidden',
+        boxShadow: `0 4px 20px ${token.colorBgElevated}`
+    };
+
+    const headerGradient = {
+        background: `linear-gradient(90deg, ${token.colorPrimary}, ${token.colorPrimaryBg})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent'
+    };
+
+    const balanceTagStyle = {
+        fontSize: 18,
+        padding: '4px 12px',
+        borderRadius: token.borderRadiusLG,
+        boxShadow: `0 2px 8px ${token.colorBgContainer}`
+    };
+
+    return (
+        <Card
+            title={
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 0'
+                }}>
+                    <Title level={4} style={{ margin: 0, ...headerGradient }}>
+                        {t('payment.wallet')}
+                    </Title>
+                    <Space>
+                        <Text style={{ fontSize: 16 }}>{t('payment.currentBalance')}:</Text>
+                        <Tag color='amber' style={balanceTagStyle}>
+                            {renderQuota(user.residualCredit, 2)}
+                        </Tag>
+                    </Space>
+                </div>}
+            style={cardStyle}
+        >
+            <Tabs 
+                type='card'
+                style={{ marginTop: '8px' }}
+                items={[
+                    {
+                        key: '1',
+                        label: (
+                            <Space size={8}>
+                                <AlipayOutlined style={{ fontSize: '18px', color: token.colorPrimary }} />
+                                {t('payment.alipayPayment')}
+                            </Space>
+                        ),
+                        children: IsEnableAlipay() === false ? 
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '40px 0',
+                            }}>
+                                <Empty
+                                    image={<WarningOutlined style={{ fontSize: '48px', color: token.colorTextQuaternary }} />}
+                                    description={<Text type="secondary" style={{ fontSize: '18px' }}>{t('payment.alipayDisabled')}</Text>}
+                                />
+                            </div> :
+                            <div style={{
+                                marginTop: 16,
+                                marginBottom: 16,
+                                overflow: 'auto',
+                                height: 'calc(100vh - 440px)',
+                                padding: '0 8px'
+                            }}>
+                                {products.length > 0 ? (
                                     <div
                                         style={{
-                                            display: 'flex', // 使用 flexbox 布局
-                                            flexWrap: 'wrap', // 允许换行
-                                            justifyContent: 'flex-start', // 从左到右排列
-                                            gap: '16px', // 卡片之间的间距
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                            gap: '24px',
+                                            justifyContent: 'center',
                                         }}
                                     >
                                         {products.map((x) => {
-                                            const originalPrice = (x.price * 1.1).toFixed(2); // 原价增加 10%
+                                            const originalPrice = (x.price * 1.1).toFixed(2);
+                                            const discount = Math.round((1 - x.price / parseFloat(originalPrice)) * 100);
 
                                             return (
                                                 <Badge.Ribbon
-                                                    text="超值充值"
+                                                    text={`${t('payment.save')}${discount}%`}
                                                     color="red"
                                                     placement="start"
                                                     key={x.id}
                                                     style={{
                                                         fontSize: 16,
                                                         fontWeight: 'bold',
-                                                        background: 'linear-gradient(90deg, #ff4d4f, #ff7a45)',
-                                                        color: '#fff',
+                                                        background: `linear-gradient(90deg, ${token.colorError}, ${token.colorErrorBg})`,
+                                                        borderRadius: '0 0 8px 0',
+                                                        boxShadow: `0 2px 8px ${token.colorBgContainer}`
                                                     }}
                                                 >
                                                     <Card
                                                         style={{
-                                                            borderRadius: 16,
+                                                            borderRadius: token.borderRadiusLG,
                                                             padding: 16,
-                                                            width: 320, // 固定卡片宽度
-                                                            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                                                            transition: 'transform 0.3s, box-shadow 0.3s',
-                                                            cursor: 'pointer',
+                                                            width: '100%',
+                                                            boxShadow: `0 8px 24px ${token.colorBgElevated}`,
+                                                            transition: 'all 0.3s ease',
+                                                            border: `1px solid ${token.colorBorderSecondary}`,
+                                                            overflow: 'hidden',
+                                                            position: 'relative'
                                                         }}
                                                         hoverable
                                                         onMouseEnter={(e) => {
-                                                            e.currentTarget.style.transform = 'scale(1.05)';
-                                                            e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.2)';
+                                                            e.currentTarget.style.transform = 'translateY(-8px)';
+                                                            e.currentTarget.style.boxShadow = `0 16px 32px ${token.colorBgElevated}`;
+                                                            e.currentTarget.style.borderColor = token.colorPrimaryBgHover;
                                                         }}
                                                         onMouseLeave={(e) => {
-                                                            e.currentTarget.style.transform = 'scale(1)';
-                                                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = `0 8px 24px ${token.colorBgElevated}`;
+                                                            e.currentTarget.style.borderColor = token.colorBorderSecondary;
                                                         }}
                                                     >
-                                                        <div style={{ textAlign: 'center' }}>
+                                                        <div style={{ 
+                                                            position: 'absolute', 
+                                                            top: 0, 
+                                                            left: 0, 
+                                                            right: 0, 
+                                                            height: '6px', 
+                                                            background: `linear-gradient(90deg, ${token.colorPrimary}, ${token.colorPrimaryBg})` 
+                                                        }} />
+                                                        <div style={{ textAlign: 'center', paddingTop: '10px' }}>
                                                             {/* 产品名称 */}
-                                                            <div
-                                                                style={{
-                                                                    fontWeight: 'bold',
-                                                                    fontSize: 24,
-                                                                    marginBottom: 12,
-                                                                    color: '#333',
-                                                                }}
-                                                            >
+                                                            <Title level={4} style={{ marginBottom: 16 }}>
                                                                 {x.name}
-                                                            </div>
+                                                            </Title>
 
                                                             {/* 产品价格和原价 */}
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 22,
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                alignItems: 'baseline',
+                                                                justifyContent: 'center',
+                                                                marginBottom: 8
+                                                            }}>
+                                                                <Text style={{
+                                                                    fontSize: 16,
+                                                                    color: token.colorError,
+                                                                    fontWeight: 'bold'
+                                                                }}>¥</Text>
+                                                                <Text style={{
+                                                                    fontSize: 32,
                                                                     fontWeight: 'bold',
-                                                                    marginBottom: 8,
-                                                                    color: '#ff4d4f',
-                                                                }}
-                                                            >
-                                                                <span>{x.price} 元</span>
+                                                                    color: token.colorError,
+                                                                    lineHeight: 1
+                                                                }}>{x.price}</Text>
                                                                 <Tag
-                                                                    color="green"
+                                                                    color="success"
                                                                     style={{
                                                                         marginLeft: 8,
-                                                                        fontSize: 14,
-                                                                        borderRadius: 8,
-                                                                        padding: '4px 8px',
+                                                                        fontSize: 12,
+                                                                        borderRadius: 12,
+                                                                        padding: '2px 8px',
                                                                     }}
                                                                 >
-                                                                    限时优惠
+                                                                    {t('payment.limitedOffer')}
                                                                 </Tag>
                                                             </div>
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 16,
-                                                                    color: '#aaa',
-                                                                    textDecoration: 'line-through',
-                                                                    marginBottom: 12,
-                                                                }}
-                                                            >
-                                                                原价：{originalPrice} 元
-                                                            </div>
-
-                                                            {/* 产品额度 */}
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 18,
-                                                                    color: '#52c41a',
-                                                                    marginBottom: 12,
-                                                                }}
-                                                            >
-                                                                剩余额度：{x.remainQuota}
-                                                            </div>
-
-                                                            {/* 产品描述 */}
-                                                            <div
+                                                            <Text
+                                                                type="secondary"
                                                                 style={{
                                                                     fontSize: 14,
-                                                                    color: '#888',
+                                                                    textDecoration: 'line-through',
                                                                     marginBottom: 16,
-                                                                    lineHeight: 1.5,
+                                                                    display: 'block'
+                                                                }}
+                                                            >
+                                                                {t('payment.originalPrice')}：¥{originalPrice}
+                                                            </Text>
+
+                                                            {/* 分割线 */}
+                                                            <div style={{
+                                                                height: '1px',
+                                                                background: `linear-gradient(90deg, transparent, ${token.colorBorderSecondary}, transparent)`,
+                                                                margin: '16px 0'
+                                                            }} />
+
+                                                            {/* 产品额度 */}
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 18,
+                                                                    color: token.colorSuccess,
+                                                                    marginBottom: 16,
+                                                                    fontWeight: 500,
+                                                                    display: 'block'
+                                                                }}
+                                                            >
+                                                                {t('payment.remainingQuota')}：<span style={{ fontWeight: 'bold' }}>{x.remainQuota}</span>
+                                                            </Text>
+
+                                                            {/* 产品描述 */}
+                                                            <Paragraph
+                                                                type="secondary"
+                                                                ellipsis={{ rows: 2 }}
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    marginBottom: 24,
+                                                                    lineHeight: 1.6,
+                                                                    height: '44px'
                                                                 }}
                                                             >
                                                                 {x.description}
-                                                            </div>
+                                                            </Paragraph>
                                                             <GradientButton
                                                                 onClick={() => {
                                                                     message.loading({
-                                                                        content: '正在生成二维码，请稍后...',
+                                                                        content: t('payment.generatingQRCode'),
                                                                         duration: 2,
                                                                     });
                                                                     alipayRecharge(x.id);
+                                                                    setCountdown(300); // 重置倒计时
                                                                 }}
                                                                 size="large"
-                                                                children="立即充值"
                                                                 block
-                                                                icon={<i className="anticon anticon-pay-circle" />}
-                                                            ></GradientButton>
+                                                                style={{
+                                                                    height: '46px',
+                                                                    borderRadius: '23px',
+                                                                    fontSize: '16px',
+                                                                    fontWeight: 'bold',
+                                                                    boxShadow: `0 8px 16px rgba(22, 119, 255, 0.2)`
+                                                                }}
+                                                                icon={<AlipayOutlined style={{ fontSize: '20px' }} />}
+                                                            >
+                                                                {t('payment.rechargeNow')}
+                                                            </GradientButton>
                                                         </div>
                                                     </Card>
                                                 </Badge.Ribbon>
@@ -224,112 +328,230 @@ export default function Pay({
                                         })}
                                     </div>
                                 ) : (
-                                    <div
-                                        style={{
-                                            display: 'flex', // 使用 flexbox 布局
-                                            justifyContent: 'center', // 水平居中
-                                            alignItems: 'center', // 垂直居中
-                                            height: '300px', // 设置高度
-                                            flexDirection: 'column', // 垂直排列内容
-                                            color: '#888', // 提示文字颜色
-                                            fontSize: '18px', // 提示文字大小
-                                            textAlign: 'center', // 居中对齐文字
-                                        }}
-                                    >
-                                        <i
-                                            className="anticon anticon-frown"
+                                    <Empty
+                                        image={<InboxOutlined style={{ fontSize: '64px', color: token.colorBorderSecondary }} />}
+                                        description={
+                                            <>
+                                                <Text style={{ fontSize: '18px', color: token.colorTextSecondary }}>
+                                                    {t('payment.noProducts')}
+                                                </Text>
+                                                <div style={{ fontSize: '14px', color: token.colorTextQuaternary, marginTop: '8px' }}>
+                                                    {t('payment.checkLater')}
+                                                </div>
+                                            </>
+                                        }
+                                    />
+                                )}
+                            </div>
+                    },
+                    {
+                        key: '2',
+                        label: (
+                            <Space size={8}>
+                                <GiftOutlined style={{ fontSize: '18px', color: token.colorPrimary }} />
+                                {t('payment.redeemCode')}
+                            </Space>
+                        ),
+                        children: (
+                            <div style={{ padding: '24px 16px' }}>
+                                <Alert
+                                    icon={<InfoCircleOutlined style={{ color: token.colorPrimary }} />}
+                                    message={
+                                        <Text strong style={{ fontSize: '16px' }}>
+                                            {t('payment.redeemCodeInfo')}
+                                        </Text>
+                                    }
+                                    description={t('payment.redeemCodeDescription')}
+                                    type="info"
+                                    showIcon
+                                    style={{ 
+                                        marginBottom: '16px',
+                                        borderRadius: token.borderRadiusLG,
+                                        background: token.colorInfoBg,
+                                    }}
+                                />
+                                
+                                <Input 
+                                    value={code}
+                                    onChange={(value) => {
+                                        setCode(value.target.value);
+                                    }}
+                                    size='large'
+                                    style={{
+                                        borderRadius: token.borderRadiusSM,
+                                        height: '48px',
+                                        fontSize: '16px',
+                                        marginBottom: '16px'
+                                    }}
+                                    prefix={<BarcodeOutlined style={{ color: token.colorPrimary, fontSize: '18px' }} />}
+                                    suffix={
+                                        <Button 
+                                            type="primary"
+                                            onClick={() => { useCode(); }}
                                             style={{
-                                                fontSize: '48px', // 图标大小
-                                                color: '#ccc', // 图标颜色
-                                                marginBottom: '16px', // 图标与文字的间距
+                                                borderRadius: token.borderRadiusSM,
+                                                height: '36px',
+                                                fontWeight: 500
                                             }}
-                                        />
-                                        暂无产品
-                                    </div>
-                                )
-                            }
+                                        >
+                                            {t('payment.redeemNow')}
+                                        </Button>
+                                    }
+                                    placeholder={t('payment.enterRedeemCode')} 
+                                />
 
-                        </div>
-                },
-                {
-                    key: '2',
-                    label: '兑换码',
-                    children: <>
-                        <Input value={code}
-                            onChange={(value) => {
-                                setCode(value.target.value);
-                            }}
-                            size='large'
-                            suffix={<Button onClick={() => {
-                                useCode();
-                            }}>兑换余额</Button>}
-                            placeholder={'输入您的兑换码'} style={{
-                                marginTop: 8
-                            }} >
-                        </Input>
-
-                        <Tag color='blue'
-                            onClick={() => {
-                                const rechargeAddress = InitSetting?.find(s => s.key === GeneralSetting.RechargeAddress)?.value;
-                                if (rechargeAddress) {
-                                    window.open(rechargeAddress, '_blank');
-                                } else {
-                                    message.error({
-                                        content: '未设置充值地址'
-                                    });
-                                }
-                            }}
-                            style={{
-                                marginTop: 8,
-                                cursor: 'pointer',
-                                color: 'var(--semi-color-text-2)',
-                                userSelect: 'none',
-                            }}>
-                            如何获取兑换码？
-                        </Tag></>
-                }
-            ]}
-        >
-        </Tabs>
-        <Modal
-            open={qrCode !== ''}
-            title='支付宝充值'
-            onClose={() => {
-                setQrCode('');
-            }}
-            footer={
-                <>
-                    <Button
-                        type='primary'
-                        onClick={() => {
-                            setQrCode('');
-                            loadProducts();
-                        }}
-                    >
-                        我已支付
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            setQrCode('');
-                        }} >关闭</Button>
-                </>
-            }
-        >
-            <QRCode
-                id="qrCode"
-                value={qrCode}
-                size={380} // 二维码的大小
-                fgColor="#000000" // 二维码的颜色
-                style={{
-                    margin: 'auto'
-                }}
-                imageSettings={{ // 二维码中间的logo图片
-                    src: 'logoUrl',
-                    height: 100,
-                    width: 100,
-                    excavate: true, // 中间图片所在的位置是否镂空
-                }}
+                                <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                                    <Tag color='blue'
+                                        onClick={() => {
+                                            const rechargeAddress = InitSetting?.find(s => s.key === GeneralSetting.RechargeAddress)?.value;
+                                            if (rechargeAddress) {
+                                                window.open(rechargeAddress, '_blank');
+                                            } else {
+                                                message.error({
+                                                    content: t('payment.noRechargeAddress')
+                                                });
+                                            }
+                                        }}
+                                        style={{
+                                            cursor: 'pointer',
+                                            color: token.colorPrimary,
+                                            userSelect: 'none',
+                                            fontSize: '14px',
+                                            padding: '6px 12px',
+                                            borderRadius: token.borderRadiusLG,
+                                            background: token.colorPrimaryBg,
+                                            border: 'none',
+                                            boxShadow: '0 2px 0 rgba(0,0,0,0.05)'
+                                        }}>
+                                        <QuestionCircleOutlined style={{ marginRight: '4px' }} />
+                                        {t('payment.howToGetRedeemCode')}
+                                    </Tag>
+                                </div>
+                            </div>
+                        )
+                    }
+                ]}
             />
-        </Modal>
-    </Card>
+            <Modal
+                open={qrCode !== ''}
+                title={
+                    <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                        paddingBottom: '12px'
+                    }}>
+                        <Space align="center">
+                            <AlipayOutlined style={{ color: token.colorPrimary, fontSize: '20px' }} />
+                            <Text strong style={{ fontSize: '18px' }}>
+                                {t('payment.scanQRCode')}
+                            </Text>
+                        </Space>
+                        <Tag color="blue" style={{ marginLeft: '8px' }}>
+                            {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                        </Tag>
+                    </div>
+                }
+                onClose={() => {
+                    setQrCode('');
+                    setCountdown(300);
+                }}
+                footer={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ color: token.colorError, fontSize: '14px' }}>
+                            <ClockCircleOutlined style={{ marginRight: '4px' }} />
+                            {t('payment.timeRemaining', { minutes: Math.floor(countdown / 60), seconds: countdown % 60 })}
+                        </div>
+                        <Space>
+                            <Button
+                                type='primary'
+                                onClick={() => {
+                                    setQrCode('');
+                                    loadProducts();
+                                    setCountdown(300);
+                                }}
+                                style={{
+                                    borderRadius: token.borderRadiusSM,
+                                    background: token.colorSuccess,
+                                    borderColor: token.colorSuccess
+                                }}
+                                icon={<CheckCircleOutlined />}
+                            >
+                                {t('payment.paymentCompleted')}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setQrCode('');
+                                    setCountdown(300);
+                                }}
+                                style={{ borderRadius: token.borderRadiusSM }}
+                            >
+                                {t('payment.cancel')}
+                            </Button>
+                        </Space>
+                    </div>
+                }
+                style={{ maxWidth: '480px' }}
+            >
+                <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    padding: '16px 0'
+                }}>
+                    <Alert
+                        message={
+                            <Text strong type="danger" style={{ fontSize: '16px' }}>
+                                {t('payment.qrCodeExpiry')}
+                            </Text>
+                        }
+                        description={t('payment.scanInstruction')}
+                        type="info"
+                        showIcon
+                        style={{ 
+                            marginBottom: '16px',
+                            width: '100%',
+                            textAlign: 'center',
+                            borderRadius: token.borderRadiusSM,
+                        }}
+                    />
+                    
+                    <div style={{ 
+                        padding: '16px', 
+                        border: `1px solid ${token.colorPrimary}`, 
+                        borderRadius: token.borderRadiusSM,
+                        background: token.colorBgContainer
+                    }}>
+                        <QRCode
+                            id="qrCode"
+                            value={qrCode}
+                            size={280}
+                            fgColor="#000000"
+                            style={{
+                                margin: 'auto'
+                            }}
+                            imageSettings={{
+                                src: 'logoUrl',
+                                height: 60,
+                                width: 60,
+                                excavate: true,
+                            }}
+                        />
+                    </div>
+                    
+                    <div style={{ 
+                        marginTop: '16px', 
+                        fontSize: '14px', 
+                        textAlign: 'center'
+                    }}>
+                        <Space>
+                            <MobileOutlined style={{ color: token.colorPrimary }} />
+                            <Text type="secondary">{t('payment.mobilePayment')}</Text>
+                        </Space>
+                    </div>
+                </div>
+            </Modal>
+        </Card>
+    );
 }

@@ -1,39 +1,48 @@
-using System.Text.Json.Serialization;
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebSockets;
 using Serilog;
+using System.Text.Json.Serialization;
+using Thor.Abstractions.Anthropic;
 using Thor.Abstractions.Chats.Dtos;
 using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Embeddings.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
+using Thor.Abstractions.Responses;
+using Thor.Abstractions.Tracker;
+using Thor.AWSClaude.Extensions;
 using Thor.AzureOpenAI.Extensions;
+using Thor.BuildingBlocks.Event;
 using Thor.Claude.Extensions;
 using Thor.Core.DataAccess;
 using Thor.Core.Extensions;
+using Thor.DeepSeek.Extensions;
+using Thor.Domain.Chats;
+using Thor.Domain.Users;
 using Thor.ErnieBot.Extensions;
+using Thor.GCPClaude.Extensions;
 using Thor.Hunyuan.Extensions;
 using Thor.LocalEvent;
 using Thor.LocalMemory.Cache;
 using Thor.MetaGLM.Extensions;
+using Thor.MiniMax.Extensions;
 using Thor.Moonshot.Extensions;
 using Thor.Ollama.Extensions;
-using Thor.DeepSeek.Extensions;
-using Thor.AWSClaude.Extensions;
-using Thor.Domain.Users;
-using Thor.MiniMax.Extensions;
 using Thor.Provider;
 using Thor.Qiansail.Extensions;
 using Thor.RabbitMQEvent;
 using Thor.RedisMemory.Cache;
 using Thor.Service.BackgroundTask;
+using Thor.Service.Eto;
+using Thor.Service.EventBus;
 using Thor.Service.Extensions;
 using Thor.Service.Filters;
 using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Middlewares;
 using Thor.Service.Options;
 using Thor.Service.Service;
+using Thor.Service.Service.OpenAI;
 using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
 using Thor.VolCenGine.Extensions;
@@ -41,7 +50,19 @@ using Product = Thor.Service.Domain.Product;
 
 try
 {
-    var builder = WebApplication.CreateBuilder(args);
+    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
+    var builder = WebApplication.CreateBuilder(new WebApplicationOptions()
+    {
+        Args = args,
+        ContentRootPath = AppContext.BaseDirectory,
+    });
+
+    // 添加Windows服务支持
+    if (OperatingSystem.IsWindows())
+    {
+        builder.Host.UseWindowsService(options => { options.ServiceName = "ThorService"; });
+    }
 
     builder.HostEnvironment();
 
@@ -97,10 +118,35 @@ try
     builder.Services.AddMvcCore().AddApiExplorer();
     builder.Services
         .AddEndpointsApiExplorer()
-        .AddAutoGnarly()
         .AddSwaggerGen()
         .AddCustomAuthentication()
         .AddHttpContextAccessor()
+        .AddScoped<IEventHandler<ChatLogger>, ChatLoggerEventHandler>()
+        .AddScoped<IEventHandler<CreateUserEto>, CreateUserEventHandler>()
+        .AddScoped<IEventHandler<UpdateModelManagerCache>, ModelManagerEventHandler>()
+        .AddTransient<JwtHelper>()
+        .AddSingleton<OpenTelemetryMiddlewares>()
+        .AddSingleton<UnitOfWorkMiddleware>()
+        .AddScoped<AuthorizeService>()
+        .AddScoped<ChannelService>()
+        .AddScoped<EmailService>()
+        .AddScoped<ImageService>()
+        .AddScoped<LoggerService>()
+        .AddScoped<ModelManagerService>()
+        .AddScoped<AnthropicChatService>()
+        .AddScoped<ResponsesService>()
+        .AddScoped<ProductService>()
+        .AddScoped<RateLimitModelService>()
+        .AddScoped<SystemService>()
+        .AddScoped<ChatService>()
+        .AddScoped<ITrackerStorage, TrackerStorage>()
+        .AddScoped<RedeemCodeService>()
+        .AddScoped<TokenService>()
+        .AddScoped<UserGroupService>()
+        .AddScoped<TrackerService>()
+        .AddScoped<ModelMapService>()
+        .AddScoped<UserService>()
+        .AddScoped<IUserContext, DefaultUserContext>()
         .AddHostedService<StatisticBackgroundTask>()
         .AddHostedService<LoggerBackgroundTask>()
         .AddHostedService<TrackerBackgroundTask>()
@@ -109,6 +155,7 @@ try
         .AddMoonshotService()
         .AddSparkDeskService()
         .AddQiansailService()
+        .AddGCPClaudeService()
         .AddMetaGLMService()
         .AddHunyuanService()
         .AddClaudiaService()
@@ -381,8 +428,8 @@ try
     channel.MapPost("", async (ChannelService service, ChatChannelInput input) =>
         await service.CreateAsync(input));
 
-    channel.MapGet("list", async (ChannelService service, int page, int pageSize,string? keyword) =>
-        await service.GetAsync(page, pageSize, keyword));
+    channel.MapGet("list", async (ChannelService service, int page, int pageSize, string? keyword, string[] groups) =>
+        await service.GetAsync(page, pageSize, keyword, groups));
 
     channel.MapDelete("{id}", async (ChannelService service, string id) =>
         await service.RemoveAsync(id));
@@ -405,6 +452,9 @@ try
     channel.MapPut("/order/{id}", async (ChannelService services, string id, int order) =>
         await services.UpdateOrderAsync(id, order));
 
+    channel.MapGet("/tag", async (ChannelService services) =>
+        await services.GetTagsAsync());
+
     #endregion
 
     #region Model
@@ -425,6 +475,14 @@ try
     model.MapGet("/use-models", async (HttpContext context) => { return await ModelService.GetUseModels(context); })
         .WithDescription("获取使用模型")
         .AllowAnonymous()
+        .WithOpenApi();
+
+    model.MapGet("/provider", ModelService.GetProviderAsync)
+        .WithDescription("获取所有模型提供商")
+        .WithOpenApi();
+
+    model.MapGet("/info", async (HttpContext context) => { return await ModelService.GetModelInfoAsync(context); })
+        .WithDescription("获取模型信息")
         .WithOpenApi();
 
     #endregion
@@ -515,6 +573,10 @@ try
 
     user.MapPut("/update-password", async (UserService service, UpdatePasswordInput input) =>
             await service.UpdatePasswordAsync(input))
+        .RequireAuthorization();
+
+    user.MapPost("/upload-avatar", async (UserService UserService, HttpContext context) =>
+            await UserService.UploadAvatarAsync(context))
         .RequireAuthorization();
 
     #endregion
@@ -816,6 +878,11 @@ try
         .WithDescription("获取用户请求")
         .WithOpenApi();
 
+    app.MapPost("/v1/responses", (ResponsesService responsesService, HttpContext context, ResponsesInput input) =>
+            responsesService.ExecuteAsync(context, input))
+        .WithDescription("OpenAI Responses")
+        .WithOpenApi();
+
     // 对话补全请求
     app.MapPost("/v1/chat/completions",
             async (ChatService service, HttpContext httpContext, ThorChatCompletionsRequest request) =>
@@ -823,6 +890,12 @@ try
         .WithGroupName("OpenAI")
         .WithDescription("Get completions from OpenAI")
         .WithOpenApi();
+
+    app.MapPost("/v1/messages",
+        (async (HttpContext context, AnthropicChatService service, AnthropicInput input) =>
+        {
+            await service.MessageAsync(context, input);
+        }));
 
     // 文本补全接口,不建议使用，使用对话补全即可
     app.MapPost("/v1/completions", async (ChatService service, HttpContext context, CompletionCreateRequest input) =>
@@ -845,6 +918,19 @@ try
         .WithDescription("Image")
         .WithOpenApi();
 
+    app.MapPost("/v1/images/edits",
+            async (ChatService imageService, HttpContext context) =>
+                await imageService.EditsImageAsync(context))
+        .WithDescription("OpenAI")
+        .WithDescription("Image")
+        .WithOpenApi();
+
+    app.MapPost("v1/images/variations",
+            async (ChatService imageService, HttpContext context) =>
+                await imageService.VariationsAsync(context))
+        .WithDescription("OpenAI")
+        .WithDescription("Image")
+        .WithOpenApi();
 
     app.MapGet("/v1/models", async (HttpContext context) => { return await ModelService.GetAsync(context); })
         .WithDescription("获取模型列表")

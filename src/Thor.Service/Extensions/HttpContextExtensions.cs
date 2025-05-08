@@ -72,7 +72,19 @@ public static class HttpContextExtensions
     public static async ValueTask WriteAsEventStreamDataAsync(this HttpContext context, object value)
     {
         var jsonData = JsonSerializer.Serialize(value, ThorJsonSerializer.DefaultOptions);
-        await context.Response.WriteAsync($"data: {jsonData}\n\n", Encoding.UTF8);
+        await context.WriteAsEventAsync($"data: {jsonData}\n\n");
+        await context.Response.Body.FlushAsync();
+    }
+
+    public static async ValueTask WriteAsEventAsync(this HttpContext context, string value)
+    {
+        await context.Response.WriteAsync(value, Encoding.UTF8);
+        await context.Response.Body.FlushAsync();
+    }
+
+    public static async ValueTask WriteAsEventStreamAsync(this HttpContext context, string @event)
+    {
+        await context.Response.WriteAsync($"{@event}\n", Encoding.UTF8);
         await context.Response.Body.FlushAsync();
     }
 
@@ -154,6 +166,20 @@ public static class HttpContextExtensions
                     },
                     Index = 0
                 }
+            }
+        };
+
+        await context.Response.WriteAsJsonAsync(error);
+    }
+
+    public static async ValueTask WriteOpenAIErrorAsync(this HttpContext context, string message, string code = "500")
+    {
+        var error = new ThorChatCompletionsResponse
+        {
+            Error = new ThorError()
+            {
+                Type = "error",
+                Code = "openai_error " + code,
             }
         };
 

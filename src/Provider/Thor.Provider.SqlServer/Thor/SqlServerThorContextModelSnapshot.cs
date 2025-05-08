@@ -22,6 +22,100 @@ namespace Thor.Provider.SqlServer.Thor
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Thor.Domain.Chats.Token", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("AccessedTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Creator")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("Disabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ExpiredTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Groups")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDelete")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .HasColumnType("nvarchar(42)");
+
+                    b.Property<string>("LimitModels")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Modifier")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("RemainQuota")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("UnlimitedExpired")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("UnlimitedQuota")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("UsedQuota")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WhiteIpList")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Creator");
+
+                    b.HasIndex("Key");
+
+                    b.ToTable("Tokens");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 179, DateTimeKind.Local).AddTicks(1232),
+                            Creator = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
+                            Disabled = false,
+                            Groups = "[\"default\"]",
+                            IsDelete = false,
+                            Key = "sk-t1Dspc0iCYmPiOWuOqgtbrEEOHnlcithgxrE3h",
+                            LimitModels = "[]",
+                            Name = "默认Token",
+                            RemainQuota = 0L,
+                            UnlimitedExpired = true,
+                            UnlimitedQuota = true,
+                            UsedQuota = 0L,
+                            WhiteIpList = "[]"
+                        });
+                });
+
             modelBuilder.Entity("Thor.Domain.Users.UserGroup", b =>
                 {
                     b.Property<Guid>("Id")
@@ -78,7 +172,7 @@ namespace Thor.Provider.SqlServer.Thor
                         {
                             Id = new Guid("ca378c74-19e7-458a-918b-4dbb7ae1729d"),
                             Code = "default",
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 677, DateTimeKind.Local).AddTicks(2424),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 180, DateTimeKind.Local).AddTicks(1982),
                             Description = "默认用户组",
                             Enable = true,
                             Name = "默认",
@@ -89,7 +183,7 @@ namespace Thor.Provider.SqlServer.Thor
                         {
                             Id = new Guid("ca378c74-19e7-458a-918b-4dbb7ae17291"),
                             Code = "vip",
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 677, DateTimeKind.Local).AddTicks(2833),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 180, DateTimeKind.Local).AddTicks(2617),
                             Description = "VIP用户组",
                             Enable = true,
                             Name = "VIP",
@@ -214,6 +308,10 @@ namespace Thor.Provider.SqlServer.Thor
                     b.Property<bool>("Enable")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Icon")
                         .HasColumnType("nvarchar(max)");
 
@@ -240,6 +338,10 @@ namespace Thor.Provider.SqlServer.Thor
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -254,1154 +356,1306 @@ namespace Thor.Provider.SqlServer.Thor
                     b.HasData(
                         new
                         {
-                            Id = new Guid("274d1123-9827-485e-a821-e205ceca872f"),
+                            Id = new Guid("10aaedb8-0f7f-4482-876b-1e526021ee0f"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7263),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(3870),
                             Description = "GPT-3.5 Turbo 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo",
                             PromptRate = 0.75m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("bf2e0bad-249b-4975-9025-1080f64e3812"),
+                            Id = new Guid("238d5fb5-cc9e-474e-bebb-1ebc6be65fbd"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7520),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4105),
                             Description = "GPT-3.5 Turbo 0125 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-0125",
                             PromptRate = 0.25m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("96a88940-a2f5-4462-8d08-f7e0e46ebb0e"),
+                            Id = new Guid("780c451f-2e7c-4139-9f3f-0ea46076d781"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7521),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4107),
                             Description = "GPT-3.5 Turbo 0301 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-0301",
                             PromptRate = 0.75m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("bdcd92ce-e0c0-4b5b-ac8e-e6a462792069"),
+                            Id = new Guid("7a394c09-7a84-4296-a3eb-a73cff1fbef1"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7522),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4108),
                             Description = "GPT-3.5 Turbo 0613 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-0613",
                             PromptRate = 0.75m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("c491a0ad-8664-494f-b8c4-e952a6f4104f"),
+                            Id = new Guid("b9946194-3187-4c0f-96a8-77916bac6f5c"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7523),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4109),
                             Description = "GPT-3.5 Turbo 1106 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-1106",
                             PromptRate = 0.25m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("962887b5-f614-44d2-ae09-d014dfec1f54"),
+                            Id = new Guid("78232419-db90-497d-85e7-ceb1a116cb56"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7524),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4109),
                             Description = "GPT-3.5 Turbo 16k 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-16k",
                             PromptRate = 0.75m,
                             QuotaMax = "16K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("4a61d49f-1adc-4405-b311-daca6a960849"),
+                            Id = new Guid("dda9488e-41bd-4a83-94f0-9b343c10e6b9"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7524),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4110),
                             Description = "GPT-3.5 Turbo 16k 0613 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-16k-0613",
                             PromptRate = 0.75m,
                             QuotaMax = "16K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("841f4f9a-b034-49a6-a1a2-5887db9f497f"),
+                            Id = new Guid("d3b4f231-5408-4521-96d4-7468bfdf4ee9"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7532),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4113),
                             Description = "GPT-3.5 Turbo Instruct 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-3.5-turbo-instruct",
                             PromptRate = 0.001m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("1a5adefd-3e88-43bb-a416-d87ea4edb07d"),
+                            Id = new Guid("4791a55c-83d9-44e0-bf3f-d1df8fae64f4"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7532),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4118),
                             Description = "GPT-4 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4",
                             PromptRate = 15m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("ced1c024-3a71-45cd-b8b2-a7cb787317fe"),
+                            Id = new Guid("ae42567e-738f-4efa-b7e8-a0e331d18b99"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7533),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4119),
                             Description = "GPT-4 0125 预览文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-0125-preview",
                             PromptRate = 5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("1dfc392d-11d9-45a0-b081-2702ba7e1bd0"),
+                            Id = new Guid("8779550e-3c75-4dda-b1ae-de1d393d1f31"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7534),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4120),
                             Description = "GPT-4 0314 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-0314",
                             PromptRate = 15m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("9b44a294-f0c7-4e22-b8be-6cf2db7f66a8"),
+                            Id = new Guid("5e8ffbb8-fa73-4540-a87b-4a85a902f3c5"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7535),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4121),
                             Description = "GPT-4 0613 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-0613",
                             PromptRate = 15m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("e35332b2-0b06-4de0-96d8-3b035646a7b7"),
+                            Id = new Guid("e8aa4b8f-fdba-4cef-afbc-a88213dd71c7"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7535),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4122),
                             Description = "GPT-4 1106 预览文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-1106-preview",
                             PromptRate = 5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("f65fcef0-0280-4a27-9d0f-0b59bfdaf565"),
+                            Id = new Guid("29fe3442-630a-4e2d-942b-95bf6b967ede"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7536),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4122),
                             Description = "GPT-4 1106 视觉预览模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-1106-vision-preview",
                             PromptRate = 10m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u89C6\\u89C9\",\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u89C6\\u89C9\",\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("0f634100-d4fa-45fe-bbbb-6c2b650973c5"),
+                            Id = new Guid("e5326a90-3498-4454-8d34-9bc6961dc4d4"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7537),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4123),
                             Description = "GPT-4 32k 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-32k",
                             PromptRate = 30m,
                             QuotaMax = "32K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("b200967e-41bd-4af0-be2a-90226c5dfe69"),
+                            Id = new Guid("0541dc90-abbf-42ef-a080-5d782953481f"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7539),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4125),
                             Description = "GPT-4 32k 0314 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-32k-0314",
                             PromptRate = 30m,
                             QuotaMax = "32K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("78abc8fc-14b4-4b9e-a835-8ba34063c761"),
+                            Id = new Guid("03714cb8-bae0-41c3-80aa-f9a85a4f58c7"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7540),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4127),
                             Description = "GPT-4 32k 0613 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-32k-0613",
                             PromptRate = 30m,
                             QuotaMax = "32K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("25b27612-43bc-48fa-8a72-96067d4be30d"),
+                            Id = new Guid("f6ae68a7-5c76-4399-971d-19acbe9a8515"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7541),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4128),
                             Description = "GPT-4 全部文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-all",
                             PromptRate = 30m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u8054\\u7F51\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u8054\\u7F51\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("bc34aa79-d68d-489a-bdb3-8d75a9461dbf"),
+                            Id = new Guid("cd2de2ff-9145-4327-92b8-46e2a1b01664"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7541),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4129),
                             Description = "GPT-4 Turbo 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-turbo",
                             PromptRate = 5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("2fb3770a-3acf-4af2-930c-fa85a451b119"),
+                            Id = new Guid("bd378e16-0239-4f44-bfa1-ce8b547eaafa"),
                             Available = true,
                             CompletionRate = 2m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7542),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4130),
                             Description = "Gemini 1.5 Pro 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Google",
                             IsVersion2 = false,
                             Model = "gemini-1.5-pro",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("4e6e48ec-8d99-4595-936d-a5bbe0d9a59d"),
+                            Id = new Guid("34121182-e63f-48e5-8037-78f9f0779bac"),
                             Available = true,
                             CompletionRate = 3m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7543),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4131),
                             Description = "Gemini Pro 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Google",
                             IsVersion2 = false,
                             Model = "gemini-pro",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("c529f3a5-d6e1-4472-8a02-cf168f506b15"),
+                            Id = new Guid("0bcdddcc-e890-43d8-9ad1-6c7c398eced3"),
                             Available = true,
                             CompletionRate = 3m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7543),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4132),
                             Description = "Gemini Pro 视觉模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Google",
                             IsVersion2 = false,
                             Model = "gemini-pro-vision",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("4d0e424e-e2eb-4b86-acf4-9f56fe4ae078"),
+                            Id = new Guid("27624bcb-2541-4470-92ca-6e28726c5782"),
                             Available = true,
                             CompletionRate = 3m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7545),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4134),
                             Description = "Gemini 1.5 Flash 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Google",
                             IsVersion2 = false,
                             Model = "gemini-1.5-flash",
                             PromptRate = 0.2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("e0685aaf-0d92-4d6a-b736-03ce04e1ffa1"),
+                            Id = new Guid("f69bcb92-c306-49da-bacd-f449560c4ef4"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7547),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4135),
                             Description = "GPT-4 Turbo 2024-04-09 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-turbo-2024-04-09",
                             PromptRate = 5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("28e3dbc8-2abe-4d8e-a8c1-1a3fcdf49734"),
+                            Id = new Guid("bfe4276c-3a61-4aef-be40-be4bfa43c4c6"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7548),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4137),
                             Description = "GPT-4 Turbo 预览文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-turbo-preview",
                             PromptRate = 5m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("253a6802-d199-4e5f-89f3-1c1e4618593c"),
+                            Id = new Guid("b881984b-d814-4554-865f-7611bc40be55"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7549),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4138),
                             Description = "GPT-4 视觉预览模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4-vision-preview",
                             PromptRate = 10m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("841f415d-218b-423b-841d-5e0c91b2f216"),
+                            Id = new Guid("bc05fb30-c6a5-430e-a2b2-c13cd40c827e"),
                             Available = true,
                             CompletionRate = 3m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7549),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4139),
                             Description = "GPT-4o 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4o",
                             PromptRate = 3m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("5ef05b16-4256-4b14-9687-ab9f64799d7d"),
+                            Id = new Guid("1e8b96da-014f-488a-b43d-32ceb9648226"),
                             Available = true,
                             CompletionRate = 4m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7550),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4141),
                             Description = "ChatGPT 4o 最新文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "chatgpt-4o-latest",
                             PromptRate = 3m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("43eb602b-0480-43ad-975f-6385fa9d535f"),
+                            Id = new Guid("da97fde2-ea67-4409-ab9e-544cd3083742"),
                             Available = true,
                             CompletionRate = 4m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7551),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4142),
                             Description = "GPT-4o Mini 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4o-mini",
                             PromptRate = 0.07m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("d32e9075-5f96-40da-ae0a-c759f37c3ff6"),
+                            Id = new Guid("a4505701-2bb1-41b2-a7a7-3ac0aaa41abf"),
                             Available = true,
                             CompletionRate = 4m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7551),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4143),
                             Description = "GPT-4o Mini 2024-07-18 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4o-mini-2024-07-18",
                             PromptRate = 0.07m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("f27c0246-4123-4229-8317-900c4701695e"),
+                            Id = new Guid("0af54beb-bcd3-4cb3-871b-2b9e8a05dbee"),
                             Available = true,
                             CompletionRate = 4m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7553),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4143),
                             Description = "GPT-4o 2024-05-13 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4o-2024-05-13",
                             PromptRate = 3m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("6589879e-fb0d-4344-96cd-fb36fa1c5e99"),
+                            Id = new Guid("42f60493-8daf-4e0f-a021-f3b3a7b077de"),
                             Available = true,
                             CompletionRate = 4m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7555),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4144),
                             Description = "GPT-4o 2024-08-06 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "gpt-4o-2024-08-06",
                             PromptRate = 1.25m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u6587\\u672C\",\"\\u89C6\\u89C9\",\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("ea42a90c-ee52-4ed5-83f4-b16c3df91d65"),
+                            Id = new Guid("77a2fa94-6d7a-4fa3-bf98-3d420c75102e"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7556),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4146),
                             Description = "Moonshot v1 128k 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Moonshot",
                             IsVersion2 = false,
                             Model = "moonshot-v1-128k",
                             PromptRate = 5.06m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("b6668ddf-3539-4c1e-b931-5e0968b19692"),
+                            Id = new Guid("b52e4103-486b-4dfa-a882-92dcaefa5a4a"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7556),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4147),
                             Description = "Moonshot v1 32k 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Moonshot",
                             IsVersion2 = false,
                             Model = "moonshot-v1-32k",
                             PromptRate = 2m,
                             QuotaMax = "32K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("6e5c5a1f-d223-4ba9-8814-b96662ebca54"),
+                            Id = new Guid("fe65a806-17e3-4d8f-b974-40cd38f73be4"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7557),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4149),
                             Description = "Moonshot v1 8k 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Moonshot",
                             IsVersion2 = false,
                             Model = "moonshot-v1-8k",
                             PromptRate = 1m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("9c72e5c5-2135-4213-9434-26f6955db143"),
+                            Id = new Guid("914be797-b286-490d-9011-9a7d2564cf39"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7558),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4149),
                             Description = "Text Babbage 001 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-babbage-001",
                             PromptRate = 0.25m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("178d282f-b6b1-4e39-8f85-5cb6ef72a987"),
+                            Id = new Guid("360ca4e7-fc99-4d6e-aa56-3c86c7823a05"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7558),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4150),
                             Description = "Text Curie 001 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-curie-001",
                             PromptRate = 1m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("01d8833b-2d93-4d95-85d7-74eed50c1874"),
+                            Id = new Guid("c82c369a-2a3e-4dfc-bb8f-f020e79522d9"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7559),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4151),
                             Description = "Text Davinci 002 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-davinci-002",
                             PromptRate = 10m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("74afffb3-4606-4eb0-9ff3-3a43ea68b983"),
+                            Id = new Guid("e5beb03e-01f9-4995-bd4c-e2793fb4a27c"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7560),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4152),
                             Description = "Text Davinci 003 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-davinci-003",
                             PromptRate = 10m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("d02083f9-9366-433e-a37b-aeb445744c02"),
+                            Id = new Guid("5e6156a5-4f82-4816-a3cc-3deb86d5e0de"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7562),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4152),
                             Description = "Text Davinci Edit 001 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-davinci-edit-001",
                             PromptRate = 10m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("96de712c-5428-441a-a72f-68286e9a75e0"),
+                            Id = new Guid("8706b189-05ec-4b54-88e0-310744f8c1d5"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7562),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4155),
                             Description = "Text Embedding 3 Large 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-embedding-3-large",
                             PromptRate = 0.13m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("a388d51c-a6c0-4560-86d7-df4534507e80"),
+                            Id = new Guid("adae5d1d-b99f-4566-abe6-af2bce909608"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7563),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4155),
                             Description = "Text Embedding 3 Small 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-embedding-3-small",
                             PromptRate = 0.1m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("7d91a2f8-4a5e-402d-958b-9d12ee501db7"),
+                            Id = new Guid("4b54a0be-f909-491a-a985-b29c197f620a"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7564),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4156),
                             Description = "Text Embedding Ada 002 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "text-embedding-ada-002",
                             PromptRate = 0.1m,
                             QuotaMax = "8K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("55d8b44e-8853-4878-a7c7-245cfa952962"),
+                            Id = new Guid("1c68a68b-1ec1-4b94-9af2-d866e3ef21c6"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7565),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4157),
                             Description = "TTS 1 语音合成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "tts-1",
                             PromptRate = 7.5m,
                             QuotaType = 1,
-                            Tags = "[\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("276cbb92-bf5c-4f04-92e2-3a7ffd399f01"),
+                            Id = new Guid("7e200932-37b5-4297-96f8-e4bb3d29d971"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7566),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4157),
                             Description = "TTS 1 1106 语音合成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "tts-1-1106",
                             PromptRate = 7.5m,
                             QuotaType = 1,
-                            Tags = "[\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("fdb3f357-31b6-4752-a182-b05df3ea29d1"),
+                            Id = new Guid("a99c09b3-91cd-4ac5-b952-4336a3a6c671"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7566),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4158),
                             Description = "TTS 1 HD 语音合成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "tts-1-hd",
                             PromptRate = 15m,
                             QuotaType = 2,
-                            Tags = "[\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("79148843-af58-45cc-ae42-435ca68d925b"),
+                            Id = new Guid("f07d394a-2547-4b76-8520-7a12b760ec50"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7567),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4159),
                             Description = "TTS 1 HD 1106 语音合成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "tts-1-hd-1106",
                             PromptRate = 15m,
                             QuotaType = 2,
-                            Tags = "[\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("5b8d7951-4db5-423c-a16d-6a086506a29e"),
+                            Id = new Guid("2c59cc7c-e0b9-4490-9147-379542657998"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7569),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4160),
                             Description = "Whisper 1 语音识别模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "whisper-1",
                             PromptRate = 15m,
                             QuotaType = 2,
-                            Tags = "[\"\\u97F3\\u9891\"]"
+                            Tags = "[\"\\u97F3\\u9891\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("499c8e8a-e2ee-4734-a779-a14814a31e24"),
+                            Id = new Guid("02b7ada3-f16a-4ae6-95fd-24cd5e1c65e3"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7570),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4162),
                             Description = "Hunyuan Lite 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Hunyuan",
                             IsVersion2 = false,
                             Model = "hunyuan-lite",
                             PromptRate = 0.75m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("b536643c-717f-4551-98ea-30b8555e36e3"),
+                            Id = new Guid("81ffd1db-5c25-47dd-b32d-cd207061c409"),
                             Available = true,
                             CompletionRate = 2m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7571),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4163),
                             Description = "通用文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Spark",
                             IsVersion2 = false,
                             Model = "general",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("5646b405-ef62-418a-8015-54796a751bc6"),
+                            Id = new Guid("a70afaff-297f-4ea7-a871-e63300374ec5"),
                             Available = true,
                             CompletionRate = 2m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7572),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4164),
                             Description = "通用文本模型 v3",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Spark",
                             IsVersion2 = false,
                             Model = "generalv3",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("f780f5ed-5359-400c-9ac4-fa49cc8304f9"),
+                            Id = new Guid("878b8589-81e7-4a3d-8f7f-f3221a242c3a"),
                             Available = true,
                             CompletionRate = 2m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7572),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4165),
                             Description = "通用文本模型 v3.5",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Spark",
                             IsVersion2 = false,
                             Model = "generalv3.5",
                             PromptRate = 2m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("ff3e8a72-50af-4080-bce3-63a1e1fcd069"),
+                            Id = new Guid("f342d14c-cd9a-4668-9fdf-d59a44354c6b"),
                             Available = true,
                             CompletionRate = 3m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7573),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4166),
                             Description = "4.0 超级文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Spark",
                             IsVersion2 = false,
                             Model = "4.0Ultra",
                             PromptRate = 5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("9b220184-6600-41e2-972f-0382cba80da5"),
+                            Id = new Guid("4547bc8d-32fe-464e-9ced-41ddd1f1edf8"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7574),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4166),
                             Description = "ChatGLM Lite 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "chatglm_lite",
                             PromptRate = 0.1429m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("b1471c85-2e38-4fcf-a72f-feccea9d44fa"),
+                            Id = new Guid("7a8c1556-438d-4608-8580-defdf1f70e67"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7574),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4167),
                             Description = "ChatGLM Pro 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "chatglm_pro",
                             PromptRate = 0.7143m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("655695cd-ec26-4d8d-9e01-30d6c3eaf4c9"),
+                            Id = new Guid("86c4131a-90ed-4e04-a42c-ea80d61a36e4"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7576),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4168),
                             Description = "ChatGLM 标准文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "chatglm_std",
                             PromptRate = 0.3572m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("3cf9445f-8282-44d4-82fa-37cfd6296acb"),
+                            Id = new Guid("0a9084e5-54d9-4586-b394-6516e0e03986"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7577),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4170),
                             Description = "ChatGLM Turbo 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "chatglm_turbo",
                             PromptRate = 0.3572m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("eaa26b2e-5a41-4e5c-b095-71b33a515e0f"),
+                            Id = new Guid("6014f127-5875-4299-98cb-e0974e8b0146"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7577),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4171),
                             Description = "Claude 2 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-2",
                             PromptRate = 7.5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("90cee66a-26fb-4816-b40c-4ea1b8cfee14"),
+                            Id = new Guid("b6c3781b-3ea9-4922-9878-6bad8e9d69bf"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7578),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4171),
                             Description = "Claude 2.0 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-2.0",
                             PromptRate = 7.5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("5af5fc71-da2f-44e3-847f-80aeb64cf2ec"),
+                            Id = new Guid("a5a8c09a-dfeb-4e5d-aca5-79adad9c703e"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7579),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4172),
                             Description = "Claude 2.1 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-2.1",
                             PromptRate = 7.5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("ab67e831-88b2-4588-a2b6-f358ef7f0803"),
+                            Id = new Guid("f6233503-5917-4597-8e81-e24450ca1976"),
                             Available = true,
                             CompletionRate = 5m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7579),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4173),
                             Description = "Claude 3 Haiku 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-3-haiku",
                             PromptRate = 0.5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("319fe598-4795-43f2-b367-031aa04312a8"),
+                            Id = new Guid("a7b5457b-e93d-4456-a15a-8c6d1ca2cf77"),
                             Available = true,
                             CompletionRate = 5m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7580),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4174),
                             Description = "Claude 3 Haiku 20240307 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-3-haiku-20240307",
                             PromptRate = 0.5m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("d76acbbf-79ce-4fca-be18-a446c04500be"),
+                            Id = new Guid("5649930c-8e3e-4af8-9b42-1f65763bd284"),
                             Available = true,
                             CompletionRate = 5m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7584),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4175),
                             Description = "Claude 3.5 Sonnet 20240620 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-3-5-sonnet-20240620",
                             PromptRate = 3m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("1f348a33-9355-4a24-96bb-a142bec4c561"),
+                            Id = new Guid("7dc63c08-1f36-4003-a03c-88500c10502d"),
                             Available = true,
                             CompletionRate = 5m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7586),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4176),
                             Description = "Claude 3 Sonnet 20240229 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-3-sonnet-20240229",
                             PromptRate = 3m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("2ba1044f-3ba8-43ba-9a4f-81b4c2147fd6"),
+                            Id = new Guid("e0112b2a-83a1-48dd-ae23-adb65fa38878"),
                             Available = true,
                             CompletionRate = 5m,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7587),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4178),
                             Description = "Claude 3 Opus 20240229 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-3-opus-20240229",
                             PromptRate = 30m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("74bf72fc-572b-4c45-97e3-def132710c41"),
+                            Id = new Guid("0949f314-a096-47df-88b5-89540856c2fa"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7588),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4179),
                             Description = "Claude Instant 1 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-instant-1",
                             PromptRate = 0.815m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("4293aa76-4416-4e69-a283-38747a93020d"),
+                            Id = new Guid("dc5f007d-a5ad-4406-a66d-8e27f2181c7e"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7588),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4179),
                             Description = "Claude Instant 1.2 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "Claude",
                             IsVersion2 = false,
                             Model = "claude-instant-1.2",
                             PromptRate = 0.4m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("d19c00ba-b029-4ea8-ad41-3326255334fc"),
+                            Id = new Guid("3d81b6d6-3390-45b0-bf96-f1036d9c14cc"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7589),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4180),
                             Description = "DALL-E 2 图像生成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "dall-e-2",
                             PromptRate = 8m,
                             QuotaType = 2,
-                            Tags = "[\"\\u56FE\\u7247\"]"
+                            Tags = "[\"\\u56FE\\u7247\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("9a52c6f0-41aa-490b-91e4-a8a9ea680eb4"),
+                            Id = new Guid("510a81a4-a91d-472c-a917-ab5d4a170ae7"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7590),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4181),
                             Description = "DALL-E 3 图像生成模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "dall-e-3",
                             PromptRate = 20m,
                             QuotaType = 2,
-                            Tags = "[\"\\u56FE\\u7247\"]"
+                            Tags = "[\"\\u56FE\\u7247\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("af2c1427-3110-489f-bcc4-2a062bd89b00"),
+                            Id = new Guid("b486a89f-5897-4ac9-b672-8c35f58f194f"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7590),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4181),
                             Description = "Embedding 2 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "embedding-2",
                             PromptRate = 0.0355m,
                             QuotaMax = "",
                             QuotaType = 1,
-                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]"
+                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("f1cc4b90-12f0-4146-89b3-23228a707c36"),
+                            Id = new Guid("8716f933-13de-4566-b988-7f4be43fa113"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7591),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4182),
                             Description = "Embedding BERT 512 v1 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "OpenAI",
                             IsVersion2 = false,
                             Model = "embedding-bert-512-v1",
                             PromptRate = 0.1m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]"
+                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("65e0a454-4f14-4e13-bcd2-f89861eae7fc"),
+                            Id = new Guid("1fe4997e-2817-4754-8828-b9130ce052cc"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7593),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4183),
                             Description = "Embedding S1 v1 嵌入模型",
                             Enable = true,
+                            Extension = "{}",
                             IsVersion2 = false,
                             Model = "embedding_s1_v1",
                             PromptRate = 0.1m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]"
+                            Tags = "[\"\\u5D4C\\u5165\\u6A21\\u578B\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("60234241-9d35-4eb7-a35a-b16c7c2a1d24"),
+                            Id = new Guid("339982d7-a05e-45cc-a535-b2de2968f68e"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7594),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4185),
                             Description = "GLM 3 Turbo 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "glm-3-turbo",
                             PromptRate = 0.355m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("470cc750-d8f9-4145-82be-155182a66cca"),
+                            Id = new Guid("b0893da8-5faf-4832-9187-2fa082b624fa"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7595),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4186),
                             Description = "GLM 4 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "glm-4",
                             PromptRate = 15m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("fce1b53a-1019-4a26-89b6-3441e78faf38"),
+                            Id = new Guid("d5e4f884-2e07-4c63-9c19-1e3bb64d7682"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7596),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4187),
                             Description = "GLM 4 全部文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "glm-4-all",
                             PromptRate = 30m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         },
                         new
                         {
-                            Id = new Guid("44cde17b-07da-4199-b8e5-8c217d3988f4"),
+                            Id = new Guid("004f019c-adb3-40bf-a9da-86721d10dfda"),
                             Available = true,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 716, DateTimeKind.Local).AddTicks(7596),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 218, DateTimeKind.Local).AddTicks(4187),
                             Description = "GLM 4v 文本模型",
                             Enable = true,
+                            Extension = "{}",
                             Icon = "ChatGLM",
                             IsVersion2 = false,
                             Model = "glm-4v",
                             PromptRate = 15m,
                             QuotaMax = "128K",
                             QuotaType = 1,
-                            Tags = "[\"\\u6587\\u672C\"]"
+                            Tags = "[\"\\u6587\\u672C\"]",
+                            Type = "chat"
                         });
                 });
 
@@ -1929,100 +2183,6 @@ namespace Thor.Provider.SqlServer.Thor
                         });
                 });
 
-            modelBuilder.Entity("Thor.Service.Domain.Token", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("AccessedTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Creator")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("Disabled")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("ExpiredTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Groups")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDelete")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(42)
-                        .HasColumnType("nvarchar(42)");
-
-                    b.Property<string>("LimitModels")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Modifier")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<long>("RemainQuota")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("UnlimitedExpired")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("UnlimitedQuota")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<long>("UsedQuota")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("WhiteIpList")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Creator");
-
-                    b.HasIndex("Key");
-
-                    b.ToTable("Tokens");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 676, DateTimeKind.Local).AddTicks(835),
-                            Creator = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
-                            Disabled = false,
-                            Groups = "[\"default\",\"vip\"]",
-                            IsDelete = false,
-                            Key = "sk-WX69KEdrtnhAi1VyMytAJovi0eTnCRyfUmFri8",
-                            LimitModels = "[]",
-                            Name = "默认Token",
-                            RemainQuota = 0L,
-                            UnlimitedExpired = true,
-                            UnlimitedQuota = true,
-                            UsedQuota = 0L,
-                            WhiteIpList = "[]"
-                        });
-                });
-
             modelBuilder.Entity("Thor.Service.Domain.User", b =>
                 {
                     b.Property<string>("Id")
@@ -2094,13 +2254,13 @@ namespace Thor.Provider.SqlServer.Thor
                         {
                             Id = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
                             ConsumeToken = 0L,
-                            CreatedAt = new DateTime(2025, 3, 13, 17, 53, 46, 674, DateTimeKind.Local).AddTicks(4728),
+                            CreatedAt = new DateTime(2025, 4, 26, 23, 58, 17, 177, DateTimeKind.Local).AddTicks(4587),
                             Email = "239573049@qq.com",
                             Groups = "[\"default\",\"vip\"]",
                             IsDelete = false,
                             IsDisabled = false,
-                            Password = "0ac4f29cc0abb315f5bb2d6757973a7c",
-                            PasswordHas = "e61a09505c5242348bcda14c702dd21a",
+                            Password = "ff1ed311796f3418c3af40f49e71ca05",
+                            PasswordHas = "a96d5b2e7c4449f7907c9f55c6656ade",
                             RequestCount = 0L,
                             ResidualCredit = 1000000000L,
                             Role = "admin",

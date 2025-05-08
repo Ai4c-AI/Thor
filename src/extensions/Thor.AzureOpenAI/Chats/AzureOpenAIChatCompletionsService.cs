@@ -6,6 +6,7 @@ using System.Text.Json;
 using Thor.Abstractions;
 using Thor.Abstractions.Chats;
 using Thor.Abstractions.Chats.Dtos;
+using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Extensions;
 
@@ -21,9 +22,10 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
         using var openai =
             Activity.Current?.Source.StartActivity("Azure OpenAI 对话补全");
         var url = AzureOpenAIFactory.GetAddress(options, chatCompletionCreate.Model);
-        
+
         var response =
-            await HttpClientFactory.GetHttpClient(options.Address).PostJsonAsync(url, chatCompletionCreate, options.ApiKey, "Api-Key");
+            await HttpClientFactory.GetHttpClient(options.Address)
+                .PostJsonAsync(url, chatCompletionCreate, options.ApiKey, "Api-Key");
 
         openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/chat/completions");
         openai?.SetTag("Model", chatCompletionCreate.Model);
@@ -41,7 +43,8 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
         }
 
         var result = await response.Content
-            .ReadFromJsonAsync<ThorChatCompletionsResponse>(cancellationToken: cancellationToken)
+            .ReadFromJsonAsync<ThorChatCompletionsResponse>(ThorJsonSerializer.DefaultOptions,
+                cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
 
@@ -65,20 +68,24 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
 
         if (response.StatusCode >= HttpStatusCode.BadRequest)
         {
-            logger.LogError("Azure对话异常 , StatusCode: {StatusCode} ", response.StatusCode);
+            var error = await response.Content.ReadAsStringAsync();
+            logger.LogError("Azure对话异常 , StatusCode: {StatusCode} 错误响应内容：{Content}", response.StatusCode,
+                error);
+
+            throw new BusinessException("AzureOpenAI对话异常：" + error, response.StatusCode.ToString());
         }
 
         using StreamReader reader = new(await response.Content.ReadAsStreamAsync(cancellationToken));
         string? line = string.Empty;
         var first = true;
-        var isThink = false;
         while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
         {
             line += Environment.NewLine;
 
             if (line.StartsWith('{'))
             {
-                logger.LogInformation("AzureOpenAI对话异常 , StatusCode: {StatusCode} Response: {Response}", response.StatusCode,
+                logger.LogInformation("AzureOpenAI对话异常 , StatusCode: {StatusCode} Response: {Response}",
+                    response.StatusCode,
                     line);
 
                 throw new BusinessException("AzureOpenAI对话异常", line);
@@ -101,42 +108,8 @@ public class AzureOpenAIChatCompletionsService(ILogger<AzureOpenAIChatCompletion
                 continue;
             }
 
-
             var result = JsonSerializer.Deserialize<ThorChatCompletionsResponse>(line,
                 ThorJsonSerializer.DefaultOptions);
-
-            var content = result?.Choices?.FirstOrDefault()?.Delta;
-
-            if (first && string.IsNullOrWhiteSpace(content?.Content) && string.IsNullOrEmpty(content?.ReasoningContent))
-            {
-                continue;
-            }
-
-            if (first && content.Content == OpenAIConstant.ThinkStart)
-            {
-                isThink = true;
-                continue;
-                // 需要将content的内容转换到其他字段
-            }
-
-            if (isThink && content.Content.Contains(OpenAIConstant.ThinkEnd))
-            {
-                isThink = false;
-                // 需要将content的内容转换到其他字段
-                continue;
-            }
-
-            if (isThink)
-            {
-                // 需要将content的内容转换到其他字段
-                foreach (var choice in result.Choices)
-                {
-                    choice.Delta.ReasoningContent = choice.Delta.Content;
-                    choice.Delta.Content = string.Empty;
-                }
-            }
-
-            first = false;
 
             yield return result;
         }

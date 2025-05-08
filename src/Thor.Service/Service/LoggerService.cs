@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using Thor.BuildingBlocks.Event;
-using Thor.Service.Model;
 using Thor.Service.Options;
 
 namespace Thor.Service.Service;
@@ -9,7 +8,7 @@ public sealed class LoggerService(
     IServiceProvider serviceProvider,
     IEventBus<ChatLogger> eventBus,
     IServiceCache serviceCache)
-    : ApplicationService(serviceProvider), IScopeDependency
+    : ApplicationService(serviceProvider)
 {
     public async ValueTask CreateAsync(ChatLogger logger)
     {
@@ -183,6 +182,16 @@ public sealed class LoggerService(
             .ToListAsync();
 
         if (!UserContext.IsAdmin) result.ForEach(x => { x.ChannelName = null; });
+        
+        // 给所有的key脱敏,只显示前面3位和后面3位
+        result.ForEach(x =>
+        {
+            if (!string.IsNullOrEmpty(x.TokenName))
+            {
+                x.TokenName = x.TokenName[..3] + "..." +
+                              x.TokenName[^3..];
+            }
+        });
 
         return new PagingDto<ChatLogger>(total, result);
     }

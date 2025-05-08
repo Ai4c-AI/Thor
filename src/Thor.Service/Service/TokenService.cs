@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using Thor.Domain.Chats;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 
@@ -9,7 +10,7 @@ public sealed class TokenService(
     UserService userService,
     JwtHelper jwtHelper,
     ILogger<TokenService> logger)
-    : ApplicationService(serviceProvider), IScopeDependency
+    : ApplicationService(serviceProvider)
 {
     public async ValueTask<string> CreateAsync(TokenInput input, string? createId = null)
     {
@@ -63,12 +64,11 @@ public sealed class TokenService(
 
     public async ValueTask<bool> UpdateAsync(Token input)
     {
-        
         if (input.Groups.Length <= 0) throw new Exception("请选择分组");
 
         if (input.Groups.Length > 1) throw new Exception("token只能属于一个分组");
 
-        
+
         var result = await DbContext.Tokens.Where(x => x.Id == input.Id)
             .ExecuteUpdateAsync(item =>
                 item.SetProperty(x => x.Name, input.Name)
@@ -135,6 +135,11 @@ public sealed class TokenService(
 
         if (string.IsNullOrEmpty(key))
         {
+            if (context.Request.Headers.TryGetValue("x-api-key", out var xapiKey))
+            {
+                key = xapiKey;
+            }
+
             var protocol = context.Request.Headers.SecWebSocketProtocol.ToString().Split(",").Select(x => x.Trim());
 
             var apiKey = protocol

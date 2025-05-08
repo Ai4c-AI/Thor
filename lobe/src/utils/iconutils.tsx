@@ -17,7 +17,15 @@ import {
     Zhipu,
     DeepSeek,
     Qingyan,
-    Qwen
+    Qwen,
+    Meta,
+    Gemini,
+    Ollama,
+    SiliconCloud,
+    Gemma,
+    AssemblyAI,
+    Doubao,
+    Stability
 } from '@lobehub/icons';
 
 export function getIconByNames(size: number = 24) {
@@ -38,7 +46,18 @@ export function getIconByNames(size: number = 24) {
         "Moonshot",
         'DeepSeek',
         "Qingyan",
-        "Qwen"
+        "Qwen",
+        "SiliconCloud",
+        "Gemini",
+        "Ollama",
+        "Meta",
+        "Yi",
+        "Zhipu",
+        "Wenxin",
+        "Gemma",
+        "AssemblyAI",
+        "Doubao",
+        "Stability"
     ]
 
     return models.map((name) => {
@@ -80,7 +99,7 @@ export function getIconByName(name: string, size: number = 36) {
         case 'Baichuan':
             return {
                 icon: <IconAvatar Icon={Baichuan} size={size} />,
-                label: 'Baichuan'
+                label: '百川'
             };
         case 'Ai21':
             return {
@@ -100,7 +119,7 @@ export function getIconByName(name: string, size: number = 36) {
         case 'Hunyuan':
             return {
                 icon: <IconAvatar Icon={Hunyuan} size={size} />,
-                label: 'Hunyuan'
+                label: '混元'
             };
         case 'Minimax':
             return {
@@ -115,27 +134,22 @@ export function getIconByName(name: string, size: number = 36) {
         case 'Wenxin':
             return {
                 icon: <IconAvatar Icon={Wenxin} size={size} />,
-                label: 'Wenxin'
+                label: '文心一言'
             };
         case 'Yi':
             return {
                 icon: <IconAvatar Icon={Yi} size={size} />,
                 label: 'Yi'
             };
-        case 'Zhipu':
-            return {
-                icon: <IconAvatar Icon={Zhipu} size={size} />,
-                label: 'Zhipu'
-            };
         case 'Moonshot':
             return {
                 icon: <IconAvatar Icon={Moonshot} size={size} />,
-                label: 'Moonshot'
+                label: '月之暗面'
             };
         case 'DeepSeek':
             return {
                 icon: <IconAvatar Icon={DeepSeek} size={size} />,
-                label: 'DeepSeek'
+                label: '深度求索'
             };
         case 'Qingyan':
             return {
@@ -146,6 +160,51 @@ export function getIconByName(name: string, size: number = 36) {
             return {
                 icon: <IconAvatar Icon={Qwen} size={size} />,
                 label: 'Qwen'
+            };
+        case 'SiliconCloud':
+            return {
+                icon: <IconAvatar Icon={SiliconCloud} size={size} />,
+                label: '硅基流动'
+            };  
+        case 'Gemini':
+            return {
+                icon: <IconAvatar Icon={Gemini} size={size} />,
+                label: 'Gemini'
+            };  
+        case 'Ollama':
+            return {
+                icon: <IconAvatar Icon={Ollama} size={size} />,
+                label: 'Ollama'
+            };
+        case 'Meta':    
+            return {
+                icon: <IconAvatar Icon={Meta} size={size} />,
+                label: 'Meta'
+            };
+        case 'Zhipu':   
+            return {
+                icon: <IconAvatar Icon={Zhipu} size={size} />,
+                label: 'Zhipu'
+            };
+        case 'Gemma':
+            return {
+                icon: <IconAvatar Icon={Gemma} size={size} />,
+                label: 'Gemma'
+            };
+        case 'AssemblyAI':
+            return {
+                icon: <IconAvatar Icon={AssemblyAI} size={size} />,
+                label: 'AssemblyAI'
+            };
+        case 'Doubao':
+            return {
+                icon: <IconAvatar Icon={Doubao} size={size} />,
+                label: 'Doubao'
+            };
+        case 'Stability':
+            return {
+                icon: <IconAvatar Icon={Stability} size={size} />,
+                label: 'Stability'
             };
         default:
             return {

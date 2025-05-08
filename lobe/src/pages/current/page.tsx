@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
-import { info,  updatePassword } from '../../services/UserService';
-import { message,  Input, Button, Tabs } from 'antd';
+import { info } from '../../services/UserService';
+import { ConfigProvider, Card, Tabs, Empty, Spin, theme } from 'antd';
 import Pay from '../../components/pay';
 import UserInfo from '../../components/User/UserInfo';
+import { useTranslation } from 'react-i18next';
+import { UserOutlined, WalletOutlined } from '@ant-design/icons';
+
 export default function ProfileForm() {
+  const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [user, setUser] = useState({} as any);
-  const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [loading, setLoading] = useState(true);
 
   function loadUser() {
+    setLoading(true);
     info()
       .then((res) => {
         setUser(res.data);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }
 
@@ -19,90 +27,94 @@ export default function ProfileForm() {
     loadUser();
   }, []);
 
-  /**
-   * 修改密码
-   */
-  function onUpdatePassword() {
-    updatePassword({
-      oldPassword: password,
-      newPassword: newPassword
-    })
-      .then((res) => {
-        res.success ? message.success({
-          content: '修改成功',
-        }) : message.error({
-          content: res.message
-        });
-      });
-  }
+  // Modern card styles with Ant Design token system
+  const containerStyle = {
+    margin: token.marginLG,
+    height: '100%',
+    width: '100%',
+    maxWidth: '1200px',
+    padding: token.paddingMD,
+  };
+
+  const cardStyle = {
+    borderRadius: token.borderRadiusLG,
+    boxShadow: `0 4px 20px ${token.colorBgElevated}`,
+    overflow: 'hidden',
+  };
+
+  const tabBarStyle = {
+    marginBottom: token.marginMD,
+    display: 'flex',
+    justifyContent: 'center',
+  };
 
   return (
-    <div style={{
-      margin: 20,
-      height: '100%',
-      width: '100%',
-    }}>
-      <Tabs
-        style={{
-          width: '100%',
+    <div style={containerStyle}>
+      <ConfigProvider
+        theme={{
+          components: {
+            Tabs: {
+              cardGutter: token.marginXS,
+            },
+          },
         }}
-        tabPosition="top"
-        items={[
-          {
-            key: '1',
-            label: '用户信息',
-            children: <div style={{ padding: '0 24px' }}>
-              <UserInfo user={user} />
+      >
+        <Card 
+          style={cardStyle}
+          bodyStyle={{ padding: 0 }}
+        >
+          {loading ? (
+            <div style={{ padding: token.paddingLG, textAlign: 'center' }}>
+              <Spin size="large" />
             </div>
-          },
-          {
-            key: '2',
-            label: '充值余额',
-            children: <div style={{ padding: '0 24px' }}>
-              <Pay user={user} />
-            </div>
-          },
-          {
-            key: '3',
-            label: '修改密码',
-            children: <div style={{
-              padding: '0 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center'
-            }}>
-              <Input value={password}
-                type='password'
-                onChange={(value) => {
-                  setPassword(value.target.value);
-                }}
-                placeholder={'输入您原有密码'} style={{
-                  marginTop: 8
-                }} >
-              </Input>
-              <Input value={newPassword}
-                type='password'
-                onChange={(value) => {
-                  setNewPassword(value.target.value);
-                }}
-                placeholder={'输入您的新密码'} style={{
-                  marginTop: 8
-                }} >
-              </Input>
-              <div style={{
-                marginTop: 8
-              }}>
-                <Button style={{
-                  marginTop: 8
-                }} onClick={() => onUpdatePassword()} block type="primary" htmlType="submit">
-                  保存修改
-                </Button>
-              </div>
-            </div>
-          }
-        ]}
-        type='line'>
-      </Tabs>
+          ) : Object.keys(user).length === 0 ? (
+            <Empty 
+              description={t('common.noData')}
+              style={{ padding: token.paddingLG }}
+            />
+          ) : (
+            <Tabs
+              style={{ width: '100%' }}
+              tabBarStyle={tabBarStyle}
+              tabPosition="top"
+              items={[
+                {
+                  key: '1',
+                  label: (
+                    <span>
+                      <UserOutlined style={{ marginRight: token.marginXS }} />
+                      {t('userProfile.userInfo')}
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ padding: `0 ${token.paddingLG}px` }}>
+                      <UserInfo 
+                        onUpdate={loadUser}
+                        user={user} 
+                      />
+                    </div>
+                  ),
+                },
+                {
+                  key: '2',
+                  label: (
+                    <span>
+                      <WalletOutlined style={{ marginRight: token.marginXS }} />
+                      {t('userProfile.balance')}
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ padding: `0 ${token.paddingLG}px` }}>
+                      <Pay user={user} />
+                    </div>
+                  ),
+                }
+              ]}
+              type='card'
+            />
+          )}
+        </Card>
+      </ConfigProvider>
     </div>
   );
 }
