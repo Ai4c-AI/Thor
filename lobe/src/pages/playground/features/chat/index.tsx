@@ -1,17 +1,19 @@
-import { useEffect, useState, useRef } from 'react';
-import { Card, Select, Input, Button, Avatar, theme, message, Spin, Modal, Form, Row, Col, Empty, Grid, Space, Popconfirm, Tooltip } from 'antd';
-import { SendOutlined, UserOutlined, DeleteOutlined, SettingOutlined, SaveOutlined, SyncOutlined } from '@ant-design/icons';
+import { Card, Select, Input, Button, Avatar, theme, message, Spin, Modal, Form, Row, Col, Grid, Space, Popconfirm, Tooltip, Typography,  Tag } from 'antd';
+import { SendOutlined, UserOutlined, DeleteOutlined, SettingOutlined, SaveOutlined, SyncOutlined, ClearOutlined, RobotOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Flexbox } from 'react-layout-kit';
-import { IconAvatar } from '@lobehub/icons';
 import ReactMarkdown from 'react-markdown';
+import { useTranslation } from 'react-i18next';
 import { isMobileDevice } from '../../../../utils/responsive';
 import { getTokens } from '../../../../services/TokenService';
 import { getModels } from '../../../../services/ModelService';
+import { createCompletion, isResponsesModel, processStreamResponse } from '../../../../services/ResponsesService';
 import OpenAI from 'openai';
+import { useEffect, useRef, useState } from 'react';
 
 const { Option } = Select;
 const { TextArea } = Input;
 const { useBreakpoint } = Grid;
+const { Text, Title } = Typography;
 
 // Message type definition
 export interface Message {
@@ -41,6 +43,7 @@ export interface ChatHistory {
 
 export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
     const { token } = theme.useToken();
+    const { t } = useTranslation();
     const screens = useBreakpoint();
     const isMobile = !screens.md || isMobileDevice();
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,7 +56,7 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
     const [selectedToken, setSelectedToken] = useState<string>('');
     const [prompt, setPrompt] = useState<string>('');
     const [messages, setMessages] = useState<Message[]>([]);
-    const [systemPrompt, setSystemPrompt] = useState<string>('你是一个有用的AI助手。');
+    const [systemPrompt, setSystemPrompt] = useState<string>(t('playground.systemPrompt') || '你是一个有用的AI助手。');
     const [streaming, setStreaming] = useState(false);
     const [currentAssistantMessage, setCurrentAssistantMessage] = useState('');
     const [settingsVisible, setSettingsVisible] = useState(false);
@@ -62,7 +65,7 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
     useEffect(() => {
         // Initial loading of tokens and models
         fetchTokens();
-    }, []);
+    }, [modelInfo]);
 
     useEffect(() => {
         // Scroll to bottom when messages change
@@ -83,12 +86,12 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                     setSelectedToken(firstToken.key);
                     fetchModels(firstToken.key);
                 } else {
-                    message.warning('没有可用的Token，请先添加Token');
+                    message.warning(t('playground.errorMessages.noTokensAvailable'));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch tokens:', error);
-            message.error('获取Token列表失败');
+            message.error(t('common.error'));
         }
     };
     
@@ -97,7 +100,7 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
             setLoading(true);
             
             if (!token) {
-                message.warning('请先选择Token');
+                message.warning(t('playground.errorMessages.selectToken'));
                 return;
             }
             
@@ -133,20 +136,17 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                     }
                     
                     setModelOptions(filteredModels);
-                    
                     if (filteredModels.length > 0) {
                         setSelectedModel(filteredModels[0]);
-                    } else {
-                        message.info('没有可用的聊天模型');
                     }
                 } else {
-                    message.error('OpenAI API返回了意外的响应结构');
+                    message.error(t('playground.errorMessages.responseFailed'));
                     throw new Error('Unexpected OpenAI API response structure');
                 }
             } catch (apiError: any) {
                 console.error('OpenAI API error:', apiError);
                 console.error('Error details:', apiError.message, apiError.status, apiError.headers);
-                message.error(`获取OpenAI模型列表失败: ${apiError.message || '未知错误'}`);
+                message.error(`${t('playground.errorMessages.responseFailed')}: ${apiError.message || t('common.unknown')}`);
                 
                 try {
                     const res = await getModels();
@@ -180,12 +180,12 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                     }
                 } catch (fallbackError) {
                     console.error('Fallback getModels error:', fallbackError);
-                    message.error('获取模型列表失败，请稍后再试');
+                    message.error(t('common.error'));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch models:', error);
-            message.error('获取模型列表失败');
+            message.error(t('common.error'));
         } finally {
             setLoading(false);
         }
@@ -197,7 +197,20 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
     };
     
     const handleSendMessage = async () => {
-        if (!prompt.trim()) return;
+        if (!prompt.trim()) {
+            message.warning(t('playground.errorMessages.enterMessage'));
+            return;
+        }
+        
+        if (!selectedModel) {
+            message.warning(t('playground.errorMessages.selectModel'));
+            return;
+        }
+        
+        if (!selectedToken) {
+            message.warning(t('playground.errorMessages.selectToken'));
+            return;
+        }
         
         // Add user message
         const userMessage: Message = {
@@ -219,15 +232,8 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
         
         try {
             if (!selectedToken || !selectedModel) {
-                throw new Error('请先选择Token和模型');
+                throw new Error(t('playground.errorMessages.selectToken'));
             }
-            
-            // Initialize OpenAI client
-            const openai = new OpenAI({
-                apiKey: selectedToken,
-                dangerouslyAllowBrowser: true,
-                baseURL: window.location.origin + '/v1'
-            });
             
             // Prepare messages array including system prompt
             let messageArray = [];
@@ -250,29 +256,37 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
             // Start performance timer
             const startTime = Date.now();
             
-            // Create streaming completion
-            const stream = await openai.chat.completions.create({
+            // 判断是否为需要使用responses接口的模型
+            const useResponsesAPI = isResponsesModel(selectedModel);
+            console.log(`模型 ${selectedModel} 使用${useResponsesAPI ? 'responses' : 'chat completions'}接口`);
+            
+            // 使用统一的API调用方法
+            const stream = await createCompletion({
                 model: selectedModel,
                 messages: messageArray as any,
+                token: selectedToken,
+                baseURL: window.location.origin + '/v1',
                 stream: true
             });
             
             let firstTokenTime = 0;
             let responseContent = '';
             
-            // Process the stream
-            for await (const chunk of stream) {
-                // Record time of first token
-                if (responseContent === '' && chunk.choices[0]?.delta?.content) {
-                    firstTokenTime = Date.now();
-                }
-                
-                // Append the chunk content if available
-                if (chunk.choices[0]?.delta?.content) {
-                    responseContent += chunk.choices[0].delta.content;
+            // 处理流式响应
+            await processStreamResponse(
+                stream,
+                (content: string) => {
+                    // Record time of first token
+                    if (responseContent === '' && content) {
+                        firstTokenTime = Date.now();
+                    }
+                    
+                    // Append the chunk content
+                    responseContent += content;
                     setCurrentAssistantMessage(responseContent);
-                }
-            }
+                },
+                useResponsesAPI
+            );
             
             // Completion time
             const completionTime = Date.now();
@@ -305,12 +319,12 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
             
         } catch (error: any) {
             console.error('Error in chat completion:', error);
-            message.error(`聊天失败: ${error.message || '未知错误'}`);
+            message.error(`${t('playground.errorMessages.responseFailed')}: ${error.message || t('common.unknown')}`);
             
             // Add error message
             const errorMessage: Message = {
                 role: 'assistant',
-                content: `错误: ${error.message || '未知错误'}`,
+                content: `${t('common.error')}: ${error.message || t('common.unknown')}`,
                 timestamp: Date.now()
             };
             
@@ -349,70 +363,106 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
         
         // If deleting a user message, also delete the following assistant message
         if (messages[index].role === 'user' && index + 1 < messages.length) {
-            setMessages(prev => [...prev.slice(0, index), ...prev.slice(index + 2)]);
+            setMessages((prev:any) => [...prev.slice(0, index), ...prev.slice(index + 2)]);
         } 
         // If deleting an assistant message, also delete the preceding user message
         else if (messages[index].role === 'assistant' && index > 0) {
-            setMessages(prev => [...prev.slice(0, index - 1), ...prev.slice(index + 1)]);
+            setMessages((prev:any) => [...prev.slice(0, index - 1), ...prev.slice(index + 1)]);
         }
         // If it's a standalone message, just delete it
         else {
-            setMessages(prev => [...prev.slice(0, index), ...prev.slice(index + 1)]);
+            setMessages((prev:any) => [...prev.slice(0, index), ...prev.slice(index + 1)]);
         }
     };
     
     const clearMessages = () => {
         setMessages([]);
         setCurrentAssistantMessage('');
+        message.success(t('playground.clearChat'));
     };
+    
+    const renderEmptyState = () => (
+        <div style={{ 
+            textAlign: 'center', 
+            padding: isMobile ? '40px 20px' : '80px 40px',
+            color: token.colorTextSecondary
+        }} className="empty-state">
+            <RobotOutlined style={{ fontSize: 64, color: token.colorPrimary, marginBottom: 16 }} />
+            <Title level={3} style={{ color: token.colorTextSecondary, marginBottom: 8 }}>
+                {t('playground.emptyChat.title')}
+            </Title>
+            <Text style={{ fontSize: 16, marginBottom: 24, display: 'block' }}>
+                {t('playground.emptyChat.description')}
+            </Text>
+            <Space direction={isMobile ? 'vertical' : 'horizontal'} size="middle">
+                <Button 
+                    type="dashed" 
+                    onClick={() => setPrompt(t('playground.emptyChat.suggestion1'))}
+                    disabled={!selectedModel || !selectedToken}
+                >
+                    {t('playground.emptyChat.suggestion1')}
+                </Button>
+                <Button 
+                    type="dashed" 
+                    onClick={() => setPrompt(t('playground.emptyChat.suggestion2'))}
+                    disabled={!selectedModel || !selectedToken}
+                >
+                    {t('playground.emptyChat.suggestion2')}
+                </Button>
+            </Space>
+        </div>
+    );
     
     const renderMessages = () => {
         if (messages.length === 0) {
-            return (
-                <Empty 
-                    image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                    description="No messages yet"
-                    style={{ margin: '100px 0' }}
-                />
-            );
+            return renderEmptyState();
         }
         
         return (
-            <div className="message-list">
-                {messages.map((msg, index) => (
+            <div className="message-list" style={{ padding: isMobile ? '8px' : '16px' }}>
+                {messages.map((msg:any, index:any) => (
                     <div 
                         key={msg.id || index} 
                         className={`message ${msg.role}`}
                         style={{
                             display: 'flex',
                             margin: '16px 0',
-                            padding: '12px 16px',
+                            padding: isMobile ? '12px' : '16px 20px',
                             borderRadius: token.borderRadiusLG,
-                            backgroundColor: msg.role === 'user' ? token.colorBgElevated : token.colorBgContainer,
-                            position: 'relative', // For absolute positioned buttons
+                            backgroundColor: msg.role === 'user' 
+                                ? token.colorBgElevated 
+                                : token.colorBgContainer,
+                            border: `1px solid ${token.colorBorderSecondary}`,
+                            position: 'relative',
+                            transition: 'all 0.2s ease',
                         }}
                     >
                         <Avatar 
-                            icon={msg.role === 'user' ? <UserOutlined /> : <IconAvatar size={18} />}
+                            icon={msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                             style={{ 
                                 marginRight: 12,
-                                backgroundColor: msg.role === 'user' ? token.colorPrimary : '#10a37f'
+                                backgroundColor: msg.role === 'user' ? token.colorPrimary : token.colorSuccess,
+                                flexShrink: 0
                             }}
+                            size={isMobile ? 'default' : 'large'}
                         />
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ 
-                                fontWeight: 500, 
-                                marginBottom: 4,
+                                fontWeight: 600, 
+                                marginBottom: 8,
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                color: token.colorText
                             }}>
-                                <span>{msg.role === 'user' ? 'You' : 'Assistant'}</span>
+                                <span style={{ fontSize: isMobile ? 14 : 16 }}>
+                                    {msg.role === 'user' ? t('common.you') : t('playground.title')}
+                                </span>
                                 
                                 {/* Message action buttons */}
                                 <Space size="small">
                                     {msg.role === 'assistant' && index > 0 && (
-                                        <Tooltip title="Regenerate response">
+                                        <Tooltip title={t('playground.regenerate')}>
                                             <Button 
                                                 type="text" 
                                                 size="small"
@@ -420,39 +470,63 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                                                 loading={regeneratingMessageIndex === index}
                                                 onClick={() => handleRegenerateMessage(index)}
                                                 disabled={loading}
+                                                style={{ 
+                                                    color: token.colorTextSecondary,
+                                                    opacity: 0.7
+                                                }}
                                             />
                                         </Tooltip>
                                     )}
-                                    <Tooltip title="Delete message">
-                                        <Button 
-                                            type="text" 
-                                            size="small"
-                                            danger
-                                            icon={<DeleteOutlined />}
-                                            onClick={() => handleDeleteMessage(index)}
-                                            disabled={loading}
-                                        />
+                                    <Tooltip title={t('playground.delete')}>
+                                        <Popconfirm
+                                            title={t('playground.confirmDelete')}
+                                            onConfirm={() => handleDeleteMessage(index)}
+                                            okText={t('common.confirm')}
+                                            cancelText={t('common.cancel')}
+                                        >
+                                            <Button 
+                                                type="text" 
+                                                size="small"
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                disabled={loading}
+                                                style={{ opacity: 0.7 }}
+                                            />
+                                        </Popconfirm>
                                     </Tooltip>
                                 </Space>
                             </div>
-                            <div className="message-content">
+                            <div className="message-content" style={{ 
+                                lineHeight: 1.6,
+                                fontSize: isMobile ? 14 : 16,
+                                color: token.colorText
+                            }}>
                                 {msg.role === 'assistant' ? (
                                     <ReactMarkdown>
                                         {msg.content}
                                     </ReactMarkdown>
                                 ) : (
-                                    <div>{msg.content}</div>
+                                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                                 )}
                             </div>
                             {msg.role === 'assistant' && msg.performance && (
-                                <div style={{ 
-                                    fontSize: '12px', 
-                                    color: token.colorTextSecondary,
-                                    marginTop: '8px'
+                                <div className="performance-tags" style={{ 
+                                    fontSize: 12, 
+                                    color: token.colorTextTertiary,
+                                    marginTop: 12,
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '8px'
                                 }}>
-                                    First token: {msg.performance.firstTokenTime}ms | 
-                                    Total time: {msg.performance.completionTime}ms | 
-                                    ~{Math.round(msg.performance.tokensPerSecond || 0)} tokens/sec
+                                    <Tag icon={<ThunderboltOutlined />} color="blue">
+                                        {t('playground.performance.firstToken')}: {msg.performance.firstTokenTime}ms
+                                    </Tag>
+                                    <Tag color="green">
+                                        {t('playground.performance.completion')}: {msg.performance.completionTime}ms
+                                    </Tag>
+                                    <Tag color="orange">
+                                        ~{Math.round(msg.performance.tokensPerSecond || 0)} {t('playground.performance.tokens')}/s
+                                    </Tag>
                                 </div>
                             )}
                         </div>
@@ -465,23 +539,40 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                         style={{
                             display: 'flex',
                             margin: '16px 0',
-                            padding: '12px 16px',
+                            padding: isMobile ? '12px' : '16px 20px',
                             borderRadius: token.borderRadiusLG,
                             backgroundColor: token.colorBgContainer,
+                            border: `1px solid ${token.colorPrimary}`,
+                            boxShadow: `0 0 0 1px ${token.colorPrimary}20`,
                         }}
                     >
                         <Avatar 
-                            icon={<IconAvatar size={18} />}
+                            icon={<RobotOutlined />}
                             style={{ 
                                 marginRight: 12,
-                                backgroundColor: '#10a37f'
+                                backgroundColor: token.colorSuccess,
+                                flexShrink: 0
                             }}
+                            size={isMobile ? 'default' : 'large'}
                         />
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 500, marginBottom: 4 }}>
-                                Assistant
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ 
+                                fontWeight: 600, 
+                                marginBottom: 8,
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: token.colorText
+                            }}>
+                                <span style={{ fontSize: isMobile ? 14 : 16 }}>
+                                    {t('playground.title')}
+                                </span>
+                                <Spin size="small" style={{ marginLeft: 8 }} />
                             </div>
-                            <div className="message-content">
+                            <div className="message-content" style={{ 
+                                lineHeight: 1.6,
+                                fontSize: isMobile ? 14 : 16,
+                                color: token.colorText
+                            }}>
                                 <ReactMarkdown>
                                     {currentAssistantMessage}
                                 </ReactMarkdown>
@@ -491,10 +582,14 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                 )}
                 
                 {loading && !streaming && (
-                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                        <Spin size="small" />
-                        <div style={{ marginTop: 8, color: token.colorTextSecondary }}>
-                            Thinking...
+                    <div style={{ 
+                        textAlign: 'center', 
+                        padding: '32px 0',
+                        color: token.colorTextSecondary
+                    }}>
+                        <Spin size="large" />
+                        <div style={{ marginTop: 16, fontSize: 16 }} className="loading-dots">
+                            {t('common.loading')}
                         </div>
                     </div>
                 )}
@@ -506,25 +601,43 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
     
     const renderSettingsModal = () => (
         <Modal
-            title="Chat Settings"
+            title={
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <SettingOutlined style={{ marginRight: 8 }} />
+                    {t('playground.chatSettings')}
+                </div>
+            }
             open={settingsVisible}
             onCancel={() => setSettingsVisible(false)}
             footer={[
                 <Button key="cancel" onClick={() => setSettingsVisible(false)}>
-                    Cancel
+                    {t('common.cancel')}
                 </Button>,
-                <Button key="save" type="primary" onClick={() => setSettingsVisible(false)}>
-                    Save
+                <Button 
+                    key="save" 
+                    type="primary" 
+                    onClick={() => {
+                        setSettingsVisible(false);
+                        message.success(t('common.saveSuccess'));
+                    }}
+                >
+                    {t('common.save')}
                 </Button>
             ]}
+            width={isMobile ? '90%' : 600}
         >
             <Form layout="vertical">
-                <Form.Item label="System Prompt">
+                <Form.Item 
+                    label={t('playground.systemPrompt')}
+                    tooltip={t('playground.systemPrompt')}
+                >
                     <TextArea
-                        rows={4}
+                        rows={6}
                         value={systemPrompt}
                         onChange={e => setSystemPrompt(e.target.value)}
-                        placeholder="Instructions for the AI assistant..."
+                        placeholder={t('playground.systemPrompt')}
+                        showCount
+                        maxLength={2000}
                     />
                 </Form.Item>
             </Form>
@@ -538,7 +651,8 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                 height: '100%',
                 width: '100%',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                backgroundColor: token.colorBgLayout
             }}
         >
             <Card
@@ -548,7 +662,8 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                     display: 'flex',
                     flexDirection: 'column',
                     border: 'none',
-                    borderRadius: 0
+                    borderRadius: 0,
+                    backgroundColor: token.colorBgContainer
                 }}
                 bodyStyle={{
                     flex: '1',
@@ -560,75 +675,92 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
             >
                 {/* Header with model selection */}
                 <div style={{ 
-                    padding: isMobile ? '8px 12px' : '16px 24px',
+                    padding: isMobile ? '12px 16px' : '20px 24px',
                     borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    backgroundColor: token.colorBgElevated,
+                    boxShadow: token.boxShadowTertiary
                 }}>
-                    <Row gutter={16} style={{ flex: 1 }}>
-                        <Col span={isMobile ? 12 : 8}>
+                    <Row gutter={[16, 16]} align="middle">
+                        <Col xs={24} sm={12} md={8}>
+                            <div style={{ marginBottom: isMobile ? 4 : 0 }}>
+                                <Text strong style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                                    {t('playground.selectToken')}
+                                </Text>
+                            </div>
                             <Select
                                 style={{ width: '100%' }}
-                                placeholder="Select a token"
+                                placeholder={t('playground.selectToken')}
                                 value={selectedToken}
                                 onChange={handleTokenChange}
                                 loading={loading}
+                                size={isMobile ? 'middle' : 'large'}
                             >
-                                {tokenOptions.map(token => (
+                                {tokenOptions.map((token:any) => (
                                     <Option key={token.key} value={token.key}>
                                         {token.name || token.key}
                                     </Option>
                                 ))}
                             </Select>
                         </Col>
-                        <Col span={isMobile ? 12 : 8}>
-                            <Select
-                                style={{ width: '100%' }}
-                                placeholder="Select a model"
-                                value={selectedModel}
-                                onChange={setSelectedModel}
-                                loading={loading}
-                                disabled={!selectedToken}
-                            >
-                                {modelOptions.map(model => (
-                                    <Option key={model} value={model}>
-                                        {model}
-                                    </Option>
-                                ))}
-                            </Select>
-                        </Col>
-                        {!isMobile && (
-                            <Col span={8} style={{ textAlign: 'right' }}>
-                                <Space>
-                                    <Tooltip title="Settings">
-                                        <Button 
-                                            icon={<SettingOutlined />} 
-                                            onClick={() => setSettingsVisible(true)}
-                                        />
-                                    </Tooltip>
-                                    <Tooltip title="Clear messages">
-                                        <Popconfirm
-                                            title="Clear all messages?"
-                                            onConfirm={clearMessages}
-                                            okText="Yes"
-                                            cancelText="No"
-                                        >
-                                            <Button 
-                                                icon={<DeleteOutlined />} 
-                                                disabled={messages.length === 0}
-                                            />
-                                        </Popconfirm>
-                                    </Tooltip>
-                                    <Tooltip title="Save chat">
-                                        <Button 
-                                            icon={<SaveOutlined />} 
-                                            disabled={messages.length === 0}
-                                        />
-                                    </Tooltip>
+                        <Col xs={24} md={12}>
+                            <Space direction="vertical" style={{ width: '100%' }} size="small">
+                                <Text type="secondary">{t('playground.selectModel')}</Text>
+                                <Space wrap>
+                                    <Select
+                                        style={{ minWidth: 200, flex: 1 }}
+                                        placeholder={t('playground.selectModel')}
+                                        value={selectedModel}
+                                        onChange={setSelectedModel}
+                                        loading={loading}
+                                        disabled={!selectedToken}
+                                    >
+                                        {modelOptions.map(model => (
+                                            <Option key={model} value={model}>
+                                                {model}
+                                            </Option>
+                                        ))}
+                                    </Select>
+                                    {selectedModel && (
+                                        <Tag color={isResponsesModel(selectedModel) ? 'blue' : 'green'}>
+                                            {isResponsesModel(selectedModel) ? 'Responses API' : 'Chat Completions API'}
+                                        </Tag>
+                                    )}
                                 </Space>
-                            </Col>
-                        )}
+                            </Space>
+                        </Col>
+                        <Col xs={24} md={8} style={{ textAlign: isMobile ? 'center' : 'right' }}>
+                            <Space size="middle">
+                                <Tooltip title={t('playground.chatSettings')}>
+                                    <Button 
+                                        icon={<SettingOutlined />} 
+                                        onClick={() => setSettingsVisible(true)}
+                                        size={isMobile ? 'middle' : 'large'}
+                                    />
+                                </Tooltip>
+                                <Tooltip title={t('playground.clearChat')}>
+                                    <Popconfirm
+                                        title={t('playground.clearChat')}
+                                        description={t('playground.confirmDeleteChat')}
+                                        onConfirm={clearMessages}
+                                        okText={t('common.confirm')}
+                                        cancelText={t('common.cancel')}
+                                    >
+                                        <Button 
+                                            icon={<ClearOutlined />} 
+                                            disabled={messages.length === 0}
+                                            size={isMobile ? 'middle' : 'large'}
+                                        />
+                                    </Popconfirm>
+                                </Tooltip>
+                                <Tooltip title={t('playground.saveChat')}>
+                                    <Button 
+                                        icon={<SaveOutlined />} 
+                                        disabled={messages.length === 0}
+                                        size={isMobile ? 'middle' : 'large'}
+                                    />
+                                </Tooltip>
+                            </Space>
+                        </Col>
                     </Row>
                 </div>
                 
@@ -636,77 +768,62 @@ export default function ChatFeature({ modelInfo }: { modelInfo: any }) {
                 <div style={{ 
                     flex: 1, 
                     overflow: 'auto',
-                    padding: isMobile ? '8px 12px' : '16px 24px'
+                    backgroundColor: token.colorBgLayout
                 }}>
                     {renderMessages()}
                 </div>
                 
                 {/* Input area */}
                 <div style={{ 
-                    padding: isMobile ? '8px 12px 12px' : '16px 24px 24px',
+                    padding: isMobile ? '16px' : '20px 24px',
                     borderTop: `1px solid ${token.colorBorderSecondary}`,
-                    backgroundColor: token.colorBgContainer
+                    backgroundColor: token.colorBgElevated,
+                    boxShadow: token.boxShadowTertiary
                 }}>
-                    <Row gutter={[16, 16]}>
-                        {isMobile && (
-                            <Col span={24} style={{ display: 'flex', justifyContent: 'center' }}>
-                                <Space>
-                                    <Button 
-                                        icon={<SettingOutlined />} 
-                                        onClick={() => setSettingsVisible(true)}
-                                    />
-                                    <Popconfirm
-                                        title="Clear all messages?"
-                                        onConfirm={clearMessages}
-                                        okText="Yes"
-                                        cancelText="No"
-                                    >
-                                        <Button 
-                                            icon={<DeleteOutlined />} 
-                                            disabled={messages.length === 0}
-                                        />
-                                    </Popconfirm>
-                                    <Button 
-                                        icon={<SaveOutlined />} 
-                                        disabled={messages.length === 0}
-                                    />
-                                </Space>
-                            </Col>
-                        )}
-                        <Col span={24}>
-                            <div style={{ display: 'flex' }}>
-                                <TextArea
-                                    value={prompt}
-                                    onChange={e => setPrompt(e.target.value)}
-                                    placeholder="Type a message..."
-                                    autoSize={{ minRows: 1, maxRows: 6 }}
-                                    style={{ flex: 1 }}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendMessage();
-                                        }
-                                    }}
-                                />
-                                <Button
-                                    type="primary"
-                                    icon={<SendOutlined />}
-                                    style={{ marginLeft: 8 }}
-                                    onClick={handleSendMessage}
-                                    disabled={!prompt.trim() || !selectedModel || !selectedToken}
-                                    loading={loading}
-                                />
-                            </div>
-                            <div style={{ 
-                                marginTop: 8, 
-                                textAlign: 'center',
-                                fontSize: 12,
-                                color: token.colorTextSecondary
-                            }}>
-                                Press Enter to send, Shift+Enter for new line
-                            </div>
-                        </Col>
-                    </Row>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                            <TextArea
+                                value={prompt}
+                                onChange={e => setPrompt(e.target.value)}
+                                placeholder={t('playground.inputMessage')}
+                                autoSize={{ minRows: 1, maxRows: 6 }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSendMessage();
+                                    }
+                                }}
+                                style={{ 
+                                    fontSize: isMobile ? 14 : 16,
+                                    borderRadius: token.borderRadiusLG
+                                }}
+                                size="large"
+                            />
+                        </div>
+                        <Button
+                            type="primary"
+                            icon={<SendOutlined />}
+                            onClick={handleSendMessage}
+                            disabled={!prompt.trim() || !selectedModel || !selectedToken || loading}
+                            loading={loading}
+                            size="large"
+                            style={{ 
+                                height: 'auto',
+                                minHeight: 40,
+                                borderRadius: token.borderRadiusLG
+                            }}
+                        >
+                            {!isMobile && t('playground.send')}
+                        </Button>
+                    </div>
+                    <div style={{ 
+                        marginTop: 8, 
+                        textAlign: 'center',
+                        fontSize: 12,
+                        color: token.colorTextTertiary
+                    }}>
+                        {t('playground.enterToSend')}
+                    </div>
                 </div>
             </Card>
             

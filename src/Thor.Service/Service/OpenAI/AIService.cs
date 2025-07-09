@@ -1,4 +1,7 @@
-﻿namespace Thor.Service.Service;
+﻿using Thor.Domain.Chats;
+using Thor.Service.Infrastructure;
+
+namespace Thor.Service.Service;
 
 public abstract class AIService(IServiceProvider serviceProvider, ImageService imageService)
     : ApplicationService(serviceProvider)
@@ -7,6 +10,12 @@ public abstract class AIService(IServiceProvider serviceProvider, ImageService i
     ///  按量计费模型倍率模板
     /// </summary>
     protected const string ConsumerTemplate = "模型倍率：{0} 补全倍率：{1} 分组倍率：{2}";
+    
+    
+    /// <summary>
+    ///  按量计费模型倍率模板
+    /// </summary>
+    protected const string ConsumerImageTemplate = "模型倍率：{0}  分组倍率：{1}";
 
     /// <summary>
     /// 按量计费命中缓存模型
@@ -95,13 +104,17 @@ public abstract class AIService(IServiceProvider serviceProvider, ImageService i
         foreach (var chatChannel in chatChannels)
         {
             value -= chatChannel.Order;
-            if (value <= 0)
-            {
-                return chatChannel;
-            }
+            if (value > 0) continue;
+            
+            ChannelAsyncLocal.ChannelIds.Add(chatChannel.Id);
+            return chatChannel;
         }
 
-        return chatChannels.Last();
+        var v = chatChannels.Last();
+        
+        ChannelAsyncLocal.ChannelIds.Add(v.Id);
+        
+        return v;
     }
 
     /// <summary>
@@ -136,6 +149,59 @@ public abstract class AIService(IServiceProvider serviceProvider, ImageService i
         };
     }
 
+
+    /// <summary>
+    /// 计算图片token
+    /// </summary>
+    /// <param name="url"></param>
+    /// <param name="detail"></param>
+    /// <returns></returns>
+    protected Tuple<int, Exception> CountImageTokens(ReadOnlyMemory<byte> url, string detail)
+    {
+        var fetchSize = true;
+        int width = 0, height = 0;
+        var lowDetailCost = 20; // Assuming lowDetailCost is 20
+        var highDetailCostPerTile = 100; // Assuming highDetailCostPerTile is 100
+        var additionalCost = 50; // Assuming additionalCost is 50
+
+        if (string.IsNullOrEmpty(detail) || detail == "auto") detail = "high";
+
+        switch (detail)
+        {
+            case "low":
+                return new Tuple<int, Exception>(lowDetailCost, null);
+            case "high":
+                if (fetchSize)
+                    try
+                    {
+                        (width, height) = imageService.GetImageSizeFromUrlAsync(url);
+                    }
+                    catch (Exception e)
+                    {
+                        return new Tuple<int, Exception>(0, e);
+                    }
+
+                if (width > 2048 || height > 2048)
+                {
+                    var ratio = 2048.0 / Math.Max(width, height);
+                    width = (int)(width * ratio);
+                    height = (int)(height * ratio);
+                }
+
+                if (width > 768 && height > 768)
+                {
+                    var ratio = 768.0 / Math.Min(width, height);
+                    width = (int)(width * ratio);
+                    height = (int)(height * ratio);
+                }
+
+                var numSquares = (int)Math.Ceiling((double)width / 512) * (int)Math.Ceiling((double)height / 512);
+                var result = numSquares * highDetailCostPerTile + additionalCost;
+                return new Tuple<int, Exception>(result, null);
+            default:
+                return new Tuple<int, Exception>(0, new Exception("Invalid detail option"));
+        }
+    }
 
     /// <summary>
     /// 计算图片token

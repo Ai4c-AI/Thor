@@ -28,10 +28,11 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.3" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
-    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.1.1" />
+    <PackageReference Include="MiniExcel" Version="1.41.2" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="SharpToken" Version="2.0.3" />
-    <PackageReference Include="SkiaSharp" Version="3.118.0-preview.2.3" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.118.0-preview.2.3" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
     <PackageReference Include="Mapster.DependencyInjection" Version="1.0.2-pre01" />
     <PackageReference Include="Serilog" Version="4.2.0" />
@@ -39,17 +40,20 @@
     <PackageReference Include="Serilog.Formatting.Json.Rendered" Version="1.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\extensions\Thor.AWSClaude\Thor.AWSClaude.csproj" />
+    <ProjectReference Include="..\extensions\Thor.AzureDatabricks\Thor.AzureDatabricks.csproj" />
     <ProjectReference Include="..\extensions\Thor.AzureOpenAI\Thor.AzureOpenAI.csproj" />
     <ProjectReference Include="..\extensions\Thor.Claude\Thor.Claude.csproj" />
+    <ProjectReference Include="..\extensions\Thor.CustomOpenAI\Thor.CustomOpenAI.csproj" />
     <ProjectReference Include="..\extensions\Thor.DeepSeek\Thor.DeepSeek.csproj" />
     <ProjectReference Include="..\extensions\Thor.ErnieBot\Thor.ErnieBot.csproj" />
     <ProjectReference Include="..\extensions\Thor.GCPClaude\Thor.GCPClaude.csproj" />
+    <ProjectReference Include="..\extensions\Thor.Gemini\Thor.Gemini.csproj" />
     <ProjectReference Include="..\extensions\Thor.GiteeAI\Thor.GiteeAI.csproj" />
     <ProjectReference Include="..\extensions\Thor.Hunyuan\Thor.Hunyuan.csproj" />
     <ProjectReference Include="..\extensions\Thor.MetaGLM\Thor.MetaGLM.csproj" />
@@ -85,15 +89,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\.dockerignore">
-      <Link>.dockerignore</Link>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="install-service.bat">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Service\OpenAI\ChatService.Image.cs">
+      <DependentUpon>ChatService.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\.dockerignore">
+      <Link>.dockerignore</Link>
+    </Content>
   </ItemGroup>
 
 </Project>

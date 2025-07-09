@@ -4,10 +4,12 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Thor.Abstractions;
 using Thor.Abstractions.Audios;
+using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Extensions;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
 using Thor.Abstractions.ObjectModels.ObjectModels.ResponseModels;
+using Thor.Abstractions.Realtime.Dto;
 
 namespace Thor.SiliconFlow.Audios
 {
@@ -54,7 +56,6 @@ namespace Thor.SiliconFlow.Audios
             var response = await HttpClientFactory.GetHttpClient(options.Address)
                 .SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
 
-            openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/audio/transcriptions");
             openai?.SetTag("Model", request.Model);
             openai?.SetTag("Response", response.StatusCode.ToString());
 
@@ -122,7 +123,6 @@ namespace Thor.SiliconFlow.Audios
             var response = await HttpClientFactory.GetHttpClient(options.Address)
                 .SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
 
-            openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/audio/translations");
             openai?.SetTag("Model", request.Model);
             openai?.SetTag("Response", response.StatusCode.ToString());
 
@@ -154,7 +154,8 @@ namespace Thor.SiliconFlow.Audios
             return result;
         }
 
-        public async Task<Stream> SpeechAsync(AudioCreateSpeechRequest request, ThorPlatformOptions? options = null,
+        public async Task<(Stream, ThorUsageResponse? usage)> SpeechAsync(AudioCreateSpeechRequest request,
+            ThorPlatformOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             using var openai =
@@ -163,7 +164,6 @@ namespace Thor.SiliconFlow.Audios
             var response = await HttpClientFactory.GetHttpClient(options.Address)
                 .PostJsonAsync(options?.Address.TrimEnd('/') + "/v1/audio/speech", request, options.ApiKey);
 
-            openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/audio/speech");
             openai?.SetTag("Model", request.Model);
             openai?.SetTag("Response", response.StatusCode.ToString());
 
@@ -190,7 +190,7 @@ namespace Thor.SiliconFlow.Audios
 
             var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 
-            return stream;
+            return (stream, null);
         }
     }
 }

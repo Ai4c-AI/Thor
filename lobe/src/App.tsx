@@ -30,6 +30,8 @@ const PanelPage = lazy(() => import('./pages/panel/page'))
 const ModelMapPage = lazy(() => import('./pages/model-map/page'))
 const UserGroupPage = lazy(() => import('./pages/user-group/page'))
 const PlaygroundPage = lazy(() => import('./pages/playground'))
+const UsagePage = lazy(() => import('./pages/usage/page'))
+const AnnouncementPage = lazy(() => import('./pages/announcement/page'))
 
 function App() {
   const { themeMode, toggleTheme } = useThemeStore();
@@ -126,6 +128,16 @@ function App() {
       {
         path: 'playground', element: <Suspense fallback={<FullscreenLoading title={t('pageTitle.loading.playground')} />}>
           <PlaygroundPage />
+        </Suspense>
+      },
+      {
+        path: 'usage', element: <Suspense fallback={<FullscreenLoading title={t('pageTitle.loading.usage')} />}>
+          <UsagePage />
+        </Suspense>
+      },
+      {
+        path: 'announcement', element: <Suspense fallback={<FullscreenLoading title={t('pageTitle.loading.announcement')} />}>
+          <AnnouncementPage />
         </Suspense>
       }
     ]

@@ -18,7 +18,9 @@ import {
   UsersRound,
   Home,
   ChevronRight,
-  Bug
+  Bug,
+  PieChart,
+  Megaphone
 } from "lucide-react";
 import './index.css'
 import { SidebarTabKey } from "../../../../store/global/initialState";
@@ -143,6 +145,16 @@ const Nav = memo(() => {
         },
         role: "user,admin",
       },
+      {
+        icon: <PieChart />,
+        enable: true,
+        label: t('sidebar.usage'),
+        key: SidebarTabKey.Usage,
+        onClick: () => {
+          navigate("/usage");
+        },
+        role: "user,admin",
+      },
       
       // Business section
       {
@@ -194,6 +206,16 @@ const Nav = memo(() => {
         enable: true,
         key: SidebarTabKey.Setting,
         children: [
+          {
+            icon: <Megaphone />,
+            label: t('sidebar.announcement'),
+            enable: true,
+            key: SidebarTabKey.Announcement,
+            onClick: () => {
+              navigate("/announcement");
+            },
+            role: "admin",
+          },
           {
             icon: <FileText />,
             label: t('sidebar.logger'),

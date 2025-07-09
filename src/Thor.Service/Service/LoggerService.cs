@@ -1,19 +1,36 @@
 ﻿using System.Diagnostics;
 using Thor.BuildingBlocks.Event;
+using Thor.Domain.Chats;
 using Thor.Service.Options;
+using MiniExcelLibs;
+using System.IO;
+using Thor.Infrastructure;
 
 namespace Thor.Service.Service;
 
 public sealed class LoggerService(
     IServiceProvider serviceProvider,
     IEventBus<ChatLogger> eventBus,
+    IEventBus<Tracing> tracingEventBus,
     IServiceCache serviceCache)
     : ApplicationService(serviceProvider)
 {
     public async ValueTask CreateAsync(ChatLogger logger)
     {
+        var tracing = TracingExtensions.GetCurrentRootTracing();
+
+        if (string.IsNullOrEmpty(logger.Id))
+        {
+            logger.Id = Guid.NewGuid().ToString("N") + Random.Shared.Next(1000, 9999);
+        }
+
         logger.CreatedAt = DateTime.Now;
         await eventBus.PublishAsync(logger);
+        if (tracing != null)
+        {
+            tracing.ChatLoggerId = logger.Id;
+            await tracingEventBus.PublishAsync(tracing);
+        }
     }
 
     /// <summary>
@@ -34,27 +51,35 @@ public sealed class LoggerService(
     /// <param name="stream">是否Stream请求</param>
     /// <param name="totalTime">请求总耗时</param>
     /// <param name="organizationId"></param>
-    public async ValueTask CreateConsumeAsync(string content, string model, int promptTokens, int completionTokens,
+    public async ValueTask CreateConsumeAsync(string url, string content, string model, int promptTokens,
+        int completionTokens,
         int quota, string? tokenName, string? userName, string? userId, string? channelId, string? channelName,
-        string ip, string userAgent, bool stream, int totalTime, string? organizationId = null)
+        string ip, string userAgent, bool stream, int totalTime, string? organizationId = null,
+        string? serviceId = null, string openAIProject = null,
+        bool isSuccess = true, Dictionary<string, string>? meatdata = null
+    )
     {
-        using var consume =
-            Activity.Current?.Source.StartActivity("创建消费日志");
+        meatdata ??= new Dictionary<string, string>();
 
-        consume?.SetTag("Content", content);
-        consume?.SetTag("model", model);
-
-        if (ChatCoreOptions.FreeModel?.EnableFree == true)
         {
-            var freeModel =
-                ChatCoreOptions.FreeModel.Items?.FirstOrDefault(x => x.Model.Contains(model));
-            if (freeModel != null)
+            using var consume =
+                Activity.Current?.Source.StartActivity("创建消费日志");
+
+            consume?.SetTag("Content", content);
+            consume?.SetTag("model", model);
+
+            if (ChatCoreOptions.FreeModel?.EnableFree == true)
             {
-                string key = "FreeModal:" + userId;
-                var result = await serviceCache.GetAsync<int?>(key) ?? 0;
-                if (result < freeModel.Limit)
+                var freeModel =
+                    ChatCoreOptions.FreeModel.Items?.FirstOrDefault(x => x.Model.Contains(model));
+                if (freeModel != null)
                 {
-                    quota = 0;
+                    string key = "FreeModal:" + userId;
+                    var result = await serviceCache.GetAsync<int?>(key) ?? 0;
+                    if (result < freeModel.Limit)
+                    {
+                        quota = 0;
+                    }
                 }
             }
         }
@@ -67,6 +92,11 @@ public sealed class LoggerService(
             PromptTokens = promptTokens,
             CompletionTokens = completionTokens,
             Stream = stream,
+            ServiceId = serviceId,
+            OpenAIProject = openAIProject,
+            Metadata = meatdata,
+            IsSuccess = isSuccess,
+            Url = url,
             TotalTime = totalTime,
             IP = ip,
             UserAgent = userAgent,
@@ -81,6 +111,7 @@ public sealed class LoggerService(
 
         await CreateAsync(logger);
     }
+
 
     public async ValueTask CreateRechargeAsync(string content, int quota, string userId)
     {
@@ -108,7 +139,7 @@ public sealed class LoggerService(
 
     public async Task<long> ViewConsumptionAsync(ThorChatLoggerType? type,
         string? model,
-        DateTime? startTime, DateTime? endTime, string? keyword)
+        DateTime? startTime, DateTime? endTime, string? keyword, string? userId = null)
     {
         var query = LoggerDbContext.Loggers
             .AsNoTracking();
@@ -123,8 +154,17 @@ public sealed class LoggerService(
 
         if (endTime.HasValue) query = query.Where(x => x.CreatedAt <= endTime);
 
-        // 非管理员只能查看自己的日志
-        if (!UserContext.IsAdmin) query = query.Where(x => x.UserId == UserContext.CurrentUserId);
+        // 用户权限校验
+        if (!UserContext.IsAdmin)
+        {
+            // 非管理员只能查看自己的日志
+            query = query.Where(x => x.UserId == UserContext.CurrentUserId);
+        }
+        else if (!string.IsNullOrWhiteSpace(userId))
+        {
+            // 管理员可以查看指定用户的日志
+            query = query.Where(x => x.UserId == userId);
+        }
 
         if (!string.IsNullOrWhiteSpace(keyword))
             query = query.Where(x =>
@@ -142,7 +182,7 @@ public sealed class LoggerService(
 
     public async ValueTask<PagingDto<ChatLogger>> GetAsync(int page, int pageSize, ThorChatLoggerType? type,
         string? model,
-        DateTime? startTime, DateTime? endTime, string? keyword, string? organizationId = null)
+        DateTime? startTime, DateTime? endTime, string? keyword, string? organizationId = null, string? userId = null)
     {
         var query = LoggerDbContext.Loggers
             .AsNoTracking();
@@ -157,7 +197,17 @@ public sealed class LoggerService(
 
         if (endTime.HasValue) query = query.Where(x => x.CreatedAt <= endTime);
 
-        if (!UserContext.IsAdmin) query = query.Where(x => x.UserId == UserContext.CurrentUserId);
+        // 用户权限校验
+        if (!UserContext.IsAdmin)
+        {
+            // 非管理员只能查看自己的日志
+            query = query.Where(x => x.UserId == UserContext.CurrentUserId);
+        }
+        else if (!string.IsNullOrWhiteSpace(userId))
+        {
+            // 管理员可以查看指定用户的日志
+            query = query.Where(x => x.UserId == userId);
+        }
 
         if (!string.IsNullOrEmpty(organizationId))
         {
@@ -182,7 +232,7 @@ public sealed class LoggerService(
             .ToListAsync();
 
         if (!UserContext.IsAdmin) result.ForEach(x => { x.ChannelName = null; });
-        
+
         // 给所有的key脱敏,只显示前面3位和后面3位
         result.ForEach(x =>
         {
@@ -194,6 +244,59 @@ public sealed class LoggerService(
         });
 
         return new PagingDto<ChatLogger>(total, result);
+    }
+
+    /// <summary>
+    /// 导出日志
+    /// </summary>
+    public async Task ExportAsync(
+        HttpContext context,
+        ThorChatLoggerType? type,
+        string? model,
+        DateTime? startTime, DateTime? endTime, string? keyword, string? organizationId = null, string? userId = null)
+    {
+        var result = await GetAsync(1, int.MaxValue, type, model, startTime, endTime, keyword, organizationId, userId);
+
+        // 使用MiniExcel导出
+        if (result.Items.Any())
+        {
+            // 创建导出数据
+            var exportData = result.Items.Select(log => new
+            {
+                日志类型 = log.Type.ToString(),
+                模型名称 = log.ModelName,
+                用户名 = log.UserName,
+                用户ID = log.UserId,
+                IP地址 = log.IP,
+                内容 = log.Content,
+                提示词Token = log.PromptTokens,
+                完成Token = log.CompletionTokens,
+                总消耗 = log.Quota,
+                额度 = RenderHelper.RenderQuota(log.Quota, 2),
+                响应时间 = log.TotalTime,
+                是否成功 = log.IsSuccess ? "是" : "否",
+                创建时间 = log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+            }).ToList();
+
+            // 设置文件名称
+            string fileName = $"{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+
+            // 设置响应头
+            context.Response.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            context.Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+
+            var exportStream = new MemoryStream();
+            await exportStream.SaveAsAsync(exportData);
+
+            exportStream.Seek(0, SeekOrigin.Begin);
+
+            await exportStream.CopyToAsync(context.Response.Body);
+        }
+        else
+        {
+            context.Response.ContentType = "text/plain";
+            await context.Response.WriteAsync("没有找到符合条件的数据");
+        }
     }
 
     /// <summary>

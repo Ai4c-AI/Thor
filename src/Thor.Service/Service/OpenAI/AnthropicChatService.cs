@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Thor.Abstractions.Anthropic;
 using Thor.Abstractions.Exceptions;
+using Thor.Domain.Chats;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
@@ -137,10 +138,10 @@ public class AnthropicChatService(
                         // 将quota 四舍五入
                         quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
-                        await loggerService.CreateConsumeAsync(
+                        await loggerService.CreateConsumeAsync("/v1/messages",
                             string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
                                 cachedTokens, rate.CacheRate),
-                            request.Model,
+                            model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
@@ -148,25 +149,25 @@ public class AnthropicChatService(
                     }
                     else
                     {
-                        await loggerService.CreateConsumeAsync(
+                        await loggerService.CreateConsumeAsync("/v1/messages",
                             string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate),
-                            request.Model,
+                            model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
                             (int)sw.ElapsedMilliseconds, organizationId);
 
                         await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
-                            request.Model);
+                            model);
                     }
                 }
                 else
                 {
                     // 费用
-                    await loggerService.CreateConsumeAsync(
+                    await loggerService.CreateConsumeAsync("/v1/messages",
                         string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
                             userGroup.Rate),
-                        request.Model,
+                        model,
                         requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
                         user?.UserName, user?.Id,
                         channel.Id,
@@ -176,13 +177,13 @@ public class AnthropicChatService(
 
                     await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key,
                         channel.Id,
-                        request.Model);
+                        model);
                 }
             }
             else
             {
                 context.Response.StatusCode = 400;
-                await context.WriteErrorAsync($"当前{request.Model}模型未设置倍率,请联系管理员设置倍率", "400");
+                await context.WriteErrorAsync($"当前{model}模型未设置倍率,请联系管理员设置倍率", "400");
             }
         }
         catch (ThorRateLimitException)

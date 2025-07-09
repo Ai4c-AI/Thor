@@ -119,7 +119,6 @@ public sealed class ClaudiaChatCompletionsService(ILogger<ClaudiaChatCompletions
             temperature = isThink ? null : input.Temperature
         }, string.Empty, headers);
 
-        openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/chat/completions");
         openai?.SetTag("Model", input.Model);
         openai?.SetTag("Response", response.StatusCode.ToString());
 
@@ -155,6 +154,16 @@ public sealed class ClaudiaChatCompletionsService(ILogger<ClaudiaChatCompletions
             {
                 CachedTokens = value.Usage.cache_read_input_tokens.Value,
             };
+
+            if (value.Usage.input_tokens > 0)
+            {
+                thor.Usage.InputTokens = value.Usage.input_tokens;
+            }
+
+            if (value.Usage.output_tokens > 0)
+            {
+                thor.Usage.CompletionTokens = value.Usage.output_tokens;
+            }
         }
 
         return thor;
@@ -322,6 +331,88 @@ public sealed class ClaudiaChatCompletionsService(ILogger<ClaudiaChatCompletions
                             text = message.Content
                         });
                     }
+                    else if (message.Role == "tool")
+                    {
+                        list.Add(new
+                        {
+                            role = "user",
+                            content = new List<object>
+                            {
+                                new
+                                {
+                                    type = "tool_result",
+                                    tool_use_id = message.ToolCallId,
+                                    content = message.Content
+                                }
+                            }
+                        });
+                    }
+                    else if (message.Role == "assistant")
+                    {
+                        // {
+                        //     "role": "assistant",
+                        //     "content": [
+                        //     {
+                        //         "type": "text",
+                        //         "text": "<thinking>I need to use get_weather, and the user wants SF, which is likely San Francisco, CA.</thinking>"
+                        //     },
+                        //     {
+                        //         "type": "tool_use",
+                        //         "id": "toolu_01A09q90qw90lq917835lq9",
+                        //         "name": "get_weather",
+                        //         "input": {
+                        //             "location": "San Francisco, CA",
+                        //             "unit": "celsius"
+                        //         }
+                        //     }
+                        //     ]
+                        // },
+                        if (message.ToolCalls?.Count > 0)
+                        {
+                            var content = new List<object>();
+                            if (!string.IsNullOrEmpty(message.Content))
+                            {
+                                content.Add(new
+                                {
+                                    type = "text",
+                                    text = message.Content
+                                });
+                            }
+
+                            foreach (var toolCall in message.ToolCalls)
+                            {
+                                content.Add(new
+                                {
+                                    type = "tool_use",
+                                    id = toolCall.Id,
+                                    name = toolCall.Function?.Name,
+                                    input = JsonSerializer.Deserialize<Dictionary<string, object>>(
+                                        toolCall.Function?.Arguments, ThorJsonSerializer.DefaultOptions)
+                                });
+                            }
+
+                            list.Add(new
+                            {
+                                role = "assistant",
+                                content
+                            });
+                        }
+                        else
+                        {
+                            list.Add(new
+                            {
+                                role = "assistant",
+                                content = new List<object>
+                                {
+                                    new
+                                    {
+                                        type = "text",
+                                        text = message.Content
+                                    }
+                                }
+                            });
+                        }
+                    }
                     else
                     {
                         list.Add(new
@@ -440,7 +531,6 @@ public sealed class ClaudiaChatCompletionsService(ILogger<ClaudiaChatCompletions
             temperature = isThinking ? null : input.Temperature
         }, string.Empty, headers);
 
-        openai?.SetTag("Address", options?.Address.TrimEnd('/') + "/v1/chat/completions");
         openai?.SetTag("Model", input.Model);
         openai?.SetTag("Response", response.StatusCode.ToString());
 

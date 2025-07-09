@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Typography, Select, Form, Upload, message, Divider, Row, Col, Image, Slider,  Grid, Empty } from 'antd';
-import {  PictureOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Typography, Select, Form, Upload, message, Divider, Row, Col, Image, Grid, Empty } from 'antd';
+import { PictureOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
 import { Flexbox } from 'react-layout-kit';
 import { useTranslation } from 'react-i18next';
 import { getTokens } from '../../../../services/TokenService';
@@ -9,7 +9,7 @@ import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { processImage } from '../../../../services/ImageService';
 const { Option } = Select;
 const { TextArea } = Input;
-const {  Text } = Typography;
+const { Text } = Typography;
 const { useBreakpoint } = Grid;
 const { Dragger } = Upload;
 
@@ -34,7 +34,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
     const { t } = useTranslation();
     const screens = useBreakpoint();
     const isMobile = !screens.md || isMobileDevice();
-    
+
     const [tokenOptions, setTokenOptions] = useState<any[]>([]);
     const [selectedToken, setSelectedToken] = useState<string>('');
     const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -45,8 +45,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
     const [imageSize, setImageSize] = useState<string>('1024x1024');
     const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
     const [fileList, setFileList] = useState<UploadFile[]>([]);
-    const [transformationStrength, setTransformationStrength] = useState<number>(0.7);
-    
+
     useEffect(() => {
         // Initial loading of tokens and models
         fetchTokens();
@@ -59,7 +58,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
             }
         }
     }, [modelInfo]);
-    
+
     const fetchTokens = async () => {
         try {
             const res = await getTokens(1, 100);
@@ -77,20 +76,20 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
             message.error(t('common.error'));
         }
     };
-    
+
     // Handle token selection change
     const handleTokenChange = (value: string) => {
         setSelectedToken(value);
     };
-    
+
     // Handle file upload for img2img
     const handleUpload: UploadProps['onChange'] = ({ fileList: newFileList }) => {
         setFileList(newFileList);
-        
+
         // Process each file to create source images
         const processFiles = async () => {
             const newSourceImages: SourceImage[] = [];
-            
+
             for (const file of newFileList) {
                 if (file.originFileObj) {
                     try {
@@ -105,10 +104,10 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                     }
                 }
             }
-            
+
             setSourceImages(newSourceImages);
         };
-        
+
         processFiles();
     };
 
@@ -121,35 +120,35 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
             reader.readAsDataURL(file);
         });
     };
-    
+
     // Clear all images
     const handleClearAllImages = () => {
         setFileList([]);
         setSourceImages([]);
     };
-    
+
     // Generate image from text or transform existing image
     const handleGenerateImage = async () => {
         if (!prompt.trim()) {
             message.warning(t('imageFeature.promptRequired'));
             return;
         }
-        
+
         if (!selectedToken) {
             message.warning(t('imageFeature.tokenRequired'));
             return;
         }
-        
+
         if (!selectedModel) {
             message.warning(t('imageFeature.modelRequired'));
             return;
         }
-        
+
         setLoading(true);
-        
+
         try {
             const hasSourceImages = sourceImages.length > 0;
-            
+
             // Base parameters for all requests
             const baseParams = {
                 prompt,
@@ -157,7 +156,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                 size: imageSize,
                 token: selectedToken,
             };
-            
+
             if (hasSourceImages) {
                 // Process each source image
                 for (const sourceImage of sourceImages) {
@@ -166,22 +165,21 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                         const params = {
                             ...baseParams,
                             image: sourceImage.dataUrl, // Pass complete dataURL - our service will handle extraction
-                            transformationStrength,
                         };
-                        
+
                         const result = await processImage(params);
-                        
+
                         if (result && result.data) {
                             // Add new image to the list
                             const newImage: GeneratedImage = {
                                 id: result.data.id || Date.now().toString() + Math.random().toString(36).substring(2, 9),
-                                url: result.data.url,
+                                url: result.data.b64_json?.startsWith("http") ? result.data.b64_json : `data:image/png;base64,${result.data.b64_json}`,
                                 prompt,
                                 model: selectedModel,
                                 timestamp: Date.now(),
                                 size: imageSize
                             };
-                            
+
                             setGeneratedImages(prev => [newImage, ...prev]);
                         }
                     } catch (error) {
@@ -189,23 +187,23 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                         message.error(`Failed to process image: ${sourceImage.file.name}`);
                     }
                 }
-                
+
                 message.success(t('imageFeature.generateSuccess'));
             } else {
                 // Text-to-image generation using OpenAI
                 const result = await processImage(baseParams);
-                
+
                 if (result && result.data) {
                     // Add new image to the list
                     const newImage: GeneratedImage = {
                         id: result.data.id || Date.now().toString(),
-                        url: result.data.url,
+                        url: result.data.b64_json?.startsWith("http") ? result.data.b64_json : `data:image/png;base64,${result.data.b64_json}`,
                         prompt,
                         model: selectedModel,
                         timestamp: Date.now(),
                         size: imageSize
                     };
-                    
+
                     setGeneratedImages(prev => [newImage, ...prev]);
                     message.success(t('imageFeature.generateSuccess'));
                 }
@@ -217,9 +215,9 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
             setLoading(false);
         }
     };
-    
+
     const hasSourceImages = sourceImages.length > 0;
-    
+
     return (
         <Flexbox
             gap={0}
@@ -249,7 +247,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
             >
                 <Flexbox direction="vertical" gap={16}>
                     <Typography.Title level={5}>{t('imageFeature.title')}</Typography.Title>
-                    
+
                     <Form layout="vertical">
                         <Form.Item label={t('imageFeature.sourceImages')}>
                             <Dragger
@@ -272,11 +270,11 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                                     {t('imageFeature.supportMultipleFiles')}
                                 </p>
                             </Dragger>
-                            
+
                             {fileList.length > 0 && (
-                                <Button 
-                                    danger 
-                                    icon={<DeleteOutlined />} 
+                                <Button
+                                    danger
+                                    icon={<DeleteOutlined />}
                                     onClick={handleClearAllImages}
                                     style={{ marginTop: 8 }}
                                 >
@@ -284,23 +282,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                                 </Button>
                             )}
                         </Form.Item>
-                        
-                        {hasSourceImages && (
-                            <Form.Item label={t('imageFeature.transformationStrength')}>
-                                <Slider 
-                                    min={0} 
-                                    max={1} 
-                                    step={0.01} 
-                                    value={transformationStrength}
-                                    onChange={setTransformationStrength}
-                                    marks={{
-                                        0: t('imageFeature.subtle'),
-                                        1: t('imageFeature.complete')
-                                    }}
-                                />
-                            </Form.Item>
-                        )}
-                        
+
                         <Form.Item label={hasSourceImages ? t('imageFeature.transformationPrompt') : t('imageFeature.prompt')}>
                             <TextArea
                                 rows={4}
@@ -309,7 +291,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                                 placeholder={hasSourceImages ? t('imageFeature.transformationPromptPlaceholder') : t('imageFeature.promptPlaceholder')}
                             />
                         </Form.Item>
-                        
+
                         <Row gutter={16}>
                             <Col span={isMobile ? 24 : 8}>
                                 <Form.Item label={t('imageFeature.token')}>
@@ -358,7 +340,7 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                                 </Form.Item>
                             </Col>
                         </Row>
-                        
+
                         <Form.Item>
                             <Button
                                 type="primary"
@@ -371,9 +353,9 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                             </Button>
                         </Form.Item>
                     </Form>
-                    
+
                     <Divider>{t('imageFeature.generatedImages')}</Divider>
-                    
+
                     {generatedImages.length === 0 ? (
                         <Empty description={t('imageFeature.noImagesYet')} />
                     ) : (

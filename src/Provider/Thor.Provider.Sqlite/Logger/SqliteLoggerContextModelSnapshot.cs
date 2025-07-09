@@ -15,9 +15,9 @@ namespace Thor.Provider.Logger
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.2");
 
-            modelBuilder.Entity("Thor.Service.Domain.ChatLogger", b =>
+            modelBuilder.Entity("Thor.Domain.Chats.ChatLogger", b =>
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
@@ -45,11 +45,20 @@ namespace Thor.Provider.Logger
                     b.Property<string>("IP")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ModelName")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Modifier")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OpenAIProject")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("OrganizationId")
@@ -60,6 +69,9 @@ namespace Thor.Provider.Logger
 
                     b.Property<long>("Quota")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ServiceId")
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("Stream")
                         .HasColumnType("INTEGER");
@@ -74,6 +86,9 @@ namespace Thor.Provider.Logger
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("UserAgent")
@@ -93,11 +108,88 @@ namespace Thor.Provider.Logger
 
                     b.HasIndex("OrganizationId");
 
+                    b.HasIndex("ServiceId");
+
                     b.HasIndex("TokenName");
+
+                    b.HasIndex("UserId");
 
                     b.HasIndex("UserName");
 
                     b.ToTable("Loggers");
+                });
+
+            modelBuilder.Entity("Thor.Domain.Chats.Tracing", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Attributes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChatLoggerId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Children")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Creator")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Duration")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Modifier")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TraceId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChatLoggerId");
+
+                    b.HasIndex("Creator");
+
+                    b.HasIndex("TraceId");
+
+                    b.ToTable("Tracings");
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.ModelStatisticsNumber", b =>

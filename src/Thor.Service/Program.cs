@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebSockets;
 using Serilog;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.ResponseCompression;
 using Thor.Abstractions.Anthropic;
 using Thor.Abstractions.Chats.Dtos;
 using Thor.Abstractions.Dtos;
@@ -12,16 +13,19 @@ using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
 using Thor.Abstractions.Responses;
 using Thor.Abstractions.Tracker;
 using Thor.AWSClaude.Extensions;
+using Thor.AzureDatabricks.Extensions;
 using Thor.AzureOpenAI.Extensions;
 using Thor.BuildingBlocks.Event;
 using Thor.Claude.Extensions;
 using Thor.Core.DataAccess;
 using Thor.Core.Extensions;
+using Thor.CustomOpenAI.Extensions;
 using Thor.DeepSeek.Extensions;
 using Thor.Domain.Chats;
 using Thor.Domain.Users;
 using Thor.ErnieBot.Extensions;
 using Thor.GCPClaude.Extensions;
+using Thor.Gemini.Extensions;
 using Thor.Hunyuan.Extensions;
 using Thor.LocalEvent;
 using Thor.LocalMemory.Cache;
@@ -47,10 +51,14 @@ using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
 using Thor.VolCenGine.Extensions;
 using Product = Thor.Service.Domain.Product;
+using TracingService = Thor.Service.Service.TracingService;
 
 try
 {
     Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
+    // 初始化活动跟踪
+    ActivitySetup.SetupActivityListeners();
 
     var builder = WebApplication.CreateBuilder(new WebApplicationOptions()
     {
@@ -123,10 +131,12 @@ try
         .AddHttpContextAccessor()
         .AddScoped<IEventHandler<ChatLogger>, ChatLoggerEventHandler>()
         .AddScoped<IEventHandler<CreateUserEto>, CreateUserEventHandler>()
+        .AddScoped<IEventHandler<Tracing>, TracingEventHandler>()
         .AddScoped<IEventHandler<UpdateModelManagerCache>, ModelManagerEventHandler>()
         .AddTransient<JwtHelper>()
         .AddSingleton<OpenTelemetryMiddlewares>()
         .AddSingleton<UnitOfWorkMiddleware>()
+        .AddTracingService()
         .AddScoped<AuthorizeService>()
         .AddScoped<ChannelService>()
         .AddScoped<EmailService>()
@@ -146,6 +156,8 @@ try
         .AddScoped<TrackerService>()
         .AddScoped<ModelMapService>()
         .AddScoped<UserService>()
+        .AddScoped<UsageService>()
+        .AddScoped<AnnouncementService>()
         .AddScoped<IUserContext, DefaultUserContext>()
         .AddHostedService<StatisticBackgroundTask>()
         .AddHostedService<LoggerBackgroundTask>()
@@ -154,6 +166,7 @@ try
         .AddOpenAIService()
         .AddMoonshotService()
         .AddSparkDeskService()
+        .AddCustomeOpenAIService()
         .AddQiansailService()
         .AddGCPClaudeService()
         .AddMetaGLMService()
@@ -167,7 +180,9 @@ try
         .AddMiniMaxService()
         .AddVolCenGineService()
         .AddSiliconFlowService()
-        .AddDeepSeekService();
+        .AddAzureDatabricksPlatform()
+        .AddDeepSeekService()
+        .AddGeminiService();
 
     builder.Services
         .AddCors(options =>
@@ -215,6 +230,13 @@ try
         }
     }));
 
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+        options.MimeTypes =
+            ResponseCompressionDefaults.MimeTypes.Concat(["application/javascript", "text/css", "text/html"]);
+    });
+
     builder.AddServiceDefaults();
 
     builder.Services.AddWebSockets(options =>
@@ -235,8 +257,12 @@ try
 
     app.UseWebSockets();
 
+    app.UseTracingMiddleware();
+
     app.UseAuthentication();
     app.UseAuthorization();
+
+    app.UseResponseCompression();
 
     app.UseStaticFiles();
 
@@ -443,17 +469,50 @@ try
     channel.MapPut("/disable/{id}", async (ChannelService services, string id) =>
         await services.DisableAsync(id));
 
+    channel.MapPut("/order/{id}", async (ChannelService services, string id, int order) =>
+        await services.UpdateOrderAsync(id, order));
+
+
     channel.MapPut("/test/{id}", async (ChannelService services, string id) =>
         await services.TestChannelAsync(id));
 
     channel.MapPut("/control-automatically/{id}", async (ChannelService services, string id) =>
         await services.ControlAutomaticallyAsync(id));
 
-    channel.MapPut("/order/{id}", async (ChannelService services, string id, int order) =>
-        await services.UpdateOrderAsync(id, order));
+    channel.MapPost("/import", async (ChannelService service, HttpContext context) =>
+    {
+        var file = context.Request.Form.Files.FirstOrDefault();
+        if (file == null || file.Length == 0)
+            return Results.BadRequest("请上传有效的Excel文件");
 
-    channel.MapGet("/tag", async (ChannelService services) =>
-        await services.GetTagsAsync());
+        // 验证文件扩展名是否为.xlsx或.xls
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension != ".xlsx" && extension != ".xls")
+            return Results.BadRequest("只支持.xlsx或.xls格式的Excel文件");
+
+        using var stream = file.OpenReadStream();
+        var importCount = await service.ImportChannelsFromExcelAsync(stream);
+
+        return Results.Ok(new { Success = true, Message = $"成功导入{importCount}个渠道" });
+    });
+
+    app.MapGet("/api/v1/channel/import/template", async (ChannelService service, HttpContext context) =>
+        {
+            using var memoryStream = service.GenerateImportTemplate();
+
+            context.Response.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            context.Response.Headers.Add("Content-Disposition", "attachment; filename=ChannelImportTemplate.xlsx");
+
+
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            await memoryStream.CopyToAsync(context.Response.Body);
+        }).RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithDescription("下载渠道导入模板")
+        .WithTags("Channel")
+        .WithOpenApi();
 
     #endregion
 
@@ -485,6 +544,20 @@ try
         .WithDescription("获取模型信息")
         .WithOpenApi();
 
+    // 新增模型库相关端点
+    model.MapGet("/library", async (HttpContext context, string? model, int page = 1, int pageSize = 20,
+                string? type = null, string? modelType = null, string[]? tags = null) =>
+            await ModelService.GetModelLibraryAsync(context, model, page, pageSize, type, modelType, tags))
+        .WithDescription("获取模型库列表")
+        .AllowAnonymous()
+        .WithName("获取模型库列表");
+
+    model.MapGet("/library/metadata",
+            async (HttpContext context) => { return await ModelService.GetModelLibraryMetadataAsync(context); })
+        .WithDescription("获取模型库元数据")
+        .AllowAnonymous()
+        .WithName("获取模型库元数据");
+
     #endregion
 
     #region Logger
@@ -497,16 +570,28 @@ try
     log.MapGet(string.Empty,
             async (LoggerService service, int page, int pageSize, ThorChatLoggerType? type, string? model,
                     DateTime? startTime,
-                    DateTime? endTime, string? keyword, string? organizationId) =>
-                await service.GetAsync(page, pageSize, type, model, startTime, endTime, keyword, organizationId))
+                    DateTime? endTime, string? keyword, string? organizationId, string? userId) =>
+                await service.GetAsync(page, pageSize, type, model, startTime, endTime, keyword, organizationId, userId))
         .WithDescription("获取日志")
         .WithDisplayName("获取日志")
         .WithOpenApi();
 
+    app.MapGet("/api/v1/logger/export",
+            async (
+                    HttpContext context,
+                    LoggerService service, ThorChatLoggerType? type, string? model,
+                    DateTime? startTime,
+                    DateTime? endTime, string? keyword, string? organizationId, string? userId) =>
+                await service.ExportAsync(context, type, model, startTime, endTime, keyword, organizationId, userId))
+        .WithDescription("获取日志")
+        .WithDisplayName("获取日志")
+        .RequireAuthorization()
+        .WithOpenApi();
+
     log.MapGet("view-consumption",
             async (LoggerService service, ThorChatLoggerType? type, string? model, DateTime? startTime,
-                    DateTime? endTime, string? keyword) =>
-                await service.ViewConsumptionAsync(type, model, startTime, endTime, keyword))
+                    DateTime? endTime, string? keyword, string? userId) =>
+                await service.ViewConsumptionAsync(type, model, startTime, endTime, keyword, userId))
         .WithDescription("查看消耗")
         .WithDisplayName("查看消耗")
         .WithOpenApi();
@@ -540,6 +625,16 @@ try
         {
             Roles = RoleConstant.Admin
         });
+
+    user.MapGet("simple-list", async (UserService service) =>
+            await service.GetSimpleListAsync())
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithDescription("获取用户简化列表")
+        .WithDisplayName("获取用户简化列表")
+        .WithOpenApi();
 
     user.MapGet("info", async (UserService service) =>
             await service.GetAsync())
@@ -855,7 +950,6 @@ try
     #region System
 
     var system = app.MapGroup("/api/v1/system")
-        .WithGroupName("System")
         .WithTags("System")
         .AddEndpointFilter<ResultFilter>();
 
@@ -866,11 +960,78 @@ try
 
     #endregion
 
+    #region Announcement
+
+    var announcement = app.MapGroup("/api/v1/announcement")
+        .WithTags("Announcement")
+        .AddEndpointFilter<ResultFilter>();
+
+    // 获取有效公告（用户端）
+    announcement.MapGet("active", async (AnnouncementService service) =>
+            await service.GetActiveAnnouncementsAsync())
+        .WithDescription("获取有效公告")
+        .WithOpenApi();
+
+    // 管理员相关API
+    var announcementAdmin = app.MapGroup("/api/v1/announcement/admin")
+        .WithTags("Announcement")
+        .AddEndpointFilter<ResultFilter>()
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        });
+
+    announcementAdmin.MapPost(string.Empty, async (AnnouncementService service, CreateAnnouncementInput input) =>
+            await service.CreateAsync(input))
+        .WithDescription("创建公告")
+        .WithOpenApi();
+
+    announcementAdmin.MapGet("list",
+            async (AnnouncementService service, int page = 1, int pageSize = 10, string? keyword = null) =>
+                await service.GetListAsync(page, pageSize, keyword))
+        .WithDescription("获取公告列表")
+        .WithOpenApi();
+
+    announcementAdmin.MapGet("{id}", async (AnnouncementService service, string id) =>
+            await service.GetAsync(id))
+        .WithDescription("获取公告详情")
+        .WithOpenApi();
+
+    announcementAdmin.MapPut("{id}", async (AnnouncementService service, string id, UpdateAnnouncementInput input) =>
+            await service.UpdateAsync(id, input))
+        .WithDescription("更新公告")
+        .WithOpenApi();
+
+    announcementAdmin.MapDelete("{id}", async (AnnouncementService service, string id) =>
+            await service.DeleteAsync(id))
+        .WithDescription("删除公告")
+        .WithOpenApi();
+
+    announcementAdmin.MapPut("toggle/{id}", async (AnnouncementService service, string id, bool enabled) =>
+            await service.ToggleEnabledAsync(id, enabled))
+        .WithDescription("启用/禁用公告")
+        .WithOpenApi();
+
+    #endregion
+
+    var usage = app.MapGroup("/api/v1/usage")
+        .WithTags("Usage")
+        .AddEndpointFilter<ResultFilter>()
+        .RequireAuthorization();
+
+    usage.MapGet(string.Empty,
+            async (UsageService usageService, string? token, DateTime? startDate, DateTime? endDate) =>
+                await usageService.GetUsageAsync(token, startDate, endDate))
+        .WithDescription("获取使用记录")
+        .WithOpenApi();
+
     var tracker = app.MapGroup("/api/v1/tracker")
         .WithTags("Tracker")
         .AddEndpointFilter<ResultFilter>();
 
-    tracker.MapGet(string.Empty, async (TrackerService service) => await service.GetAsync())
+    tracker.MapGet("{loggerId}",
+            async (ILoggerDbContext loggerDbContext, string loggerId) =>
+                await TracingService.GetTracing(loggerDbContext, loggerId))
         .WithDescription("获取Tracker")
         .WithOpenApi();
 
@@ -925,7 +1086,7 @@ try
         .WithDescription("Image")
         .WithOpenApi();
 
-    app.MapPost("v1/images/variations",
+    app.MapPost("/v1/images/variations",
             async (ChatService imageService, HttpContext context) =>
                 await imageService.VariationsAsync(context))
         .WithDescription("OpenAI")
@@ -958,6 +1119,25 @@ try
         {
             await chatService.SpeechAsync(context, request);
         });
+
+    #region Tracing
+
+    // 添加链路跟踪API端点
+    app.MapGet("/api/v1/tracing/current", () =>
+        {
+            var tracing = Thor.Service.Infrastructure.Helper.TracingService.CurrentRootTracing;
+            if (tracing == null)
+            {
+                return Results.NotFound("当前请求没有跟踪信息");
+            }
+
+            return Results.Ok(tracing);
+        })
+        .WithTags("Tracing")
+        .WithDescription("获取当前请求的链路跟踪信息")
+        .WithOpenApi();
+
+    #endregion
 
     if (app.Environment.IsDevelopment())
     {

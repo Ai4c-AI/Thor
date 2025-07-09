@@ -6,20 +6,23 @@ using System.Text.Json;
 using Thor.Abstractions.Audios;
 using Thor.Abstractions.Chats;
 using Thor.Abstractions.Chats.Dtos;
+using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Embeddings;
 using Thor.Abstractions.Embeddings.Dtos;
 using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Images;
 using Thor.Abstractions.Images.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
+using Thor.Abstractions.ObjectModels.ObjectModels.ResponseModels;
 using Thor.Abstractions.Realtime;
 using Thor.Abstractions.Realtime.Dto;
+using Thor.Domain.Chats;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 using Thor.Service.Infrastructure;
 
-namespace Thor.Service.Service;
+namespace Thor.Service.Service.OpenAI;
 
 /// <summary>
 /// 对话服务
@@ -31,7 +34,7 @@ namespace Thor.Service.Service;
 /// <param name="rateLimitModelService"></param>
 /// <param name="userService"></param>
 /// <param name="loggerService"></param>
-public sealed class ChatService(
+public sealed partial class ChatService(
     IServiceProvider serviceProvider,
     ChannelService channelService,
     TokenService tokenService,
@@ -44,389 +47,6 @@ public sealed class ChatService(
     LoggerService loggerService)
     : AIService(serviceProvider, imageService)
 {
-    public async Task VariationsAsync(HttpContext context)
-    {
-        try
-        {
-            using var image =
-                Activity.Current?.Source.StartActivity("图片变体");
-
-            var organizationId = string.Empty;
-            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
-            {
-                organizationId = organizationIdHeader.ToString();
-            }
-
-            var request = new ImageVariationCreateRequest();
-            // 读取表单数据
-            if (context.Request.HasFormContentType)
-            {
-                var form = await context.Request.ReadFormAsync(context.RequestAborted);
-                request.N = int.TryParse(form["n"], out var n) ? n : 1;
-                request.Size = form["size"];
-                request.Model = form["model"];
-                request.ResponseFormat = form["response_format"];
-
-                // 文件stream转换byte
-
-                var imageFile = form.Files.GetFile("image");
-                if (imageFile != null)
-                {
-                    await using var stream = new MemoryStream();
-                    await imageFile.CopyToAsync(stream, context.RequestAborted);
-                    request.Image = stream.ToArray();
-                    request.ImageName = imageFile.FileName;
-                }
-            }
-
-
-            if (string.IsNullOrEmpty(request?.Model)) request.Model = "dall-e-2";
-
-            var imageCostRatio = GetImageCostRatio(request.Model, request.Size);
-
-            var rate = ModelManagerService.PromptRate[request.Model];
-
-            var (token, user) = await tokenService.CheckTokenAsync(context, rate);
-
-            await rateLimitModelService.CheckAsync(request.Model, user.Id);
-            TokenService.CheckModel(request.Model, token, context);
-
-            request.Model = await modelMapService.ModelMap(request.Model);
-
-            request.N ??= 1;
-
-            var quota = (int)(rate.PromptRate * imageCostRatio) * request.N;
-
-            if (request == null) throw new Exception("模型校验异常");
-
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("您的账号钱包余额不足请在控制台充值。");
-
-            // 获取渠道 通过算法计算权重
-            var channel =
-                CalculateWeight(await channelService.GetChannelsContainsModelAsync(request.Model, user, token));
-
-            if (channel == null)
-                throw new NotModelException(
-                    $"{request.Model}在分组：{(token?.Groups.FirstOrDefault() ?? user.Groups.FirstOrDefault())} 未找到可用渠道");
-
-            var userGroup = await userGroupService.GetAsync(channel.Groups);
-
-            if (userGroup == null)
-            {
-                throw new BusinessException("当前渠道未设置分组，请联系管理员设置分组", "400");
-            }
-
-            // 获取渠道指定的实现类型的服务
-            var openService = GetKeyedService<IThorImageService>(channel.Type);
-
-            if (openService == null) throw new Exception($"并未实现：{channel.Type} 的服务");
-
-            var sw = Stopwatch.StartNew();
-
-            var response = await openService.CreateImageVariation(request, new ThorPlatformOptions
-            {
-                ApiKey = channel.Key,
-                Address = channel.Address,
-                Other = channel.Other
-            });
-
-            // 计算createdAT
-            var createdAt = DateTime.Now;
-            var created = (int)createdAt.ToUnixTimeSeconds();
-            await context.Response.WriteAsJsonAsync(new ThorImageCreateResponse
-            {
-                data = response.Results,
-                created = created,
-                successful = response.Successful
-            });
-
-            sw.Stop();
-
-            quota = (int)((decimal)userGroup.Rate * quota);
-
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
-                request.Model,
-                0, 0, quota ?? 0, token?.Key, user?.UserName, user?.Id, channel.Id,
-                channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-                organizationId);
-
-            await userService.ConsumeAsync(user!.Id, quota ?? 0, 0, token?.Key, channel.Id, request.Model);
-        }
-        catch (PaymentRequiredException)
-        {
-            context.Response.StatusCode = 402;
-            await context.WriteErrorAsync("账号余额不足请充值", "402");
-        }
-        catch (RateLimitException)
-        {
-            context.Response.StatusCode = 429;
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            context.Response.StatusCode = 401;
-        }
-        catch (Exception e)
-        {
-            logger.LogError("对话模型请求异常：{e}", e);
-            await context.WriteErrorAsync(e.Message);
-        }
-    }
-
-
-    public async Task EditsImageAsync(HttpContext context)
-    {
-        try
-        {
-            using var image =
-                Activity.Current?.Source.StartActivity("图片修改图片");
-
-            var organizationId = string.Empty;
-            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
-            {
-                organizationId = organizationIdHeader.ToString();
-            }
-
-            var request = new ImageEditCreateRequest();
-            // 读取表单数据
-            if (context.Request.HasFormContentType)
-            {
-                var form = await context.Request.ReadFormAsync(context.RequestAborted);
-                request.Prompt = form["prompt"];
-                request.N = int.TryParse(form["n"], out var n) ? n : 1;
-                request.Size = form["size"];
-                request.Model = form["model"];
-                request.ResponseFormat = form["response_format"];
-
-                // 文件stream转换byte
-
-                var imageFile = form.Files.GetFile("image");
-                if (imageFile != null)
-                {
-                    await using var stream = new MemoryStream();
-                    await imageFile.CopyToAsync(stream, context.RequestAborted);
-                    request.Image = stream.ToArray();
-                    request.ImageName = imageFile.FileName;
-                }
-                else
-                {
-                    throw new BusinessException("image是必须的", "400");
-                }
-
-                // 先判断Mask是否
-                var mask = form.Files.GetFile("mask");
-
-                if (mask != null)
-                {
-                    await using var stream = new MemoryStream();
-                    await mask.CopyToAsync(stream, context.RequestAborted);
-                    request.Mask = stream.ToArray();
-                    request.MaskName = mask.FileName;
-                }
-            }
-
-
-            if (string.IsNullOrEmpty(request?.Model)) request.Model = "dall-e-2";
-
-            var imageCostRatio = GetImageCostRatio(request.Model, request.Size);
-
-            var rate = ModelManagerService.PromptRate[request.Model];
-
-            var (token, user) = await tokenService.CheckTokenAsync(context, rate);
-
-            await rateLimitModelService.CheckAsync(request.Model, user.Id);
-            TokenService.CheckModel(request.Model, token, context);
-
-            request.Model = await modelMapService.ModelMap(request.Model);
-
-
-            request.N ??= 1;
-
-            var quota = (int)(rate.PromptRate * imageCostRatio) * request.N;
-
-            if (request == null) throw new Exception("模型校验异常");
-
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
-
-            // 获取渠道 通过算法计算权重
-            var channel =
-                CalculateWeight(await channelService.GetChannelsContainsModelAsync(request.Model, user, token));
-
-            if (channel == null)
-                throw new NotModelException(
-                    $"{request.Model}在分组：{(token?.Groups.FirstOrDefault() ?? user.Groups.FirstOrDefault())} 未找到可用渠道");
-
-            var userGroup = await userGroupService.GetAsync(channel.Groups);
-
-            if (userGroup == null)
-            {
-                throw new BusinessException("当前渠道未设置分组，请联系管理员设置分组", "400");
-            }
-
-            // 获取渠道指定的实现类型的服务
-            var openService = GetKeyedService<IThorImageService>(channel.Type);
-
-            if (openService == null) throw new Exception($"并未实现：{channel.Type} 的服务");
-
-            var sw = Stopwatch.StartNew();
-
-            var response = await openService.CreateImageEdit(request, new ThorPlatformOptions
-            {
-                ApiKey = channel.Key,
-                Address = channel.Address,
-                Other = channel.Other
-            });
-
-            // 计算createdAT
-            var createdAt = DateTime.Now;
-            var created = (int)createdAt.ToUnixTimeSeconds();
-            await context.Response.WriteAsJsonAsync(new ThorImageCreateResponse
-            {
-                data = response.Results,
-                created = created,
-                successful = response.Successful
-            });
-
-            sw.Stop();
-
-            quota = (int)((decimal)userGroup.Rate * quota);
-
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
-                request.Model,
-                0, 0, quota ?? 0, token?.Key, user?.UserName, user?.Id, channel.Id,
-                channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-                organizationId);
-
-            await userService.ConsumeAsync(user!.Id, quota ?? 0, 0, token?.Key, channel.Id, request.Model);
-        }
-        catch (PaymentRequiredException)
-        {
-            context.Response.StatusCode = 402;
-            await context.WriteErrorAsync("账号余额不足请充值", "402");
-        }
-        catch (RateLimitException)
-        {
-            context.Response.StatusCode = 429;
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            context.Response.StatusCode = 401;
-        }
-        catch (Exception e)
-        {
-            logger.LogError("对话模型请求异常：{e}", e);
-            await context.WriteErrorAsync(e.Message);
-        }
-    }
-
-
-    public async Task CreateImageAsync(HttpContext context, ImageCreateRequest request)
-    {
-        try
-        {
-            using var image =
-                Activity.Current?.Source.StartActivity("文字生成图片");
-
-            var organizationId = string.Empty;
-            if (context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader))
-            {
-                organizationId = organizationIdHeader.ToString();
-            }
-
-
-            if (string.IsNullOrEmpty(request?.Model)) request.Model = "dall-e-2";
-
-            var imageCostRatio = GetImageCostRatio(request);
-
-            var rate = ModelManagerService.PromptRate[request.Model];
-
-
-            var (token, user) = await tokenService.CheckTokenAsync(context, rate);
-
-            await rateLimitModelService.CheckAsync(request.Model, user.Id);
-            TokenService.CheckModel(request.Model, token, context);
-
-            request.Model = await modelMapService.ModelMap(request.Model);
-
-
-            request.N ??= 1;
-
-            var quota = (int)(rate.PromptRate * imageCostRatio) * request.N;
-
-            if (request == null) throw new Exception("模型校验异常");
-
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
-
-            // 获取渠道 通过算法计算权重
-            var channel =
-                CalculateWeight(await channelService.GetChannelsContainsModelAsync(request.Model, user, token));
-
-            if (channel == null)
-                throw new NotModelException(
-                    $"{request.Model}在分组：{(token?.Groups.FirstOrDefault() ?? user.Groups.FirstOrDefault())} 未找到可用渠道");
-
-            var userGroup = await userGroupService.GetAsync(channel.Groups);
-
-            if (userGroup == null)
-            {
-                throw new BusinessException("当前渠道未设置分组，请联系管理员设置分组", "400");
-            }
-
-            // 获取渠道指定的实现类型的服务
-            var openService = GetKeyedService<IThorImageService>(channel.Type);
-
-            if (openService == null) throw new Exception($"并未实现：{channel.Type} 的服务");
-
-            var sw = Stopwatch.StartNew();
-
-            var response = await openService.CreateImage(request, new ThorPlatformOptions
-            {
-                ApiKey = channel.Key,
-                Address = channel.Address,
-                Other = channel.Other
-            });
-
-            // 计算createdAT
-            var createdAt = DateTime.Now;
-            var created = (int)createdAt.ToUnixTimeSeconds();
-            await context.Response.WriteAsJsonAsync(new ThorImageCreateResponse
-            {
-                data = response.Results,
-                created = created,
-                successful = response.Successful
-            });
-
-            sw.Stop();
-
-            quota = (int)((decimal)userGroup.Rate * quota);
-
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
-                request.Model,
-                0, 0, quota ?? 0, token?.Key, user?.UserName, user?.Id, channel.Id,
-                channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-                organizationId);
-
-            await userService.ConsumeAsync(user!.Id, quota ?? 0, 0, token?.Key, channel.Id, request.Model);
-        }
-        catch (PaymentRequiredException)
-        {
-            context.Response.StatusCode = 402;
-            await context.WriteOpenAIErrorAsync("账号余额不足请充值", "402");
-        }
-        catch (RateLimitException)
-        {
-            context.Response.StatusCode = 429;
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            context.Response.StatusCode = 401;
-        }
-        catch (Exception e)
-        {
-            logger.LogError("对话模型请求异常：{e}", e);
-            await context.WriteOpenAIErrorAsync(e.Message);
-        }
-    }
-
     public async ValueTask EmbeddingAsync(HttpContext context, ThorEmbeddingInput input)
     {
         try
@@ -516,7 +136,7 @@ public sealed class ChatService(
                 sw.Stop();
 
 
-                var quota = requestToken * rate.PromptRate;
+                var quota = (stream.Usage?.InputTokens ?? requestToken) * rate.PromptRate;
 
                 var completionRatio = GetCompletionRatio(input.Model);
                 quota += rate.PromptRate * completionRatio;
@@ -526,18 +146,33 @@ public sealed class ChatService(
                 // 将quota 四舍五入
                 quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
-                await loggerService.CreateConsumeAsync(
+                await loggerService.CreateConsumeAsync("/v1/embeddings",
                     string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate),
                     input.Model,
-                    requestToken, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
+                    (stream.Usage?.InputTokens ?? requestToken), 0, (int)quota, token?.Key, user?.UserName, user?.Id,
+                    channel.Id,
                     channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
                     organizationId);
 
-                await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
+                await userService.ConsumeAsync(user!.Id, (long)quota, (stream.Usage?.InputTokens ?? requestToken),
+                    token?.Key, channel.Id,
                     input.Model);
+
                 stream.ConvertEmbeddingData(input.EncodingFormat);
 
-                await context.Response.WriteAsJsonAsync(stream);
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    input.Model,
+                    stream.Data,
+                    stream.Error,
+                    stream.ObjectTypeName,
+                    Usage = new ThorUsageResponse()
+                    {
+                        InputTokens = (stream.Usage?.InputTokens ?? requestToken),
+                        CompletionTokens = 0,
+                        TotalTokens = (stream.Usage?.InputTokens ?? requestToken)
+                    }
+                });
             }
         }
         catch (RateLimitException)
@@ -614,7 +249,7 @@ public sealed class ChatService(
 
                     sw.Stop();
 
-                    await loggerService.CreateConsumeAsync(
+                    await loggerService.CreateConsumeAsync("/v1/completions",
                         string.Format(ConsumerTemplate, rate, completionRatio, userGroup.Rate),
                         input.Model,
                         requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
@@ -692,6 +327,7 @@ public sealed class ChatService(
         }
 
         var rateLimit = 0;
+        Exception? lastException = null;
 
         // 用于限流重试，如果限流则重试并且进行重新负载均衡计算
         limitGoto:
@@ -718,9 +354,15 @@ public sealed class ChatService(
                 var channel =
                     CalculateWeight(await channelService.GetChannelsContainsModelAsync(request.Model, user, token));
 
-                if (channel == null)
+                if (lastException == null && channel == null)
                     throw new NotModelException(
                         $"{request.Model}在分组：{(token?.Groups.FirstOrDefault() ?? user.Groups.FirstOrDefault())} 未找到可用渠道");
+
+                if (lastException != null && channel == null)
+                {
+                    await context.WriteErrorAsync(lastException.Message);
+                    return;
+                }
 
                 var userGroup = await userGroupService.GetAsync(channel.Groups);
 
@@ -752,18 +394,12 @@ public sealed class ChatService(
 
                 if (request.Stream == true)
                 {
-                    using var activity =
-                        Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
-
                     (requestToken, responseToken) =
                         await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
                 }
                 else
                 {
-                    using var activity =
-                        Activity.Current?.Source.StartActivity("非流式对话", ActivityKind.Internal);
-
                     (requestToken, responseToken, cachedTokens) =
                         await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
@@ -799,10 +435,10 @@ public sealed class ChatService(
                         // 将quota 四舍五入
                         quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
-                        await loggerService.CreateConsumeAsync(
+                        await loggerService.CreateConsumeAsync("/v1/chat/completions",
                             string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
                                 cachedTokens, rate.CacheRate),
-                            request.Model,
+                            model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
@@ -810,25 +446,25 @@ public sealed class ChatService(
                     }
                     else
                     {
-                        await loggerService.CreateConsumeAsync(
+                        await loggerService.CreateConsumeAsync("/v1/chat/completions",
                             string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate),
-                            request.Model,
+                            model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
                             (int)sw.ElapsedMilliseconds, organizationId);
 
                         await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
-                            request.Model);
+                            model);
                     }
                 }
                 else
                 {
                     // 费用
-                    await loggerService.CreateConsumeAsync(
+                    await loggerService.CreateConsumeAsync("/v1/chat/completions",
                         string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
                             userGroup.Rate),
-                        request.Model,
+                        model,
                         requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
                         user?.UserName, user?.Id,
                         channel.Id,
@@ -838,7 +474,7 @@ public sealed class ChatService(
 
                     await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key,
                         channel.Id,
-                        request.Model);
+                        model);
                 }
             }
             else
@@ -849,10 +485,11 @@ public sealed class ChatService(
         }
         catch (ThorRateLimitException)
         {
+            lastException = new ThorRateLimitException("对话模型请求限流");
             logger.LogWarning("对话模型请求限流：{rateLimit}", rateLimit);
             rateLimit++;
             // TODO：限流重试次数
-            if (rateLimit > 3)
+            if (rateLimit > 5)
             {
                 context.Response.StatusCode = 429;
             }
@@ -891,14 +528,10 @@ public sealed class ChatService(
         }
         catch (Exception e)
         {
-            // 读取body
-            logger.LogError("对话模型请求异常：{e} 准备重试{rateLimit}，请求参数：{request}", e, rateLimit,
-                JsonSerializer.Serialize(request, ThorJsonSerializer.DefaultOptions));
-            logger.LogError("对话模型请求异常：{e} 准备重试{rateLimit}，请求参数：{request}", e, rateLimit,
-                JsonSerializer.Serialize(request, ThorJsonSerializer.DefaultOptions));
+            lastException = e;
             rateLimit++;
             // TODO：限流重试次数
-            if (rateLimit > 3)
+            if (rateLimit > 5)
             {
                 context.Response.StatusCode = 400;
                 await context.WriteErrorAsync(e.Message, "500");
@@ -1088,7 +721,7 @@ public sealed class ChatService(
 
                     sw.Stop();
 
-                    await loggerService.CreateConsumeAsync(
+                    await loggerService.CreateConsumeAsync("/v1/realtime",
                         string.Format(RealtimeConsumerTemplate, rate, completionRatio,
                             (ModelManagerService.PromptRate[model].AudioPromptRate),
                             ModelManagerService.PromptRate[model].AudioOutputRate, userGroup.Rate),
@@ -1203,7 +836,7 @@ public sealed class ChatService(
             // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
             if (result?.Usage?.CompletionTokens is not null && result.Usage.CompletionTokens > 0)
             {
-                responseToken = result.Usage.CompletionTokens.Value;
+                responseToken = (int)result.Usage.CompletionTokens.Value;
             }
             else
             {
@@ -1258,7 +891,7 @@ public sealed class ChatService(
 
         if (result?.Usage?.CompletionTokens is not null && result.Usage.CompletionTokens > 0)
         {
-            responseToken = result.Usage.CompletionTokens.Value;
+            responseToken = (int)result.Usage.CompletionTokens.Value;
         }
         else
         {
@@ -1369,7 +1002,8 @@ public sealed class ChatService(
 
             quota = (decimal)userGroup.Rate * quota;
 
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
+            await loggerService.CreateConsumeAsync("/v1/audio/transcriptions",
+                string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
                 audioCreateTranscriptionRequest.Model,
                 requestToken, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                 channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
@@ -1444,7 +1078,7 @@ public sealed class ChatService(
 
             var sw = Stopwatch.StartNew();
 
-            var response =
+            var (response, usage) =
                 await openService.SpeechAsync(request, new ThorPlatformOptions
                 {
                     ApiKey = channel.Key,
@@ -1453,9 +1087,16 @@ public sealed class ChatService(
                 }, context.RequestAborted);
 
             // 计算音频的时长
-            var requestToken = TokenHelper.GetTotalTokens(request.Input);
+            var requestToken = usage?.PromptTokens ?? TokenHelper.GetTotalTokens(request.Input);
 
             quota = requestToken * rate.PromptRate * (rate.CompletionRate ?? 1);
+
+            if (usage?.CompletionTokens > 0)
+            {
+                // (模型倍率 * (文字输入 + 文字输出 * 补全倍率)
+                quota = (decimal)((requestToken + usage.CompletionTokens * (rate.CompletionRate ?? 1)) *
+                                  rate.PromptRate) ;
+            }
 
             switch (request.ResponseFormat)
             {
@@ -1495,13 +1136,16 @@ public sealed class ChatService(
 
             quota = (decimal)userGroup.Rate * quota;
 
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
+            await loggerService.CreateConsumeAsync("/v1/audio/speech",
+                string.Format(ConsumerTemplate, rate.PromptRate, ((int?)usage?.CompletionTokens ?? 0), userGroup.Rate),
                 request.Model,
-                requestToken, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
+                requestToken, ((int?)usage?.CompletionTokens ?? 0), (int)quota, token?.Key, user?.UserName, user?.Id,
+                channel.Id,
                 channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
                 organizationId);
 
-            await userService.ConsumeAsync(user!.Id, (int)quota, 0, token?.Key, channel.Id,
+            await userService.ConsumeAsync(user!.Id, (int)quota, ((int?)usage?.CompletionTokens ?? 0), token?.Key,
+                channel.Id,
                 request.Model);
         }
         catch (RateLimitException)
@@ -1515,7 +1159,7 @@ public sealed class ChatService(
         catch (Exception e)
         {
             logger.LogError("对话模型请求异常：{e}", e);
-            await context.WriteErrorAsync(e.Message);
+            await context.WriteOpenAIErrorAsync(e.Message);
         }
     }
 
@@ -1618,7 +1262,8 @@ public sealed class ChatService(
 
             quota = (decimal)userGroup.Rate * quota;
 
-            await loggerService.CreateConsumeAsync(string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
+            await loggerService.CreateConsumeAsync("/v1/audio/translations",
+                string.Format(ConsumerTemplate, rate.PromptRate, 0, userGroup.Rate),
                 audioCreateTranscriptionRequest.Model,
                 requestToken, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                 channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
@@ -1761,7 +1406,7 @@ public sealed class ChatService(
 
                 if (item.Usage is { CompletionTokens: > 0 })
                 {
-                    responseToken = item.Usage.CompletionTokens.Value;
+                    responseToken = (int)item.Usage.CompletionTokens.Value;
                 }
 
                 if (item.Choices != null)
@@ -1811,25 +1456,6 @@ public sealed class ChatService(
 
 
         return (requestToken, responseToken);
-    }
-
-    /// <summary>
-    /// 计算图片倍率
-    /// </summary>
-    /// <param name="module"></param>
-    /// <returns></returns>
-    private static decimal GetImageCostRatio(ImageCreateRequest module)
-    {
-        var imageCostRatio = GetImageSizeRatio(module.Model, module.Size);
-        if (module is { Quality: "hd", Model: "dall-e-3" })
-        {
-            if (module.Size == "1024x1024")
-                imageCostRatio *= 2;
-            else
-                imageCostRatio *= (decimal)1.5;
-        }
-
-        return imageCostRatio;
     }
 
 

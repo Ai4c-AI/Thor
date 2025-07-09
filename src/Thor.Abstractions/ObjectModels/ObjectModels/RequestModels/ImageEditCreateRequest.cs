@@ -8,7 +8,7 @@ public record ImageEditCreateRequest : SharedImageRequestBaseModel
     /// <summary>
     ///     The image to edit. Must be a valid PNG file, less than 4MB, and square.
     /// </summary>
-    public byte[] Image { get; set; }
+    public byte[]? Image { get; set; }
 
     /// <summary>
     ///     Image file name
@@ -26,6 +26,9 @@ public record ImageEditCreateRequest : SharedImageRequestBaseModel
     /// </summary>
     public string? MaskName { get; set; }
 
+    [JsonPropertyName("quality")]
+    public string Quality { get; set; }
+
     /// <summary>
     ///     A text description of the desired image(s). The maximum length is 1000 characters.
     /// </summary>
@@ -39,8 +42,11 @@ public record ImageEditCreateRequest : SharedImageRequestBaseModel
     public string? Moderation { get; set; }
     
     [JsonPropertyName("output_compression")]
-    public string? output_compression { get; set; }
+    public string? OutputCompression { get; set; }
+    
+    [JsonPropertyName("output_format")]
+    public string? OutputFormat { get; set; }
     
     [JsonPropertyName("style")]
-    public string? style { get; set; }
+    public string? Style { get; set; }
 }
