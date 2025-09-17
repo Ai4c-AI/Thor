@@ -16,6 +16,8 @@
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.412" />
     <PackageReference Include="Casdoor.AspNetCore" Version="1.16.0" />
     <PackageReference Include="Casdoor.Client" Version="1.16.0" />
+    <PackageReference Include="Making.AspNetCore" Version="1.0.9-preview" />
+    <PackageReference Include="Making.MiniApis.Analyzers" Version="1.0.9-preview" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2">

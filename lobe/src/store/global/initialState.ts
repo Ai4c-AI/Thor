@@ -15,9 +15,6 @@ export enum SidebarTabKey {
 
   Product = "product",
 
-  Logger = "logger",
-
-  RequestLog = "request-log",
 
   RedeemCode = "redeem-code",
 
@@ -43,4 +40,6 @@ export enum SidebarTabKey {
   Announcement = 'announcement',
 
   Tracing = 'tracing',
+
+  Logger = 'logger',
 }

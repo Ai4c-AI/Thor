@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { message, Button, Spin } from "antd";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getCasdoorToken, getGiteeToken, getGithubToken } from "../../services/AuthorizeService";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Logo } from "@lobehub/ui";
-import { CheckCircleFilled, LoadingOutlined } from '@ant-design/icons';
+import { CheckCircle, Loader2 } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 export default function Auth() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -32,19 +35,13 @@ export default function Auth() {
                 navigate('/panel');
             }, 800);
         } else {
-            message.error({ 
-                content: res.message, 
-                style: { borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' } 
-            });
+            toast.error(res.message);
             setLoading(false);
         }
     };
 
     const handleError = (error: any) => {
-        message.error({ 
-            content: error.message, 
-            style: { borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' } 
-        });
+        toast.error(error.message);
         setLoading(false);
     };
 
@@ -74,8 +71,6 @@ export default function Auth() {
         }
     }, [code, location.pathname]);
 
-    const antIcon = <LoadingOutlined style={{ fontSize: 24, color: '#FE6B8B' }} spin />;
-
     return (
         <div className="auth-container">
             <div className="auth-background">
@@ -85,33 +80,37 @@ export default function Auth() {
             </div>
             <div className="auth-card">
                 <div className="logo-container">
-                    <Logo size={80} extra="Thor" />
+                    <Avatar className="h-20 w-20">
+                        <AvatarImage src="/logo.png" alt="Thor" />
+                        <AvatarFallback>T</AvatarFallback>
+                    </Avatar>
+                    <h2 style={{ marginLeft: 16, color: '#1677ff' }}>Thor</h2>
                 </div>
-                <h2 className="auth-title">第三方登录授权</h2>
+                <h2 className="auth-title">{t('auth.thirdPartyTitle')}</h2>
                 <div className="auth-status">
                     {loading ? (
                         <div className="loading-container">
-                            <Spin indicator={antIcon} />
-                            <span className="loading-text">正在处理授权请求...</span>
+                            <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#FE6B8B' }} />
+                            <span className="loading-text">{t('auth.processing')}</span>
                         </div>
                     ) : isSuccess ? (
                         <div className="success-container">
-                            <CheckCircleFilled style={{ fontSize: 28, color: '#52c41a', marginRight: 10 }} />
-                            <span className="success-text">授权成功</span>
+                            <CheckCircle className="h-7 w-7 text-green-500 mr-2" />
+                            <span className="success-text">{t('auth.success')}</span>
                         </div>
                     ) : (
-                        <span className="waiting-text">等待处理授权...</span>
+                        <span className="waiting-text">{t('auth.waiting')}</span>
                     )}
                 </div>
-                <Button 
+                <Button
                     className="auth-button"
                     onClick={() => {
                         window.location.href = '/login'
                     }}>
-                    返回登录
+                    {t('auth.backToLogin')}
                 </Button>
                 <div className="auth-footer">
-                    <span>安全可靠的第三方授权服务</span>
+                    <span>{t('auth.secureService')}</span>
                 </div>
             </div>
             <style>{`

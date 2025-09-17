@@ -12,7 +12,7 @@ using Thor.Abstractions.Extensions;
 
 namespace Thor.OpenAI.Chats;
 
-public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsService> logger)
+public sealed class OpenAiChatCompletionsService(ILogger<OpenAiChatCompletionsService> logger)
     : IThorChatCompletionsService
 {
     public async Task<ThorChatCompletionsResponse> ChatCompletionsAsync(ThorChatCompletionsRequest chatCompletionCreate,

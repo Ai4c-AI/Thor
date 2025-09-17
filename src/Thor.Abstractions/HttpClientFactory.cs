@@ -41,21 +41,18 @@ public static class HttpClientFactory
 
     private static readonly ConcurrentDictionary<string, Lazy<List<HttpClient>>> HttpClientPool = new();
 
-    private static SocketsHttpHandler socketsHttpHandler = new SocketsHttpHandler
+    private static readonly SocketsHttpHandler SocketsHttpHandler = new()
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(30),
         PooledConnectionIdleTimeout = TimeSpan.FromMinutes(30),
         EnableMultipleHttp2Connections = true,
         // 使用h2
-
-
         MaxConnectionsPerServer = int.MaxValue,
         AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Brotli,
         // 连接超时5分钟
         ConnectTimeout = TimeSpan.FromMinutes(5),
         MaxAutomaticRedirections = 3,
         AllowAutoRedirect = true,
-
         Expect100ContinueTimeout = TimeSpan.FromMinutes(30),
     };
 
@@ -67,7 +64,7 @@ public static class HttpClientFactory
 
             for (var i = 0; i < PoolSize; i++)
             {
-                clients.Add(new HttpClient(socketsHttpHandler)
+                clients.Add(new HttpClient(SocketsHttpHandler)
                 {
                     DefaultRequestVersion = HttpVersion.Version20,
                     DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,

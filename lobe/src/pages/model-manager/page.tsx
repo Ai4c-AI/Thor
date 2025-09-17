@@ -1,1154 +1,1171 @@
 import { useEffect, useState } from "react";
-import { DeleteModelManager, EnableModelManager, GetModelManagerList, GetModelStats, GetModelTypes, GetAllTags } from "../../services/ModelManagerService";
-import { Button, message, Space, Input as AntInput, Switch, Typography, ConfigProvider, theme, Tag as AntTag, Card, Flex, Divider, Badge, Drawer, Descriptions, Modal, Empty, Spin } from "antd";
+import { DeleteModelManager, EnableModelManager, GetModelManagerList, GetModelStats, GetModelTypes, GetAllTags, GetModelMetadata } from "../../services/ModelManagerService";
 import { getCompletionRatio, renderQuota } from "../../utils/render";
 import CreateModelManagerPage from "./features/CreateModelManager";
-import { getIconByName } from "../../utils/iconutils";
-import { IconAvatar, OpenAI } from "@lobehub/icons";
-import { PlusOutlined, SearchOutlined, SettingOutlined, FilterOutlined, ReloadOutlined, EyeOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import UpdateModelManagerPage from "./features/UpdateModelManager";
 import { useTranslation } from "react-i18next";
-import { useResponsive, createStyles } from "antd-style";
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search,
+  Plus,
+  Filter,
+  RefreshCw,
+  Settings,
+  Eye,
+  Edit,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  MoreHorizontal,
+  TrendingUp,
+  Database,
+  MessageSquare,
+  Image,
+  Volume2,
+  Link,
+  Mic,
+  Speaker,
+  AlertCircle,
+  BarChart3,
+  Grid3X3,
+  List,
+  SlidersHorizontal,
+  Sparkles,
+  Clock,
+  Target,
+  LayoutGrid
+} from "lucide-react";
 
-// 创建动画组件
-const MotionDiv = motion.div;
-const MotionCard = motion(Card);
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { getIconByName } from "../../utils/iconutils";
 
-// 使用 antd-style 创建样式
-const useStyles = createStyles(({ token, css }) => ({
-  container: css`
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: ${token.colorBgLayout};
-    overflow: hidden;
-  `,
-  
-  header: css`
-    background: ${token.colorBgContainer};
-    border-bottom: 1px solid ${token.colorBorderSecondary};
-    padding: 16px 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    z-index: 10;
-    
-    @media (max-width: 768px) {
-      padding: 12px 16px;
-    }
-  `,
-  
-  headerTitle: css`
-    margin: 0;
-    color: ${token.colorTextHeading};
-    font-weight: 600;
-    font-size: 20px;
-    line-height: 1.4;
-    
-    @media (max-width: 768px) {
-      font-size: 18px;
-    }
-  `,
-  
-  toolbar: css`
-    background: ${token.colorBgContainer};
-    border-bottom: 1px solid ${token.colorBorderSecondary};
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    
-    @media (max-width: 768px) {
-      padding: 12px 16px;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-    }
-  `,
-  
-  toolbarLeft: css`
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex: 1;
-    
-    @media (max-width: 768px) {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-    }
-  `,
-  
-  toolbarRight: css`
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    
-    @media (max-width: 768px) {
-      justify-content: center;
-    }
-  `,
-  
-  searchInput: css`
-    width: 300px;
-    
-    .ant-input-affix-wrapper {
-      border-radius: ${token.borderRadius}px;
-      
-      &:hover {
-        border-color: ${token.colorPrimaryHover};
-      }
-      
-      &:focus-within {
-        border-color: ${token.colorPrimary};
-        box-shadow: 0 0 0 2px ${token.colorPrimaryBg};
-      }
-    }
-    
-    @media (max-width: 768px) {
-      width: 100%;
-    }
-  `,
-  
-  priceSwitch: css`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    
-    .ant-switch-checked {
-      background: linear-gradient(90deg, ${token.colorPrimary} 0%, ${token.colorPrimaryActive} 100%);
-    }
-  `,
-  
-  actionButton: css`
-    border-radius: ${token.borderRadius}px;
-    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-    
-    &.ant-btn-primary {
-      background: linear-gradient(90deg, ${token.colorPrimary} 0%, ${token.colorPrimaryActive} 100%);
-      border: none;
-      box-shadow: 0 2px 8px ${token.colorPrimaryBg};
-      
-      &:hover {
-        background: linear-gradient(90deg, ${token.colorPrimaryHover} 0%, ${token.colorPrimaryActive} 100%);
-        box-shadow: 0 4px 12px ${token.colorPrimaryBgHover};
-        transform: translateY(-1px);
-      }
-    }
-    
-    &:not(.ant-btn-primary) {
-      &:hover {
-        border-color: ${token.colorPrimaryHover};
-        color: ${token.colorPrimaryHover};
-      }
-    }
-  `,
-  
-  mainContent: css`
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    background: ${token.colorBgLayout};
-  `,
-  
-  sidebar: css`
-    width: 280px;
-    background: ${token.colorBgContainer};
-    border-right: 1px solid ${token.colorBorderSecondary};
-    padding: 20px;
-    overflow-y: auto;
-    
-    @media (max-width: 1024px) {
-      display: none;
-    }
-  `,
-  
-  sidebarSection: css`
-    margin-bottom: 24px;
-    
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: ${token.colorTextHeading};
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-  `,
-  
-  filterItem: css`
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-radius: ${token.borderRadius}px;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 4px;
-    
-    &:hover {
-      background: ${token.colorFillAlter};
-    }
-    
-    &.active {
-      background: ${token.colorPrimaryBg};
-      color: ${token.colorPrimary};
-      font-weight: 500;
-    }
-    
-    .filter-name {
-      flex: 1;
-    }
-    
-    .filter-count {
-      font-size: 12px;
-      color: ${token.colorTextSecondary};
-      background: ${token.colorFillSecondary};
-      padding: 2px 6px;
-      border-radius: 10px;
-      min-width: 20px;
-      text-align: center;
-    }
-    
-    &.active .filter-count {
-      background: ${token.colorPrimary};
-      color: ${token.colorWhite};
-    }
-  `,
-  
-  contentArea: css`
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    
-    @media (max-width: 768px) {
-      padding: 16px;
-    }
-  `,
-  
-  statsRow: css`
-    background: ${token.colorBgContainer};
-    border-radius: ${token.borderRadiusLG}px;
-    padding: 16px 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid ${token.colorBorderSecondary};
-    
-    @media (max-width: 768px) {
-      padding: 12px 16px;
-    }
-  `,
-  
-  statItem: css`
-    text-align: center;
-    
-    .stat-number {
-      font-size: 20px;
-      font-weight: 600;
-      color: ${token.colorTextHeading};
-      margin-bottom: 4px;
-    }
-    
-    .stat-label {
-      font-size: 12px;
-      color: ${token.colorTextSecondary};
-    }
-  `,
-  
-  modelGrid: css`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    
-    @media (max-width: 768px) {
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-  `,
-  
-  modelCard: css`
-    background: ${token.colorBgContainer};
-    border: 1px solid ${token.colorBorderSecondary};
-    border-radius: ${token.borderRadiusLG}px;
-    padding: 20px;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-    
-    &:hover {
-      border-color: ${token.colorPrimary};
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-      transform: translateY(-2px);
-    }
-    
-    &.disabled {
-      opacity: 0.6;
-      
-      &:hover {
-        transform: none;
-        box-shadow: none;
-        border-color: ${token.colorBorderSecondary};
-      }
-    }
-  `,
-  
-  cardHeader: css`
-    display: flex;
-    align-items: center;
-    margin-bottom: 16px;
-  `,
-  
-  iconContainer: css`
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: ${token.borderRadius}px;
-    background: linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorBgContainer} 100%);
-    margin-right: 12px;
-    transition: all 0.3s;
-  `,
-  
-  cardInfo: css`
-    flex: 1;
-    min-width: 0;
-  `,
-  
-  modelName: css`
-    font-size: 16px;
-    font-weight: 600;
-    color: ${token.colorTextHeading};
-    margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  `,
-  
-  modelDescription: css`
-    font-size: 12px;
-    color: ${token.colorTextSecondary};
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  `,
-  
-  cardTags: css`
-    margin-bottom: 12px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  `,
-  
-  statusBadge: css`
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    
-    .ant-badge-status-dot {
-      width: 8px;
-      height: 8px;
-    }
-  `,
-  
-  cardFooter: css`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid ${token.colorBorderSecondary};
-  `,
-  
-  priceInfo: css`
-    flex: 1;
-    
-    .price-tag {
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-right: 4px;
-      margin-bottom: 4px;
-      display: inline-block;
-    }
-  `,
-  
-  cardActions: css`
-    display: flex;
-    gap: 8px;
-    
-    .ant-btn {
-      padding: 4px 8px;
-      height: auto;
-      font-size: 12px;
-      border-radius: 4px;
-    }
-  `,
-  
-  mobileFilterButton: css`
-    display: none;
-    
-    @media (max-width: 1024px) {
-      display: inline-flex;
-    }
-  `,
-  
-  drawerContent: css`
-    .ant-drawer-body {
-      padding: 0;
-    }
-  `,
-  
-  emptyState: css`
-    padding: 60px 20px;
-    text-align: center;
-    
-    .empty-icon {
-      font-size: 48px;
-      color: ${token.colorTextDisabled};
-      margin-bottom: 16px;
-    }
-    
-    .empty-title {
-      font-size: 16px;
-      color: ${token.colorTextHeading};
-      margin-bottom: 8px;
-    }
-    
-    .empty-description {
-      color: ${token.colorTextSecondary};
-      margin-bottom: 24px;
-    }
-  `,
-  
-  loadingOverlay: css`
-    position: relative;
-    min-height: 200px;
-    
-    .ant-spin {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-  `
-}));
-
-// 页面动画变量
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
-// 模型类型配置
 const MODEL_TYPES = [
-  { key: 'all', label: '全部模型', icon: '📱' },
-  { key: 'chat', label: '对话模型', icon: '💬' },
-  { key: 'image', label: '图像模型', icon: '🖼️' },
-  { key: 'audio', label: '音频模型', icon: '🎵' },
-  { key: 'embedding', label: '嵌入模型', icon: '🔗' },
-  { key: 'stt', label: '语音识别', icon: '🎤' },
-  { key: 'tts', label: '语音合成', icon: '🔊' }
+  { key: 'all', label: 'All Models', icon: Database, color: 'text-blue-600', count: 0 },
+  { key: 'chat', label: 'Chat Models', icon: MessageSquare, color: 'text-green-600', count: 0 },
+  { key: 'image', label: 'Image Models', icon: Image, color: 'text-purple-600', count: 0 },
+  { key: 'audio', label: 'Audio Models', icon: Volume2, color: 'text-orange-600', count: 0 },
+  { key: 'embedding', label: 'Embedding', icon: Link, color: 'text-pink-600', count: 0 },
+  { key: 'stt', label: 'Speech to Text', icon: Mic, color: 'text-cyan-600', count: 0 },
+  { key: 'tts', label: 'Text to Speech', icon: Speaker, color: 'text-yellow-600', count: 0 }
 ];
 
+const STATUS_FILTERS = [
+  { key: 'all', label: 'All Status', icon: BarChart3, color: 'text-slate-600' },
+  { key: 'enabled', label: 'Enabled', icon: CheckCircle, color: 'text-emerald-600' },
+  { key: 'disabled', label: 'Disabled', icon: XCircle, color: 'text-red-600' }
+];
+
+interface ModelManager {
+  id: string;
+  model: string;
+  description?: string;
+  type: string;
+  icon?: string;
+  enable: boolean;
+  tags?: string[];
+  quotaType: number;
+  promptRate: number;
+  completionRate?: number;
+  audioPromptRate?: number;
+  audioOutputRate?: number;
+  quotaMax?: number;
+  isVersion2?: boolean;
+  createdAt: string;
+}
+
+interface ModelStats {
+  total: number;
+  enabled: number;
+  disabled: number;
+  [key: string]: number;
+}
+
 export default function ModelManager() {
-    const { t } = useTranslation();
-    const { mobile } = useResponsive();
-    const { token } = theme.useToken();
-    const { styles } = useStyles();
+  const { t } = useTranslation();
 
-    const [createOpen, setCreateOpen] = useState<boolean>(false);
-    const [updateValue, setUpdateValue] = useState<any>({
-        value: {},
-        open: false
+  // State management
+  const [createOpen, setCreateOpen] = useState(false);
+  const [updateValue, setUpdateValue] = useState<{ value: ModelManager | null; open: boolean }>({
+    value: null,
+    open: false
+  });
+  const [data, setData] = useState<ModelManager[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [isK, setIsK] = useState(false);
+  const [input, setInput] = useState({
+    page: 1,
+    pageSize: 50,
+    model: '',
+  });
+
+  // Filter and view states
+  const [selectedModel, setSelectedModel] = useState<ModelManager | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [activeTypeFilter, setActiveTypeFilter] = useState('all');
+  const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<'name' | 'created' | 'type' | 'status'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Data states
+  const [modelStats, setModelStats] = useState<ModelStats>({
+    total: 0,
+    enabled: 0,
+    disabled: 0
+  });
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [metadata, setMetadata] = useState<any>({});
+
+  // Data loading functions
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await GetModelManagerList(
+        input.model,
+        input.page,
+        input.pageSize,
+        false,
+        activeTypeFilter === 'all' ? '' : activeTypeFilter,
+        '',
+        selectedTags.length > 0 ? selectedTags : undefined
+      );
+      if (res.success) {
+        setData(res.data.items || []);
+        setTotal(res.data.total || 0);
+      }
+    } catch (error) {
+      toast.error('Failed to load models');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    setStatsLoading(true);
+    try {
+      const res = await GetModelStats();
+      if (res.success) {
+        setModelStats(res.data);
+      }
+    } catch (error) {
+      toast.error('Failed to load statistics');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const loadMetadata = async () => {
+    try {
+      const res = await GetModelMetadata();
+      if (res.success) {
+        setMetadata(res.data);
+        setAvailableTags(res.data.tags || []);
+        setAvailableTypes(res.data.modelTypes || []);
+      }
+    } catch (error) {
+      toast.error('Failed to load metadata');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [input, activeTypeFilter, selectedTags]);
+
+  useEffect(() => {
+    loadStats();
+    loadMetadata();
+  }, []);
+
+  // Filter and sort data
+  const filteredAndSortedData = data
+    .filter(item => {
+      if (activeStatusFilter === 'enabled' && !item.enable) return false;
+      if (activeStatusFilter === 'disabled' && item.enable) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let aValue: any, bValue: any;
+      switch (sortBy) {
+        case 'name':
+          aValue = a.model.toLowerCase();
+          bValue = b.model.toLowerCase();
+          break;
+        case 'created':
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+          break;
+        case 'type':
+          aValue = a.type;
+          bValue = b.type;
+          break;
+        case 'status':
+          aValue = a.enable ? 1 : 0;
+          bValue = b.enable ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [total, setTotal] = useState<number>(0);
-    const [isK, setIsK] = useState<boolean>(false);
-    const [input, setInput] = useState({
-        page: 1,
-        pageSize: 50,
-        model: '',
-    });
-    const [selectedModel, setSelectedModel] = useState<any>(null);
-    const [detailDrawerOpen, setDetailDrawerOpen] = useState<boolean>(false);
-    const [filterDrawerOpen, setFilterDrawerOpen] = useState<boolean>(false);
-    const [activeFilter, setActiveFilter] = useState<string>('all');
-    const [enabledFilter, setEnabledFilter] = useState<string>('all'); // all, enabled, disabled
-    const [modelStats, setModelStats] = useState<any>({});
-    const [availableTypes, setAvailableTypes] = useState<string[]>([]);
-    const [availableTags, setAvailableTags] = useState<string[]>([]);
-    const [statsLoading, setStatsLoading] = useState<boolean>(false);
 
-    function loadData() {
-        setLoading(true);
-        GetModelManagerList(input.model, input.page, input.pageSize)
-            .then((res) => {
-                setData(res.data.items);
-                setTotal(res.data.total);
-            }).finally(() => {
-                setLoading(false);
-            });
-    }
+  // Event handlers
+  const handleModelClick = (model: ModelManager) => {
+    setSelectedModel(model);
+    setDetailOpen(true);
+  };
 
-    // 加载统计信息
-    function loadStats() {
-        setStatsLoading(true);
-        GetModelStats()
-            .then((res) => {
-                if (res.success) {
-                    setModelStats(res.data);
-                }
-            }).finally(() => {
-                setStatsLoading(false);
-            });
-    }
-
-    // 加载模型类型
-    function loadTypes() {
-        GetModelTypes()
-            .then((res) => {
-                if (res.success) {
-                    setAvailableTypes(res.data);
-                }
-            });
-    }
-
-    // 加载标签
-    function loadTags() {
-        GetAllTags()
-            .then((res) => {
-                if (res.success) {
-                    setAvailableTags(res.data);
-                }
-            });
-    }
-
-    useEffect(() => {
+  const handleEnableModel = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await EnableModelManager(id);
+      if (res.success) {
+        toast.success(currentStatus ? 'Model disabled successfully' : 'Model enabled successfully');
         loadData();
         loadStats();
-        loadTypes();
-        loadTags();
-    }, [input]);
+      } else {
+        toast.error(res.message || 'Operation failed');
+      }
+    } catch (error) {
+      toast.error('Operation failed');
+    }
+  };
 
-    // 过滤数据
-    const filteredData = data.filter(item => {
-        // 类型过滤
-        if (activeFilter !== 'all' && item.type !== activeFilter) {
-            return false;
-        }
-        
-        // 状态过滤
-        if (enabledFilter === 'enabled' && !item.enable) {
-            return false;
-        }
-        if (enabledFilter === 'disabled' && item.enable) {
-            return false;
-        }
-        
-        return true;
-    });
+  const handleDeleteModel = async (id: string) => {
+    try {
+      const res = await DeleteModelManager(id);
+      if (res.success) {
+        toast.success('Model deleted successfully');
+        loadData();
+        loadStats();
+        loadMetadata();
+      } else {
+        toast.error(res.message || 'Delete failed');
+      }
+    } catch (error) {
+      toast.error('Delete failed');
+    }
+  };
 
-    // 计算统计信息
-    const getTypeCount = (type: string) => {
-        if (type === 'all') return modelStats.total || 0;
-        return modelStats[type] || 0;
-    };
+  // Render functions
+  const renderPrice = (item: ModelManager) => {
+    const multiplier = isK ? 1000 : 1000000;
+    const unit = isK ? '1K' : '1M';
 
-    const enabledCount = modelStats.enabled || 0;
-    const disabledCount = modelStats.disabled || 0;
-
-    const renderPrice = (item: any) => {
-        if (isK) {
-            if (item.quotaType === 1) {
-                return (
-                    <div className={styles.priceInfo}>
-                        <span className="price-tag" style={{ background: token.colorInfoBg, color: token.colorInfoText }}>
-                            输入: {renderQuota(item.promptRate * 1000, 6)}/1K
-                        </span>
-                        <span className="price-tag" style={{ background: token.colorSuccessBg, color: token.colorSuccessText }}>
-                            输出: {renderQuota(item.completionRate ? item.completionRate * 1000 : getCompletionRatio(item.model) * 1000, 6)}/1K
-                        </span>
-                        {item.isVersion2 && (
-                            <>
-                                <span className="price-tag" style={{ background: token.colorWarningBg, color: token.colorWarningText }}>
-                                    音频输入: {renderQuota(item.audioPromptRate * 1000)}/1K
-                                </span>
-                                <span className="price-tag" style={{ background: token.colorErrorBg, color: token.colorErrorText }}>
-                                    音频输出: {renderQuota(item.audioOutputRate ? item.audioOutputRate * 1000 : getCompletionRatio(item.model) * 1000)}/1K
-                                </span>
-                            </>
-                        )}
-                    </div>
-                );
-            } else {
-                return (
-                    <div className={styles.priceInfo}>
-                        <span className="price-tag" style={{ background: token.colorPrimaryBg, color: token.colorPrimary }}>
-                            按次: {renderQuota(item.promptRate, 6)}
-                        </span>
-                    </div>
-                );
-            }
-        } else {
-            if (item.quotaType === 1) {
-                return (
-                    <div className={styles.priceInfo}>
-                        <span className="price-tag" style={{ background: token.colorInfoBg, color: token.colorInfoText }}>
-                            输入: {renderQuota(item.promptRate * 1000000)}/1M
-                        </span>
-                        <span className="price-tag" style={{ background: token.colorSuccessBg, color: token.colorSuccessText }}>
-                            输出: {renderQuota(item.completionRate ? item.completionRate * 1000000 : getCompletionRatio(item.model) * 1000000)}/1M
-                        </span>
-                        {item.isVersion2 && (
-                            <>
-                                <span className="price-tag" style={{ background: token.colorWarningBg, color: token.colorWarningText }}>
-                                    音频输入: {renderQuota(item.audioPromptRate * 1000000)}/1M
-                                </span>
-                                <span className="price-tag" style={{ background: token.colorErrorBg, color: token.colorErrorText }}>
-                                    音频输出: {renderQuota(item.audioOutputRate ? item.audioOutputRate * 1000000 : getCompletionRatio(item.model) * 1000000)}/1M
-                                </span>
-                            </>
-                        )}
-                    </div>
-                );
-            } else {
-                return (
-                    <div className={styles.priceInfo}>
-                        <span className="price-tag" style={{ background: token.colorPrimaryBg, color: token.colorPrimary }}>
-                            按次: {renderQuota(item.promptRate, 6)}
-                        </span>
-                    </div>
-                );
-            }
-        }
-    };
-
-    const handleModelClick = (model: any) => {
-        setSelectedModel(model);
-        setDetailDrawerOpen(true);
-    };
-
-    const handleEnableModel = async (id: string, currentStatus: boolean) => {
-        try {
-            const res = await EnableModelManager(id);
-            if (res.success) {
-                message.success(currentStatus ? '模型已禁用' : '模型已启用');
-                loadData();
-                loadStats();
-            } else {
-                message.error(res.message);
-            }
-        } catch (error) {
-            message.error('操作失败');
-        }
-    };
-
-    const handleDeleteModel = async (id: string) => {
-        Modal.confirm({
-            title: '确认删除',
-            content: '确定要删除这个模型吗？删除后无法恢复。',
-            okText: '确认',
-            cancelText: '取消',
-            okType: 'danger',
-            onOk: async () => {
-                try {
-                    const res = await DeleteModelManager(id);
-                    if (res.success) {
-                        message.success('删除成功');
-                        loadData();
-                        loadStats();
-                        loadTypes();
-                        loadTags();
-                    } else {
-                        message.error(res.message);
-                    }
-                } catch (error) {
-                    message.error('删除失败');
-                }
-            }
-        });
-    };
-
-    // 渲染侧边栏
-    const renderSidebar = () => (
-        <div className={styles.sidebar}>
-            {/* 模型类型 */}
-            <div className={styles.sidebarSection}>
-                <div className="section-title">模型类型</div>
-                {MODEL_TYPES.map(type => (
-                    <div
-                        key={type.key}
-                        className={`${styles.filterItem} ${activeFilter === type.key ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(type.key)}
-                    >
-                        <span className="filter-name">
-                            <span style={{ marginRight: 8 }}>{type.icon}</span>
-                            {type.label}
-                        </span>
-                        <span className="filter-count">{getTypeCount(type.key)}</span>
-                    </div>
-                ))}
-                
-                {/* 显示其他动态类型 */}
-                {availableTypes.filter(type => !MODEL_TYPES.some(mt => mt.key === type)).map(type => (
-                    <div
-                        key={type}
-                        className={`${styles.filterItem} ${activeFilter === type ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(type)}
-                    >
-                        <span className="filter-name">
-                            <span style={{ marginRight: 8 }}>🔧</span>
-                            {type}
-                        </span>
-                        <span className="filter-count">{getTypeCount(type)}</span>
-                    </div>
-                ))}
-            </div>
-
-            {/* 模型状态 */}
-            <div className={styles.sidebarSection}>
-                <div className="section-title">模型状态</div>
-                <div
-                    className={`${styles.filterItem} ${enabledFilter === 'all' ? 'active' : ''}`}
-                    onClick={() => setEnabledFilter('all')}
-                >
-                    <span className="filter-name">全部状态</span>
-                    <span className="filter-count">{modelStats.total || 0}</span>
-                </div>
-                <div
-                    className={`${styles.filterItem} ${enabledFilter === 'enabled' ? 'active' : ''}`}
-                    onClick={() => setEnabledFilter('enabled')}
-                >
-                    <span className="filter-name">
-                        <CheckCircleOutlined style={{ color: token.colorSuccess, marginRight: 8 }} />
-                        已启用
-                    </span>
-                    <span className="filter-count">{enabledCount}</span>
-                </div>
-                <div
-                    className={`${styles.filterItem} ${enabledFilter === 'disabled' ? 'active' : ''}`}
-                    onClick={() => setEnabledFilter('disabled')}
-                >
-                    <span className="filter-name">
-                        <CloseCircleOutlined style={{ color: token.colorError, marginRight: 8 }} />
-                        已禁用
-                    </span>
-                    <span className="filter-count">{disabledCount}</span>
-                </div>
-            </div>
-
-            {/* 标签筛选 */}
-            {availableTags.length > 0 && (
-                <div className={styles.sidebarSection}>
-                    <div className="section-title">标签筛选</div>
-                    <div className="tag-filter-container" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {availableTags.slice(0, 10).map(tag => (
-                            <AntTag 
-                                key={tag} 
-                                color="blue" 
-                                style={{ 
-                                    cursor: 'pointer', 
-                                    marginBottom: 4,
-                                    fontSize: 11 
-                                }}
-                                onClick={() => {
-                                    // 可以添加标签筛选逻辑
-                                    console.log('Filter by tag:', tag);
-                                }}
-                            >
-                                {tag}
-                            </AntTag>
-                        ))}
-                        {availableTags.length > 10 && (
-                            <AntTag color="default" style={{ fontSize: 11 }}>
-                                +{availableTags.length - 10}
-                            </AntTag>
-                        )}
-                    </div>
-                </div>
-            )}
+    if (item.quotaType === 1) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary" className="text-xs">
+            Input: {renderQuota(item.promptRate * multiplier, 6)}/{unit}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            Output: {renderQuota(item.completionRate ? item.completionRate * multiplier : getCompletionRatio(item.model) * multiplier, 6)}/{unit}
+          </Badge>
+          {item.isVersion2 && (
+            <>
+              <Badge variant="secondary" className="text-xs">
+                Audio In: {renderQuota(item.audioPromptRate! * multiplier)}/{unit}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                Audio Out: {renderQuota(item.audioOutputRate ? item.audioOutputRate * multiplier : getCompletionRatio(item.model) * multiplier)}/{unit}
+              </Badge>
+            </>
+          )}
         </div>
-    );
+      );
+    } else {
+      return (
+        <Badge variant="default" className="text-xs">
+          Per Request: {renderQuota(item.promptRate, 6)}
+        </Badge>
+      );
+    }
+  };
 
-    // 渲染模型卡片
-    const renderModelCard = (model: any, index: number) => {
-        const icon = getIconByName(model.icon);
-        const isDisabled = !model.enable;
-
-        return (
-            <MotionCard
-                key={model.id}
-                className={`${styles.modelCard} ${isDisabled ? 'disabled' : ''}`}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                onClick={() => handleModelClick(model)}
-            >
-                {/* 状态标识 */}
-                <Badge
-                    className={styles.statusBadge}
-                    status={model.enable ? 'success' : 'error'}
-                    text={model.enable ? '已启用' : '已禁用'}
-                />
-
-                {/* 卡片头部 */}
-                <div className={styles.cardHeader}>
-                    <div className={styles.iconContainer}>
-                        {icon?.icon ?? <IconAvatar size={32} Icon={OpenAI} />}
-                    </div>
-                    <div className={styles.cardInfo}>
-                        <div className={styles.modelName} title={model.model}>
-                            {model.model}
-                        </div>
-                        {model.description && (
-                            <div className={styles.modelDescription} title={model.description}>
-                                {model.description}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* 标签 */}
-                {model.tags && model.tags.length > 0 && (
-                    <div className={styles.cardTags}>
-                        {model.tags.slice(0, 3).map((tag: string) => (
-                            <AntTag key={tag} color="blue">
-                                {tag}
-                            </AntTag>
-                        ))}
-                        {model.tags.length > 3 && (
-                            <AntTag color="default">
-                                +{model.tags.length - 3}
-                            </AntTag>
-                        )}
-                    </div>
-                )}
-
-                {/* 卡片底部 */}
-                <div className={styles.cardFooter}>
-                    {renderPrice(model)}
-                    <div className={styles.cardActions} onClick={(e) => e.stopPropagation()}>
-                        <Button
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => setUpdateValue({ value: model, open: true })}
-                        >
-                            编辑
-                        </Button>
-                        <Button
-                            size="small"
-                            type={model.enable ? 'default' : 'primary'}
-                            icon={model.enable ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-                            onClick={() => handleEnableModel(model.id, model.enable)}
-                        >
-                            {model.enable ? '禁用' : '启用'}
-                        </Button>
-                        <Button
-                            size="small"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleDeleteModel(model.id)}
-                        >
-                            删除
-                        </Button>
-                    </div>
-                </div>
-            </MotionCard>
-        );
-    };
+  const renderModelCard = (model: ModelManager, index: number) => {
+    const icon = getIconByName(model.icon, 40);
+    const typeConfig = MODEL_TYPES.find(type => type.key === model.type.toLowerCase()) || MODEL_TYPES[0];
 
     return (
-        <ConfigProvider theme={{
-            components: {
-                Card: {
-                    headerBg: 'transparent',
-                    colorBgContainer: token.colorBgContainer,
-                },
-                Switch: {
-                    colorPrimary: token.colorPrimary,
-                    colorPrimaryHover: token.colorPrimaryHover,
-                },
-                Drawer: {
-                    colorBgElevated: token.colorBgContainer,
-                }
-            }
-        }}>
-            <MotionDiv 
-                className={styles.container}
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.3 }}
-            >
-                {/* 页面头部 */}
-                <div className={styles.header}>
-                    <Typography.Title level={3} className={styles.headerTitle}>
-                        {t('modelManager.title')}
-                    </Typography.Title>
+      <motion.div
+        key={model.id}
+        layout
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.2, delay: index * 0.02 }}
+        className="group cursor-pointer"
+        onClick={() => handleModelClick(model)}
+      >
+        <Card className={cn(
+          "h-full transition-all duration-200 hover:shadow-md",
+          !model.enable && "opacity-60"
+        )}>
+          <CardHeader className="space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
+                  {icon?.icon || <Database className="h-6 w-6" />}
                 </div>
-
-                {/* 工具栏 */}
-                <div className={styles.toolbar}>
-                    <div className={styles.toolbarLeft}>
-                        <AntInput.Search
-                            placeholder={t('modelManager.searchModel')}
-                            value={input.model}
-                            onChange={(e) => setInput({ ...input, model: e.target.value })}
-                            onSearch={() => loadData()}
-                            className={styles.searchInput}
-                            allowClear
-                        />
-                        
-                        <div className={styles.priceSwitch}>
-                            <Typography.Text style={{ color: token.colorTextSecondary, fontSize: 14 }}>
-                                {t('modelManager.priceUnit')}:
-                            </Typography.Text>
-                            <Switch 
-                                value={isK} 
-                                checkedChildren={t('modelManager.modelPricePerK')} 
-                                unCheckedChildren={t('modelManager.modelPricePerM')} 
-                                onChange={(checked) => setIsK(checked)} 
-                            />
-                        </div>
-                        
-                        <Button 
-                            icon={<FilterOutlined />}
-                            className={`${styles.actionButton} ${styles.mobileFilterButton}`}
-                            onClick={() => setFilterDrawerOpen(true)}
-                        >
-                            筛选
-                        </Button>
-                    </div>
-                    
-                    <div className={styles.toolbarRight}>
-                        <Button 
-                            icon={<ReloadOutlined />}
-                            onClick={() => loadData()}
-                            className={styles.actionButton}
-                            loading={loading}
-                        >
-                            {!mobile && '刷新'}
-                        </Button>
-                        
-                        <Button 
-                            type="primary"
-                            icon={<PlusOutlined />} 
-                            onClick={() => setCreateOpen(true)}
-                            className={styles.actionButton}
-                        >
-                            {t('modelManager.createModel')}
-                        </Button>
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-base font-semibold truncate">
+                    {model.model}
+                  </CardTitle>
+                  <CardDescription className="text-sm line-clamp-2">
+                    {model.description || t('common.noData')}
+                  </CardDescription>
                 </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Badge variant={model.enable ? "default" : "secondary"}>
+                  {model.enable ? t('modelManager.modelEnabled') : t('modelManager.modelDisabled')}
+                </Badge>
+                {model.isVersion2 && (
+                  <Badge variant="outline" className="text-xs">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    V2
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
 
-                {/* 主要内容区域 */}
-                <div className={styles.mainContent}>
-                    {/* 左侧边栏 */}
-                    {renderSidebar()}
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={cn("text-xs", typeConfig.color)}>
+                <typeConfig.icon className="h-3 w-3 mr-1" />
+                {t(`modelManager.type${model.type.charAt(0).toUpperCase() + model.type.slice(1)}`)}
+              </Badge>
+            </div>
 
-                    {/* 右侧内容区域 */}
-                    <div className={styles.contentArea}>
-                        {/* 统计信息 */}
-                        <div className={styles.statsRow}>
-                            {statsLoading ? (
-                                <Flex justify="center" align="center" style={{ padding: '20px 0' }}>
-                                    <Spin size="small" />
-                                    <span style={{ marginLeft: 8, color: token.colorTextSecondary }}>
-                                        加载统计信息...
-                                    </span>
-                                </Flex>
-                            ) : (
-                                <Flex justify="space-around" align="center">
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number">{modelStats.total || 0}</div>
-                                        <div className="stat-label">总计</div>
-                                    </div>
-                                    <Divider type="vertical" style={{ height: 40 }} />
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number" style={{ color: token.colorSuccess }}>{enabledCount}</div>
-                                        <div className="stat-label">已启用</div>
-                                    </div>
-                                    <Divider type="vertical" style={{ height: 40 }} />
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number" style={{ color: token.colorError }}>{disabledCount}</div>
-                                        <div className="stat-label">已禁用</div>
-                                    </div>
-                                    <Divider type="vertical" style={{ height: 40 }} />
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number" style={{ color: token.colorPrimary }}>{filteredData.length}</div>
-                                        <div className="stat-label">当前显示</div>
-                                    </div>
-                                    <Divider type="vertical" style={{ height: 40 }} />
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number" style={{ color: token.colorWarning }}>{modelStats.chat || 0}</div>
-                                        <div className="stat-label">对话模型</div>
-                                    </div>
-                                    <Divider type="vertical" style={{ height: 40 }} />
-                                    <div className={styles.statItem}>
-                                        <div className="stat-number" style={{ color: token.colorInfo }}>{modelStats.image || 0}</div>
-                                        <div className="stat-label">图像模型</div>
-                                    </div>
-                                </Flex>
-                            )}
-                        </div>
+            {model.tags && model.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {model.tags.slice(0, 3).map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                {model.tags.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{model.tags.length - 3}
+                  </Badge>
+                )}
+              </div>
+            )}
 
-                        {/* 模型网格 */}
-                        {loading ? (
-                            <div className={styles.loadingOverlay}>
-                                <Spin size="large" />
-                            </div>
-                        ) : filteredData.length > 0 ? (
-                            <div className={styles.modelGrid}>
-                                {filteredData.map((model, index) => renderModelCard(model, index))}
-                            </div>
-                        ) : (
-                            <div className={styles.emptyState}>
-                                <div className="empty-icon">📦</div>
-                                <div className="empty-title">暂无模型</div>
-                                <div className="empty-description">
-                                    {input.model ? '没有找到匹配的模型，请尝试其他搜索条件' : '还没有添加任何模型，点击上方按钮创建第一个模型'}
-                                </div>
-                                {!input.model && (
-                                    <Button 
-                                        type="primary" 
-                                        icon={<PlusOutlined />}
-                                        onClick={() => setCreateOpen(true)}
-                                        className={styles.actionButton}
-                                    >
-                                        创建模型
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{t('modelManager.modelPrice')}:</span>
+              </div>
+              {renderPrice(model)}
+            </div>
 
-                {/* 移动端筛选抽屉 */}
-                <Drawer
-                    title="筛选条件"
-                    placement="left"
-                    onClose={() => setFilterDrawerOpen(false)}
-                    open={filterDrawerOpen}
-                    width={280}
-                    className={styles.drawerContent}
+            <Separator />
+
+            <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setUpdateValue({ value: model, open: true })}
+                  className="h-8 w-8 p-0"
                 >
-                    {renderSidebar()}
-                </Drawer>
-
-                {/* 模型详情抽屉 */}
-                <Drawer
-                    title="模型详情"
-                    placement="right"
-                    onClose={() => setDetailDrawerOpen(false)}
-                    open={detailDrawerOpen}
-                    width={500}
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleEnableModel(model.id, model.enable)}
+                  className="h-8 w-8 p-0"
                 >
-                    {selectedModel && (
-                        <div>
-                            <Descriptions column={1} bordered>
-                                <Descriptions.Item label="模型名称">{selectedModel.model}</Descriptions.Item>
-                                <Descriptions.Item label="模型描述">{selectedModel.description || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="模型类型">
-                                    <AntTag color="blue">{selectedModel.type}</AntTag>
-                                </Descriptions.Item>
-                                <Descriptions.Item label="状态">
-                                    <Badge 
-                                        status={selectedModel.enable ? 'success' : 'error'}
-                                        text={selectedModel.enable ? '已启用' : '已禁用'}
-                                    />
-                                </Descriptions.Item>
-                                <Descriptions.Item label="计费类型">
-                                    {selectedModel.quotaType === 1 ? '按量计费' : '按次计费'}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="最大上下文">{selectedModel.quotaMax?.toLocaleString() || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="标签">
-                                    {selectedModel.tags?.map((tag: string) => (
-                                        <AntTag key={tag} color="blue" style={{ marginBottom: 4 }}>{tag}</AntTag>
-                                    )) || '-'}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="定价信息">
-                                    {renderPrice(selectedModel)}
-                                </Descriptions.Item>
-                            </Descriptions>
-                            
-                            <div style={{ marginTop: 20 }}>
-                                <Space>
-                                    <Button 
-                                        type="primary"
-                                        icon={<EditOutlined />}
-                                        onClick={() => {
-                                            setUpdateValue({ value: selectedModel, open: true });
-                                            setDetailDrawerOpen(false);
-                                        }}
-                                    >
-                                        编辑模型
-                                    </Button>
-                                    <Button 
-                                        type={selectedModel.enable ? 'default' : 'primary'}
-                                        icon={selectedModel.enable ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-                                        onClick={() => {
-                                            handleEnableModel(selectedModel.id, selectedModel.enable);
-                                            setDetailDrawerOpen(false);
-                                        }}
-                                    >
-                                        {selectedModel.enable ? '禁用模型' : '启用模型'}
-                                    </Button>
-                                    <Button 
-                                        danger
-                                        icon={<DeleteOutlined />}
-                                        onClick={() => {
-                                            handleDeleteModel(selectedModel.id);
-                                            setDetailDrawerOpen(false);
-                                        }}
-                                    >
-                                        删除模型
-                                    </Button>
-                                </Space>
-                            </div>
-                        </div>
-                    )}
-                </Drawer>
-                
-                <CreateModelManagerPage 
-                    open={createOpen} 
-                    onClose={() => setCreateOpen(false)} 
-                    onOk={() => {
-                        loadData();
-                        loadStats();
-                        loadTypes();
-                        loadTags();
-                        setCreateOpen(false);
-                    }} 
-                />
-                
-                <UpdateModelManagerPage 
-                    open={updateValue.open} 
-                    onClose={() => setUpdateValue({ ...updateValue, open: false })} 
-                    onOk={() => {
-                        loadData();
-                        loadStats();
-                        loadTypes();
-                        loadTags();
-                        setUpdateValue({ ...updateValue, open: false });
-                    }} 
-                    value={updateValue.value} 
-                />
-            </MotionDiv>
-        </ConfigProvider>
+                  {model.enable ? (
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  )}
+                </Button>
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleModelClick(model)}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    {t('common.view')} {t('common.detail')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setUpdateValue({ value: model, open: true })}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    {t('modelManager.updateModel')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteModel(model.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {t('modelManager.deleteModel')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     );
+  };
+
+  const renderModelList = () => {
+    return (
+      <div className="space-y-3">
+        {filteredAndSortedData.map((model, index) => {
+          const icon = getIconByName(model.icon, 32);
+          const typeConfig = MODEL_TYPES.find(type => type.key === model.type.toLowerCase()) || MODEL_TYPES[0];
+
+          return (
+            <motion.div
+              key={model.id}
+              layout
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2, delay: index * 0.02 }}
+              className={cn(
+                "cursor-pointer transition-all duration-200",
+                !model.enable && "opacity-60"
+              )}
+              onClick={() => handleModelClick(model)}
+            >
+              <Card className="hover:shadow-md transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        {icon?.icon || <Database className="h-5 w-5" />}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold truncate">{model.model}</h3>
+                          <Badge variant={model.enable ? "default" : "secondary"} className="text-xs">
+                            {model.enable ? t('modelManager.modelEnabled') : t('modelManager.modelDisabled')}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {model.description || t('common.noData')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className={cn("text-xs", typeConfig.color)}>
+                        <typeConfig.icon className="h-3 w-3 mr-1" />
+                        {t(`modelManager.type${model.type.charAt(0).toUpperCase() + model.type.slice(1)}`)}
+                      </Badge>
+
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(model.createdAt).toLocaleDateString()}
+                      </div>
+
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setUpdateValue({ value: model, open: true })}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEnableModel(model.id, model.enable)}
+                          className="h-8 w-8 p-0"
+                        >
+                          {model.enable ? (
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleModelClick(model)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              {t('common.view')} {t('common.detail')}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteModel(model.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {t('modelManager.deleteModel')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderStats = () => {
+    const stats = [
+      {
+        label: t('common.total') + ' ' + t('nav.modelManager'),
+        value: modelStats.total,
+        icon: Database,
+        description: t('modelManager.title'),
+        color: 'text-blue-600'
+      },
+      {
+        label: t('modelManager.modelEnabled'),
+        value: modelStats.enabled,
+        icon: CheckCircle,
+        description: t('common.enabled'),
+        color: 'text-green-600'
+      },
+      {
+        label: t('modelManager.modelDisabled'),
+        value: modelStats.disabled,
+        icon: XCircle,
+        description: t('common.disabled'),
+        color: 'text-red-600'
+      },
+      {
+        label: t('modelManager.typeChat'),
+        value: modelStats.chat || 0,
+        icon: MessageSquare,
+        description: t('modelManager.typeChat'),
+        color: 'text-purple-600'
+      },
+      {
+        label: t('common.view'),
+        value: filteredAndSortedData.length,
+        icon: Eye,
+        description: t('common.view'),
+        color: 'text-orange-600'
+      }
+    ];
+
+    if (statsLoading) {
+      return (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-6 w-12" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.3 }}
+          >
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-3">
+                  <div className={cn("p-2 rounded-lg bg-muted", stat.color)}>
+                    <stat.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-xs text-muted-foreground">{stat.label}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderFilters = () => (
+    <div className="space-y-6">
+      <div>
+        <h4 className="font-medium mb-3">{t('common.type')}</h4>
+        <div className="space-y-2">
+          {MODEL_TYPES.map((type) => {
+            const count = type.key === 'all' ? modelStats.total : modelStats[type.key] || 0;
+            const isActive = activeTypeFilter === type.key;
+
+            return (
+              <Button
+                key={type.key}
+                variant={isActive ? "default" : "ghost"}
+                className="w-full justify-between h-auto p-3 text-left"
+                onClick={() => setActiveTypeFilter(type.key)}
+              >
+                <div className="flex items-center gap-2">
+                  <type.icon className="h-4 w-4" />
+                  <span>
+                    {type.key === 'all' ? t('common.all') + ' ' + t('nav.modelManager') : t(`modelManager.type${type.key.charAt(0).toUpperCase() + type.key.slice(1)}`)}
+                  </span>
+                </div>
+                <Badge variant="outline">{count}</Badge>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div>
+        <h4 className="font-medium mb-3">{t('common.status')}</h4>
+        <div className="space-y-2">
+          {STATUS_FILTERS.map((status) => {
+            const count = status.key === 'all' ? modelStats.total :
+                         status.key === 'enabled' ? modelStats.enabled : modelStats.disabled;
+            const isActive = activeStatusFilter === status.key;
+
+            return (
+              <Button
+                key={status.key}
+                variant={isActive ? "default" : "ghost"}
+                className="w-full justify-between h-auto p-3 text-left"
+                onClick={() => setActiveStatusFilter(status.key)}
+              >
+                <div className="flex items-center gap-2">
+                  <status.icon className="h-4 w-4" />
+                  <span>
+                    {status.key === 'all' ? t('common.all') + ' ' + t('common.status') :
+                     status.key === 'enabled' ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </div>
+                <Badge variant="outline">{count}</Badge>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      {availableTags.length > 0 && (
+        <>
+          <Separator />
+          <div>
+            <h4 className="font-medium mb-3">{t('common.tags')}</h4>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {availableTags.slice(0, 12).map((tag) => (
+                <Badge
+                  key={tag}
+                  variant={selectedTags.includes(tag) ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setSelectedTags(prev =>
+                      prev.includes(tag)
+                        ? prev.filter(t => t !== tag)
+                        : [...prev, tag]
+                    );
+                  }}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+            {selectedTags.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedTags([])}
+                className="w-full"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                {t('common.delete')} {t('common.all')}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+
+      {(activeTypeFilter !== 'all' || activeStatusFilter !== 'all' || selectedTags.length > 0) && (
+        <>
+          <Separator />
+          <Button
+            variant="outline"
+            onClick={() => {
+              setActiveTypeFilter('all');
+              setActiveStatusFilter('all');
+              setSelectedTags([]);
+            }}
+            className="w-full"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {t('common.delete')} {t('common.all')} {t('common.filter')}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <Database className="h-6 w-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">{t('modelManager.title')}</h1>
+                  <p className="text-sm text-muted-foreground">{t('modelManager.modelDescription')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={loadData}
+                disabled={loading}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                {t('common.refresh')}
+              </Button>
+              <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t('modelManager.createModel')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="border-b bg-muted/50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-1 items-center gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={t('modelManager.searchModel')}
+                  value={input.model}
+                  onChange={(e) => setInput({ ...input, model: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && loadData()}
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Label htmlFor="price-unit" className="text-sm whitespace-nowrap">
+                  {t('modelManager.priceUnit')}:
+                </Label>
+                <Switch
+                  id="price-unit"
+                  checked={isK}
+                  onCheckedChange={setIsK}
+                />
+                <Label htmlFor="price-unit" className="text-sm text-muted-foreground">
+                  {isK ? t('modelManager.modelPricePerK') : t('modelManager.modelPricePerM')}
+                </Label>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="gap-2"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  {t('common.grid')}
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="gap-2"
+                >
+                  <List className="h-4 w-4" />
+                  {t('common.list')}
+                </Button>
+              </div>
+
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-32">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">{t('common.name')}</SelectItem>
+                  <SelectItem value="created">{t('common.createdAt')}</SelectItem>
+                  <SelectItem value="type">{t('common.type')}</SelectItem>
+                  <SelectItem value="status">{t('common.status')}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="p-2"
+              >
+                <TrendingUp className={cn("h-4 w-4", sortOrder === 'desc' && "rotate-180")} />
+              </Button>
+
+              <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    {t('common.filter')}
+                    {(activeTypeFilter !== 'all' || activeStatusFilter !== 'all' || selectedTags.length > 0) && (
+                      <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                        {[
+                          activeTypeFilter !== 'all' ? 1 : 0,
+                          activeStatusFilter !== 'all' ? 1 : 0,
+                          selectedTags.length
+                        ].reduce((a, b) => a + b, 0)}
+                      </Badge>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>{t('common.filter')} {t('nav.modelManager')}</SheetTitle>
+                    <SheetDescription>{t('modelManager.modelDescription')}</SheetDescription>
+                  </SheetHeader>
+                  <ScrollArea className="h-[calc(100vh-8rem)] mt-6">
+                    {renderFilters()}
+                  </ScrollArea>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1">
+        <div className="container mx-auto px-4 py-6">
+          {renderStats()}
+
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className={cn(
+                  viewMode === 'grid'
+                    ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    : "space-y-3"
+                )}
+              >
+                {Array.from({ length: viewMode === 'grid' ? 8 : 5 }).map((_, i) => (
+                  <Card key={i}>
+                    {viewMode === 'grid' ? (
+                      <>
+                        <CardHeader>
+                          <div className="flex items-center space-x-3">
+                            <Skeleton className="h-12 w-12 rounded-lg" />
+                            <div className="space-y-2 flex-1">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-3 w-1/2" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            <Skeleton className="h-3 w-full" />
+                            <Skeleton className="h-3 w-2/3" />
+                          </div>
+                        </CardContent>
+                      </>
+                    ) : (
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-4">
+                          <Skeleton className="h-10 w-10 rounded-lg" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/2" />
+                            <Skeleton className="h-3 w-1/3" />
+                          </div>
+                          <Skeleton className="h-6 w-16" />
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                ))}
+              </motion.div>
+            ) : filteredAndSortedData.length > 0 ? (
+              <motion.div
+                key={`${viewMode}-${filteredAndSortedData.length}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <AnimatePresence>
+                      {filteredAndSortedData.map((model, index) => renderModelCard(model, index))}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  renderModelList()
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-24"
+              >
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
+                  <Database className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{t('common.noData')}</h3>
+                <p className="text-muted-foreground mb-6 text-center max-w-md">
+                  {input.model || activeTypeFilter !== 'all' || activeStatusFilter !== 'all' || selectedTags.length > 0 ?
+                    t('modelManager.searchModel') :
+                    t('modelManager.modelDescription')
+                  }
+                </p>
+                {(!input.model && activeTypeFilter === 'all' && activeStatusFilter === 'all' && selectedTags.length === 0) ? (
+                  <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    {t('modelManager.createModel')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setInput({ ...input, model: '' });
+                      setActiveTypeFilter('all');
+                      setActiveStatusFilter('all');
+                      setSelectedTags([]);
+                    }}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    {t('common.delete')} {t('common.all')} {t('common.filter')}
+                  </Button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Model Details Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              {t('common.view')} {t('common.detail')}
+            </DialogTitle>
+            <DialogDescription>{t('modelManager.modelDescription')}</DialogDescription>
+          </DialogHeader>
+
+          {selectedModel && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
+                <div className="flex items-center justify-center w-16 h-16 rounded-lg bg-background">
+                  {getIconByName(selectedModel.icon, 32)?.icon || <Database className="w-6 h-6" />}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">{selectedModel.model}</h3>
+                  <p className="text-muted-foreground">
+                    {selectedModel.description || t('common.noData')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Badge variant={selectedModel.enable ? "default" : "secondary"}>
+                    {selectedModel.enable ? t('modelManager.modelEnabled') : t('modelManager.modelDisabled')}
+                  </Badge>
+                  {selectedModel.isVersion2 && (
+                    <Badge variant="outline">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      V2
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <Label className="font-medium">{t('common.type')}</Label>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {t(`modelManager.type${selectedModel.type.charAt(0).toUpperCase() + selectedModel.type.slice(1)}`)}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4" />
+                      <Label className="font-medium">{t('modelManager.modelType')}</Label>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {selectedModel.quotaType === 1 ? t('modelManager.volumeBilling') : t('modelManager.perUseBilling')}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Database className="h-4 w-4" />
+                      <Label className="font-medium">{t('modelManager.modelMaxContext')}</Label>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {selectedModel.quotaMax?.toLocaleString() || t('common.noData')}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4" />
+                      <Label className="font-medium">{t('common.createdAt')}</Label>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {new Date(selectedModel.createdAt).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {selectedModel.tags && selectedModel.tags.length > 0 && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Settings className="h-4 w-4" />
+                      <Label className="font-medium">{t('common.tags')}</Label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedModel.tags.map(tag => (
+                        <Badge key={tag} variant="outline">{tag}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="h-4 w-4" />
+                    <Label className="font-medium">{t('modelManager.modelPrice')}</Label>
+                  </div>
+                  <div className="space-y-2">
+                    {renderPrice(selectedModel)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => {
+                setUpdateValue({ value: selectedModel, open: true });
+                setDetailOpen(false);
+              }}
+              className="gap-2"
+            >
+              <Edit className="w-4 h-4" />
+              {t('modelManager.updateModel')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Update Modals */}
+      <CreateModelManagerPage
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onOk={() => {
+          loadData();
+          loadStats();
+          loadMetadata();
+          setCreateOpen(false);
+        }}
+      />
+
+      <UpdateModelManagerPage
+        open={updateValue.open}
+        onClose={() => setUpdateValue({ ...updateValue, open: false })}
+        onOk={() => {
+          loadData();
+          loadStats();
+          loadMetadata();
+          setUpdateValue({ ...updateValue, open: false });
+        }}
+        value={updateValue.value}
+      />
+    </div>
+  );
 }

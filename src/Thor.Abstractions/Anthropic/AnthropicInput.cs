@@ -98,6 +98,19 @@ public sealed class AnthropicInput
             }
         }
     }
+    
+    [JsonPropertyName("thinking")] public AnthropicThinkingInput? Thinking { get; set; }
+
+    [JsonPropertyName("temperature")] public double? Temperature { get; set; }
+
+    [JsonPropertyName("metadata")] public Dictionary<string, object>? Metadata { get; set; }
+}
+
+public class AnthropicThinkingInput
+{
+    [JsonPropertyName("type")] public string Type { get; set; }
+
+    [JsonPropertyName("budget_tokens")] public int BudgetTokens { get; set; }
 }
 
 public class AnthropicTooChoiceInput
@@ -120,7 +133,21 @@ public class Input_schema
 {
     [JsonPropertyName("type")] public string Type { get; set; }
 
-    [JsonPropertyName("properties")] public Dictionary<string, object>? Properties { get; set; }
+    [JsonPropertyName("properties")] public Dictionary<string, InputSchemaValue>? Properties { get; set; }
 
     [JsonPropertyName("required")] public string[]? Required { get; set; }
+}
+
+public class InputSchemaValue
+{
+    public string type { get; set; }
+
+    public string description { get; set; }
+
+    public InputSchemaValueItems? items { get; set; }
+}
+
+public class InputSchemaValueItems
+{
+    public string? type { get; set; }
 }

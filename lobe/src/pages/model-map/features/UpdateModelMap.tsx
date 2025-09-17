@@ -1,12 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Button, message, Select, InputNumber, Typography } from 'antd';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
+import { Badge } from "../../../components/ui/badge";
+import { Card, CardContent } from "../../../components/ui/card";
+import { Plus, Minus } from "lucide-react";
+import { toast } from "sonner";
 import { updateModelMap, ModelMap } from "../../../services/ModelMapService";
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { getModelList } from '../../../services/ModelService';
 import { getList } from "../../../services/UserGroupService";
-import { Flexbox } from "react-layout-kit";
 import { useTranslation } from 'react-i18next';
-import { useTheme } from 'antd-style';
+import { cn } from "../../../lib/utils";
 
 interface UpdateModelMapProps {
   visible: boolean;
@@ -17,11 +36,14 @@ interface UpdateModelMapProps {
 
 export default function UpdateModelMap({ visible, value, onSuccess, onCancel }: UpdateModelMapProps) {
   const { t } = useTranslation();
-  const theme = useTheme();
-  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [models, setModels] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    modelId: '',
+    group: [] as string[],
+    modelMapItems: [{ modelId: '', order: 1 }]
+  });
 
   useEffect(() => {
     if (visible) {
@@ -30,16 +52,16 @@ export default function UpdateModelMap({ visible, value, onSuccess, onCancel }: 
         if (res.success) {
           setModels(res.data);
         } else {
-          message.error(t('modelMap.loadError'));
+          toast.error(t('modelMap.loadError'));
         }
       });
-      
+
       // 加载用户组列表
       getList().then((res) => {
         if (res.success) {
           setGroups(res.data);
         } else {
-          message.error(t('modelMap.loadError'));
+          toast.error(t('modelMap.loadError'));
         }
       });
     }
@@ -48,175 +70,240 @@ export default function UpdateModelMap({ visible, value, onSuccess, onCancel }: 
   useEffect(() => {
     // 表单回填
     if (visible && value) {
-      form.setFieldsValue({
-        modelId: value.modelId,
-        group: value.group,
-        modelMapItems: value.modelMapItems.map((item: any) => ({
-          modelId: [item.modelId],
+      setFormData({
+        modelId: value.modelId || '',
+        group: value.group || [],
+        modelMapItems: value.modelMapItems?.length ? value.modelMapItems.map((item: any) => ({
+          modelId: item.modelId,
           order: item.order
-        }))
+        })) : [{ modelId: '', order: 1 }]
       });
     }
-  }, [visible, value, form]);
+  }, [visible, value]);
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
-      setLoading(true);
+      // 表单验证
+      if (formData.group.length === 0) {
+        toast.error(t('modelMap.pleaseSelectGroup'));
+        return;
+      }
 
-      values.modelMapItems = values.modelMapItems.map((item: any) => ({
-        modelId: item.modelId[0],
-        order: item.order
-      }));
+      // 验证映射项
+      for (const item of formData.modelMapItems) {
+        if (!item.modelId) {
+          toast.error(t('modelMap.pleaseSelectTargetModel'));
+          return;
+        }
+        if (!item.order || item.order <= 0) {
+          toast.error(t('modelMap.pleaseEnterWeight'));
+          return;
+        }
+      }
+
+      setLoading(true);
 
       const data: ModelMap = {
         id: value.id,
         modelId: value.modelId,
-        group: values.group || [],
-        modelMapItems: values.modelMapItems || []
+        group: formData.group,
+        modelMapItems: formData.modelMapItems.filter(item => item.modelId)
       };
 
       const response = await updateModelMap(data);
 
       if (response.success) {
-        message.success(t('modelMap.updateSuccess'));
+        toast.success(t('modelMap.updateSuccess'));
         onSuccess();
       } else {
-        message.error(response.message || t('common.operateFailed'));
+        toast.error(response.message || t('common.operateFailed'));
       }
     } catch (error) {
-      console.error('Validate Failed:', error);
+      console.error('Submit Failed:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const addModelMapItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      modelMapItems: [...prev.modelMapItems, { modelId: '', order: 1 }]
+    }));
+  };
+
+  const removeModelMapItem = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      modelMapItems: prev.modelMapItems.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateModelMapItem = (index: number, field: 'modelId' | 'order', value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      modelMapItems: prev.modelMapItems.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
   return (
-    <Modal
-      title={<Typography.Title level={5} style={{ margin: 0 }}>{t('modelMap.editMap')}</Typography.Title>}
-      open={visible}
-      onCancel={onCancel}
-      footer={[
-        <Button key="back" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>,
-        <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
-          {t('common.update')}
-        </Button>
-      ]}
-      width={700}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-      >
-        <Form.Item
-          name="modelId"
-          label={t('modelMap.sourceModelId')}
-          rules={[{ required: true, message: t('modelMap.pleaseSelectSourceModel') }]}
-        >
-          <Select
-            placeholder={t('modelMap.sourceModelId')}
-            showSearch
-            optionFilterProp="children"
-            disabled
-          >
-            {models.map((model: any) => (
-              <Select.Option key={model.id} value={model.id}>
-                {model.name || model.id}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
+    <Dialog open={visible} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('modelMap.editMap')}</DialogTitle>
+          <DialogDescription>
+            {t('modelMap.editDescription')}
+          </DialogDescription>
+        </DialogHeader>
 
-        <Form.Item
-          name="group"
-          label={t('modelMap.group')}
-          rules={[{ required: true, message: t('modelMap.pleaseSelectGroup') }]}
-        >
-          <Select
-            mode="tags"
-            placeholder={t('modelMap.group')}
-            options={groups?.map((group: any) => {
-              return {
-                label: <Flexbox gap={8} horizontal>
-                  <span>{group.name}</span>
-                  <span style={{ fontSize: 12, color: theme.colorTextSecondary }}>{group.description}</span>
-                  <span style={{ fontSize: 12, color: theme.colorTextSecondary }}>
-                    <span>{t('rate')}：</span>
-                    {group.rate}
-                  </span>
-                </Flexbox>,
-                value: group.code
-              }
-            })}
-            style={{ width: '100%' }}
-          />
-        </Form.Item>
+        <div className="space-y-6">
+          {/* 源模型显示（只读） */}
+          <div className="space-y-2">
+            <Label>{t('modelMap.sourceModelId')}</Label>
+            <Input
+              value={formData.modelId}
+              disabled
+              className="bg-muted"
+            />
+          </div>
 
-        <Typography.Title level={5} style={{ marginTop: theme.marginLG }}>
-          {t('modelMap.addMappingItem')}
-        </Typography.Title>
-
-        <Form.List name="modelMapItems">
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map(({ key, name, ...restField }) => (
-                <Flexbox key={key} horizontal align="center" gap={8} style={{ marginBottom: theme.marginMD }}>
-                  <Form.Item
-                    {...restField}
-                    name={[name, 'modelId']}
-                    rules={[{ required: true, message: t('modelMap.pleaseSelectTargetModel') }]}
-                    style={{ flex: 1, marginBottom: 0 }}
-                  >
-                    <Select
-                      placeholder={t('modelMap.targetModelId')}
-                      showSearch
-                      optionFilterProp="children"
-                      defaultActiveFirstOption={true}
-                      mode="tags"
-                      maxCount={1}
-                      allowClear
+          {/* 用户组选择 */}
+          <div className="space-y-2">
+            <Label>{t('modelMap.group')}</Label>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md">
+                {formData.group.map((groupCode: string) => {
+                  const group = groups.find(g => g.code === groupCode);
+                  return (
+                    <Badge
+                      key={groupCode}
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          group: prev.group.filter(g => g !== groupCode)
+                        }));
+                      }}
                     >
-                      {models.map((model: any) => (
-                        <Select.Option key={model} value={model}>
-                          {model}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                  <Form.Item
-                    {...restField}
-                    name={[name, 'order']}
-                    rules={[{ required: true, message: t('modelMap.pleaseEnterWeight') }]}
-                    style={{ width: 120, marginBottom: 0 }}
-                  >
-                    <InputNumber placeholder={t('modelMap.weight')} style={{ width: '100%' }} />
-                  </Form.Item>
-                  {fields.length > 1 ? (
-                    <Button 
-                      type="text" 
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={() => remove(name)}
-                    />
-                  ) : null}
-                </Flexbox>
+                      {group?.name || groupCode} ×
+                    </Badge>
+                  );
+                })}
+                {formData.group.length === 0 && (
+                  <span className="text-muted-foreground text-sm">{t('modelMap.group')}</span>
+                )}
+              </div>
+              <Select
+                onValueChange={(value) => {
+                  if (!formData.group.includes(value)) {
+                    setFormData(prev => ({
+                      ...prev,
+                      group: [...prev.group, value]
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('modelMap.selectGroup')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.filter(group => !formData.group.includes(group.code)).map((group: any) => (
+                    <SelectItem key={group.code} value={group.code}>
+                      <div className="flex flex-col">
+                        <span>{group.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {group.description} • {t('rate')}: {group.rate}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* 映射项 */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>{t('modelMap.addMappingItem')}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addModelMapItem}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {t('common.add')}
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {formData.modelMapItems.map((item, index) => (
+                <Card key={index}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <Label className="text-sm">{t('modelMap.targetModelId')}</Label>
+                        <Select
+                          value={item.modelId}
+                          onValueChange={(value) => updateModelMapItem(index, 'modelId', value)}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder={t('modelMap.targetModelId')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {models.map((model: any) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="w-24">
+                        <Label className="text-sm">{t('modelMap.weight')}</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.order}
+                          onChange={(e) => updateModelMapItem(index, 'order', parseInt(e.target.value) || 1)}
+                          placeholder={t('modelMap.weight')}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      {formData.modelMapItems.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeModelMapItem(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-              <Form.Item style={{ marginTop: theme.marginSM }}>
-                <Button
-                  type="dashed"
-                  onClick={() => add()}
-                  block
-                  icon={<PlusOutlined />}
-                >
-                  {t('modelMap.addMappingItem')}
-                </Button>
-              </Form.Item>
-            </>
-          )}
-        </Form.List>
-      </Form>
-    </Modal>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? t('common.updating') : t('common.update')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 } 

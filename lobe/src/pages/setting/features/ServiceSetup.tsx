@@ -1,19 +1,25 @@
-import { Button, Card, Collapse, Form, Input, InputNumber, Switch, notification } from "antd";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/label";
+import { Switch } from "../../../components/ui/switch";
+import { toast } from "sonner";
 import { GeneralSetting, UpdateSetting } from "../../../services/SettingService";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface ServiceSetupProps {
-    settings: any[];
-    setSettings?: any;
+    settings: Array<{ key: string; value: string }>;
+    setSettings?: (settings: Array<{ key: string; value: string }>) => void;
 }
 
 export default function ServiceSetup({
     settings,
     setSettings
 }: ServiceSetupProps) {
-    const [input, setInput] = useState<any>([]);
+    const [input, setInput] = useState<Record<string, string>>({});
     const { t } = useTranslation();
+    
 
     useEffect(() => {
         const initialValues = settings.reduce((acc, setting) => {
@@ -26,175 +32,258 @@ export default function ServiceSetup({
     function handleSubmit() {
         UpdateSetting(settings)
             .then((res) => {
-                res.success ? notification.success({
-                    message: t('settingPage.general.saveSuccess'),
-                }) : notification.error({
-                    message: t('settingPage.general.saveFailed'),
-                });
+                if (res.success) {
+                    toast.success(t('settingPage.general.saveSuccess'));
+                } else {
+                    toast.error(t('settingPage.general.saveFailed'));
+                }
             });
     }
 
-    const handleInputChange = (key: string, value: any) => {
-        setInput((prevInput: any) => ({
+    const handleInputChange = (key: string, value: string) => {
+        setInput((prevInput: Record<string, string>) => ({
             ...prevInput,
-            [key]: value.toString()
+            [key]: value
         }));
         const setting = settings.find(s => s.key === key);
         if (setting) {
-            setting.value = value.toString();
+            setting.value = value;
         }
 
         setSettings(settings);
     };
 
     return (
-        <Card title={t('settingPage.general.title')} style={{ maxWidth: '100%' }}>
-            <Form>
-                <Collapse>
-                    <Collapse.Panel key={1} header={t('settingPage.general.title')}>
-                        <Form.Item label={t('settingPage.service.rechargeAddress')}>
+        <div className="space-y-6">
+            {/* General Service Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('settingPage.general.title')}</CardTitle>
+                    <CardDescription>Configure basic service settings and links</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="rechargeAddress">{t('settingPage.service.rechargeAddress')}</Label>
                             <Input
-                                value={input[GeneralSetting.RechargeAddress]}
+                                id="rechargeAddress"
+                                value={input[GeneralSetting.RechargeAddress] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.RechargeAddress, e.target.value)}
                                 placeholder={t('settingPage.service.rechargeAddress')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.chatLink')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="chatLink">{t('settingPage.service.chatLink')}</Label>
                             <Input
-                                value={input[GeneralSetting.ChatLink]}
+                                id="chatLink"
+                                value={input[GeneralSetting.ChatLink] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.ChatLink, e.target.value)}
                                 placeholder={t('settingPage.service.chatLink')}
                             />
-                        </Form.Item>
-                    </Collapse.Panel>
-                </Collapse>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Collapse accordion>
-                    <Collapse.Panel key={1} header={t('settingPage.service.quotaSettings')}>
-                        <Form.Item label={t('settingPage.service.newUserQuota')}>
-                            <InputNumber
-                                value={input[GeneralSetting.NewUserQuota]}
-                                onChange={(value) => handleInputChange(GeneralSetting.NewUserQuota, value)}
+            {/* Quota Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('settingPage.service.quotaSettings')}</CardTitle>
+                    <CardDescription>Manage user quotas and limits</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="newUserQuota">{t('settingPage.service.newUserQuota')}</Label>
+                            <Input
+                                id="newUserQuota"
+                                type="number"
+                                value={input[GeneralSetting.NewUserQuota] || ''}
+                                onChange={(e) => handleInputChange(GeneralSetting.NewUserQuota, e.target.value)}
                                 placeholder={t('settingPage.service.newUserQuota')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.requestQuota')}>
-                            <InputNumber
-                                value={input[GeneralSetting.RequestQuota]}
-                                onChange={(value) => handleInputChange(GeneralSetting.RequestQuota, value)}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="requestQuota">{t('settingPage.service.requestQuota')}</Label>
+                            <Input
+                                id="requestQuota"
+                                type="number"
+                                value={input[GeneralSetting.RequestQuota] || ''}
+                                onChange={(e) => handleInputChange(GeneralSetting.RequestQuota, e.target.value)}
                                 placeholder={t('settingPage.service.requestQuota')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.inviteQuota')}>
-                            <InputNumber
-                                value={input[GeneralSetting.InviteQuota]}
-                                onChange={(value) => handleInputChange(GeneralSetting.InviteQuota, value)}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="inviteQuota">{t('settingPage.service.inviteQuota')}</Label>
+                            <Input
+                                id="inviteQuota"
+                                type="number"
+                                value={input[GeneralSetting.InviteQuota] || ''}
+                                onChange={(e) => handleInputChange(GeneralSetting.InviteQuota, e.target.value)}
                                 placeholder={t('settingPage.service.inviteQuota')}
                             />
-                        </Form.Item>
-                    </Collapse.Panel>
-                </Collapse>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Collapse>
-                    <Collapse.Panel key={1} header={t('settingPage.service.logSettings')}>
-                        <Form.Item label={t('settingPage.service.enableClearLog')}>
-                            <Switch
-                                checked={input[GeneralSetting.EnableClearLog] === 'true'}
-                                onChange={(value) => handleInputChange(GeneralSetting.EnableClearLog, value ? 'true' : 'false')}
-                            />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.intervalDays')}>
-                            <InputNumber
-                                value={input[GeneralSetting.IntervalDays]}
-                                onChange={(value) => handleInputChange(GeneralSetting.IntervalDays, value)}
-                                placeholder={t('settingPage.service.intervalDays')}
-                            />
-                        </Form.Item>
-                    </Collapse.Panel>
-                </Collapse>
+            {/* Log Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('settingPage.service.logSettings')}</CardTitle>
+                    <CardDescription>Configure logging and data retention</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="enableClearLog">{t('settingPage.service.enableClearLog')}</Label>
+                            <p className="text-sm text-muted-foreground">Automatically clear old logs</p>
+                        </div>
+                        <Switch
+                            id="enableClearLog"
+                            checked={input[GeneralSetting.EnableClearLog] === 'true'}
+                            onCheckedChange={(checked) => handleInputChange(GeneralSetting.EnableClearLog, checked ? 'true' : 'false')}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="intervalDays">{t('settingPage.service.intervalDays')}</Label>
+                        <Input
+                            id="intervalDays"
+                            type="number"
+                            value={input[GeneralSetting.IntervalDays] || ''}
+                            onChange={(e) => handleInputChange(GeneralSetting.IntervalDays, e.target.value)}
+                            placeholder={t('settingPage.service.intervalDays')}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Collapse>
-                    <Collapse.Panel key={1} header={t('settingPage.service.channelMonitoring')}>
-                        <Form.Item label={t('settingPage.service.enableAutoCheckChannel')}>
-                            <Switch
-                                checked={input[GeneralSetting.EnableAutoCheckChannel] === 'true'}
-                                onChange={(value) => handleInputChange(GeneralSetting.EnableAutoCheckChannel, value ? 'true' : 'false')}
-                            />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.checkInterval')}>
-                            <InputNumber
-                                value={input[GeneralSetting.CheckInterval]}
-                                onChange={(value) => handleInputChange(GeneralSetting.CheckInterval, value)}
+            {/* Channel Monitoring */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('settingPage.service.channelMonitoring')}</CardTitle>
+                    <CardDescription>Monitor and manage AI channels automatically</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="enableAutoCheckChannel">{t('settingPage.service.enableAutoCheckChannel')}</Label>
+                            <p className="text-sm text-muted-foreground">Automatically check channel status</p>
+                        </div>
+                        <Switch
+                            id="enableAutoCheckChannel"
+                            checked={input[GeneralSetting.EnableAutoCheckChannel] === 'true'}
+                            onCheckedChange={(checked) => handleInputChange(GeneralSetting.EnableAutoCheckChannel, checked ? 'true' : 'false')}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="checkInterval">{t('settingPage.service.checkInterval')}</Label>
+                            <Input
+                                id="checkInterval"
+                                type="number"
+                                value={input[GeneralSetting.CheckInterval] || ''}
+                                onChange={(e) => handleInputChange(GeneralSetting.CheckInterval, e.target.value)}
                                 placeholder={t('settingPage.service.checkInterval')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.autoDisableChannel')}>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="autoDisableChannel">{t('settingPage.service.autoDisableChannel')}</Label>
+                                <p className="text-sm text-muted-foreground">Auto-disable failed channels</p>
+                            </div>
                             <Switch
+                                id="autoDisableChannel"
                                 checked={input[GeneralSetting.AutoDisableChannel] === 'true'}
-                                onChange={(value) => handleInputChange(GeneralSetting.AutoDisableChannel, value ? 'true' : 'false')}
+                                onCheckedChange={(checked) => handleInputChange(GeneralSetting.AutoDisableChannel, checked ? 'true' : 'false')}
                             />
-                        </Form.Item>
-                    </Collapse.Panel>
-                </Collapse>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Collapse>
-                    <Collapse.Panel key={1} header={t('settingPage.service.alipaySettings')}>
-                        <Form.Item label={t('settingPage.service.alipayNotifyUrl')}>
+            {/* Alipay Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('settingPage.service.alipaySettings')}</CardTitle>
+                    <CardDescription>Configure Alipay payment integration</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="alipayNotifyUrl">{t('settingPage.service.alipayNotifyUrl')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayNotifyUrl]}
+                                id="alipayNotifyUrl"
+                                value={input[GeneralSetting.AlipayNotifyUrl] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayNotifyUrl, e.target.value)}
                                 placeholder={t('settingPage.service.alipayNotifyUrl')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayAppId')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="alipayAppId">{t('settingPage.service.alipayAppId')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayAppId]}
+                                id="alipayAppId"
+                                value={input[GeneralSetting.AlipayAppId] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayAppId, e.target.value)}
                                 placeholder={t('settingPage.service.alipayAppId')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayPrivateKey')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="alipayPrivateKey">{t('settingPage.service.alipayPrivateKey')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayPrivateKey]}
+                                id="alipayPrivateKey"
+                                type="password"
+                                value={input[GeneralSetting.AlipayPrivateKey] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayPrivateKey, e.target.value)}
                                 placeholder={t('settingPage.service.alipayPrivateKey')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayPublicKey')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="alipayPublicKey">{t('settingPage.service.alipayPublicKey')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayPublicKey]}
+                                id="alipayPublicKey"
+                                value={input[GeneralSetting.AlipayPublicKey] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayPublicKey, e.target.value)}
                                 placeholder={t('settingPage.service.alipayPublicKey')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayAppCertPath')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="alipayAppCertPath">{t('settingPage.service.alipayAppCertPath')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayAppCertPath]}
+                                id="alipayAppCertPath"
+                                value={input[GeneralSetting.AlipayAppCertPath] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayAppCertPath, e.target.value)}
                                 placeholder={t('settingPage.service.alipayAppCertPath')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayRootCertPath')}>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="alipayRootCertPath">{t('settingPage.service.alipayRootCertPath')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayRootCertPath]}
+                                id="alipayRootCertPath"
+                                value={input[GeneralSetting.AlipayRootCertPath] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayRootCertPath, e.target.value)}
                                 placeholder={t('settingPage.service.alipayRootCertPath')}
                             />
-                        </Form.Item>
-                        <Form.Item label={t('settingPage.service.alipayPublicCertPath')}>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="alipayPublicCertPath">{t('settingPage.service.alipayPublicCertPath')}</Label>
                             <Input
-                                value={input[GeneralSetting.AlipayPublicCertPath]}
+                                id="alipayPublicCertPath"
+                                value={input[GeneralSetting.AlipayPublicCertPath] || ''}
                                 onChange={(e) => handleInputChange(GeneralSetting.AlipayPublicCertPath, e.target.value)}
                                 placeholder={t('settingPage.service.alipayPublicCertPath')}
                             />
-                        </Form.Item>
-                    </Collapse.Panel>
-                </Collapse>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Button block onClick={handleSubmit} type="primary">
+            {/* Save Button */}
+            <div className="flex justify-end">
+                <Button onClick={handleSubmit} className="w-full sm:w-auto">
                     {t('settingPage.general.save')}
                 </Button>
-            </Form>
-        </Card>
+            </div>
+        </div>
     );
 }

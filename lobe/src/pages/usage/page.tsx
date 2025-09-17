@@ -1,30 +1,26 @@
 import { useEffect, useState, useRef } from 'react';
-import { Typography, Card, Row, Col, Space, ConfigProvider, Divider, DatePicker, Button, Select } from 'antd';
-import { Flexbox } from 'react-layout-kit';
-import { useTheme } from 'antd-style';
-import {
-    MessageOutlined,
-    FileImageOutlined,
-    AudioOutlined,
-    BuildOutlined,
-    DownloadOutlined,
-    SoundOutlined,
-    TranslationOutlined
-} from '@ant-design/icons';
+import { MessageSquare, Image, Headphones, Wrench, Download, Volume2, Languages, Calendar, Filter } from 'lucide-react';
 import { renderNumber, renderQuota } from '../../utils/render';
 import * as echarts from 'echarts';
 import { getTokens } from '../../services/TokenService';
 import { GetUsage } from '../../services/UsageService';
 import dayjs, { Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 
-const { Text } = Typography;
-const { RangePicker } = DatePicker;
+// shadcn/ui imports
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function UsagePage() {
-    const theme = useTheme();
     const [loading, setLoading] = useState(false);
-    const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+    const [dateRange, setDateRange] = useState<{start: string, end: string} | null>(null);
     const [selectedApiKey, setSelectedApiKey] = useState<string | undefined>(undefined);
     const [tokenOptions, setTokenOptions] = useState<{ label: string; value: string }[]>([]);
     const { t } = useTranslation();
@@ -45,35 +41,40 @@ export default function UsagePage() {
     const audioSpeechChartRef = useRef<HTMLDivElement>(null);
     const audioTranscriptionChartRef = useRef<HTMLDivElement>(null);
     const audioTranslationChartRef = useRef<HTMLDivElement>(null);
-    const dailyUsageChartRef = useRef<HTMLDivElement>(null);  // 消费图表
-    const requestsChartRef = useRef<HTMLDivElement>(null);    // 请求数图表
-    const tokensChartRef = useRef<HTMLDivElement>(null);      // 令牌数图表
+    const dailyUsageChartRef = useRef<HTMLDivElement>(null);
+    const requestsChartRef = useRef<HTMLDivElement>(null);
+    const tokensChartRef = useRef<HTMLDivElement>(null);
 
     // 图表实例引用
     const chartInstancesRef = useRef<{ [key: string]: echarts.ECharts }>({});
 
-    // 统一卡片样式
-    const cardStyle = {
-        borderRadius: 8,
-        height: '100%',
-        marginBottom: 16
-    };
-
-    const categoryCardStyle = {
-        ...cardStyle,
-        marginBottom: 0
+    // ECharts compatible color palette - matches the design system
+    const chartColors = {
+        primary: '#0f172a',
+        success: '#22c55e',
+        warning: '#f59e0b',
+        destructive: '#ef4444',
+        info: '#3b82f6',
+        muted: '#64748b',
+        background: '#ffffff',
+        foreground: '#0f172a',
+        border: '#e2e8f0',
+        // Chart specific gradients
+        primaryAlpha80: 'rgba(15, 23, 42, 0.8)',
+        successAlpha80: 'rgba(34, 197, 94, 0.8)',
+        warningAlpha80: 'rgba(245, 158, 11, 0.8)',
     };
 
     // 加载Token列表
     const loadTokenList = async () => {
         setLoading(true);
         try {
-            const response = await getTokens(1, 1000); // 获取足够多的token
+            const response = await getTokens(1, 1000);
             if (response.success && response.data) {
                 const options = [
-                    { label: t('usage.allApiKeys'), value: '' },
+                    { label: t('usage.allApiKeys'), value: 'all' },
                     ...(response.data.items || []).map((item: any) => ({
-                        label: item.name || item.key, // 使用名称，如果没有则使用Key
+                        label: item.name || item.key,
                         value: item.key
                     }))
                 ];
@@ -93,29 +94,25 @@ export default function UsagePage() {
         // 默认设置日期范围为最近7天
         const endDate = dayjs();
         const startDate = dayjs().subtract(7, 'day');
-        setDateRange([startDate, endDate]);
+        setDateRange({
+            start: startDate.format('YYYY-MM-DD'),
+            end: endDate.format('YYYY-MM-DD')
+        });
     }, []);
 
     // 根据选择的Token和日期范围获取使用数据
     const fetchUsageData = async () => {
+        if (!dateRange) return;
+
         setLoading(true);
         try {
-            // 如果未选择或选择的是空字符串，则查询所有Token的数据
-            const tokenKey = !selectedApiKey || selectedApiKey === '' ? '' : selectedApiKey;
-
-            const startDateStr = dateRange?.[0]?.format('YYYY-MM-DD');
-            const endDateStr = dateRange?.[1]?.format('YYYY-MM-DD');
-
-            const response = await GetUsage(tokenKey, startDateStr, endDateStr);
+            const tokenKey = !selectedApiKey || selectedApiKey === 'all' ? '' : selectedApiKey;
+            const response = await GetUsage(tokenKey, dateRange.start, dateRange.end);
 
             if (response.success && response.data) {
                 setUsageData(response.data);
-
-                // 确保DOM已经渲染后再更新图表
                 setTimeout(() => {
                     updateCharts(response.data);
-
-                    // 手动触发resize确保图表正确渲染
                     Object.values(chartInstancesRef.current).forEach(chart => {
                         chart?.resize();
                     });
@@ -137,20 +134,16 @@ export default function UsagePage() {
 
     // 处理每个API类别的数据
     const getCategoryData = (categoryEndpoint: string) => {
-        // 筛选特定API端点的请求
         const filteredRequests = usageData.serviceRequests.filter(
             (req: any) => {
-                // 对于聊天完成类别，同时包含/v1/chat/completions和/v1/completions
                 if (categoryEndpoint === '/v1/chat/completions') {
                     return req.apiEndpoint.startsWith('/v1/chat/completions') ||
                         req.apiEndpoint.startsWith('/v1/completions');
                 }
-                // 其他类别正常匹配
                 return req.apiEndpoint.startsWith(categoryEndpoint);
             }
         );
 
-        // 汇总数据
         const summary = {
             requestCount: 0,
             tokenCount: 0,
@@ -164,7 +157,6 @@ export default function UsagePage() {
             summary.tokenCount += req.tokenCount || 0;
             summary.imageCount += req.imageCount || 0;
             summary.cost += req.cost || 0;
-            // 音频API可能会有秒数计量，这里假设有AudioSeconds字段
             summary.audioSeconds += req.audioSeconds || 0;
         });
 
@@ -173,76 +165,61 @@ export default function UsagePage() {
 
     // 更新图表数据
     const updateCharts = (data: any) => {
-        // 如果没有数据或者没有日期数据，则不进行图表更新
         if (!data || !data.dailyUsage || data.dailyUsage.length === 0) {
             return;
         }
 
-        // 提取日期和按服务分类的数据
-        const dates = data.dailyUsage.map((item: any) => {
-            const date = new Date(item.date);
-            return `${date.getMonth() + 1}/${date.getDate()}`;
-        }).reverse(); // 从旧到新
-
-        // 为每日使用柱状图准备数据
         const dailyUsageData = data.dailyUsage.map((item: any) => ({
             date: new Date(item.date),
             cost: item.cost,
             requestCount: item.requestCount,
             tokenCount: item.tokenCount,
             modelUsage: item.modelUsage || []
-        })).sort((a: any, b: any) => a.date.getTime() - b.date.getTime()); // 按日期升序排序
+        })).sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
 
         const dailyDates = dailyUsageData.map((item: any) => `${item.date.getMonth() + 1}/${item.date.getDate()}`);
         const dailyCosts = dailyUsageData.map((item: any) => item.cost);
         const dailyRequests = dailyUsageData.map((item: any) => item.requestCount);
         const dailyTokens = dailyUsageData.map((item: any) => item.tokenCount);
 
-        // 更新三个独立图表，传入模型使用数据
         updateCostChart(dailyDates, dailyCosts, dailyUsageData);
-        updateRequestsChart(dailyDates, dailyRequests, dailyUsageData);
-        updateTokensChart(dailyDates, dailyTokens, dailyUsageData);
+        updateRequestsChart(dailyDates, dailyRequests);
+        updateTokensChart(dailyDates, dailyTokens);
 
-        // 提取各服务的数据
-        const chatServiceData = prepareChartDataForService('/v1/chat/completions', data);
-        const imageServiceData = prepareChartDataForService('/v1/images/generations', data);
-        const embeddingsServiceData = prepareChartDataForService('/v1/embeddings', data);
-        const audioSpeechServiceData = prepareChartDataForService('/v1/audio/speech', data);
-        const audioTranscriptionServiceData = prepareChartDataForService('/v1/audio/transcriptions', data);
-        const audioTranslationServiceData = prepareChartDataForService('/v1/audio/translations', data);
+        // Update service charts
+        const dates = dailyDates;
+        const services = [
+            { ref: chatCompletionChartRef, endpoint: '/v1/chat/completions', title: t('usage.chatCompletion'), hasTokens: true },
+            { ref: imagesChartRef, endpoint: '/v1/images/generations', title: t('usage.images'), hasTokens: false },
+            { ref: embeddingsChartRef, endpoint: '/v1/embeddings', title: t('usage.embeddings'), hasTokens: true },
+            { ref: audioSpeechChartRef, endpoint: '/v1/audio/speech', title: t('usage.audioSpeech'), hasTokens: false },
+            { ref: audioTranscriptionChartRef, endpoint: '/v1/audio/transcriptions', title: t('usage.audioTranscription'), hasTokens: false },
+            { ref: audioTranslationChartRef, endpoint: '/v1/audio/translations', title: t('usage.audioTranslation'), hasTokens: false }
+        ];
 
-        // 更新图表
-        updateChart(chatCompletionChartRef, t('usage.chatCompletion'), dates, chatServiceData, true);
-        updateChart(imagesChartRef, t('usage.images'), dates, imageServiceData, false);
-        updateChart(embeddingsChartRef, t('usage.embeddings'), dates, embeddingsServiceData, true);
-        updateChart(audioSpeechChartRef, t('usage.audioSpeech'), dates, audioSpeechServiceData, false);
-        updateChart(audioTranscriptionChartRef, t('usage.audioTranscription'), dates, audioTranscriptionServiceData, false);
-        updateChart(audioTranslationChartRef, t('usage.audioTranslation'), dates, audioTranslationServiceData, false);
+        services.forEach(service => {
+            const serviceData = prepareChartDataForService(service.endpoint, data);
+            updateChart(service.ref, service.title, dates, serviceData, service.hasTokens);
+        });
     };
 
     // 更新消费图表
     const updateCostChart = (dates: string[], costs: number[], dailyUsageData: any[]) => {
         if (!dailyUsageChartRef.current) return;
 
-        // 销毁之前的实例（如果存在）
         if (chartInstancesRef.current['dailyUsage']) {
             chartInstancesRef.current['dailyUsage'].dispose();
         }
 
-        // 创建新的图表实例
         const chart = echarts.init(dailyUsageChartRef.current);
         chartInstancesRef.current['dailyUsage'] = chart;
 
-        // 计算总消费
         const totalCost = costs.reduce((sum, current) => sum + current, 0);
-
-        // 检查是否有模型使用数据
         const hasModelUsage = dailyUsageData.some(item => item.modelUsage && item.modelUsage.length > 0);
 
         let series: any[] = [];
 
         if (hasModelUsage) {
-            // 收集所有模型名称
             const allModels = new Set<string>();
             dailyUsageData.forEach(item => {
                 if (item.modelUsage) {
@@ -252,19 +229,7 @@ export default function UsagePage() {
                 }
             });
 
-            // 为每个模型创建系列数据
-            const modelColors = [
-                theme.colorPrimary,
-                theme.colorSuccess,
-                theme.colorWarning,
-                theme.colorError,
-                theme.colorInfo,
-                '#722ed1', // 紫色
-                '#eb2f96', // 粉色
-                '#52c41a', // 绿色
-                '#fa8c16', // 橙色
-                '#13c2c2'  // 青色
-            ];
+            const modelColors = [chartColors.primary, chartColors.success, chartColors.warning, chartColors.destructive, chartColors.info];
 
             Array.from(allModels).forEach((modelName, index) => {
                 const modelData = dailyUsageData.map(item => {
@@ -280,33 +245,21 @@ export default function UsagePage() {
                     itemStyle: {
                         color: modelColors[index % modelColors.length]
                     },
-                    emphasis: {
-                        itemStyle: {
-                            opacity: 0.8
-                        }
-                    },
                     data: modelData
                 });
             });
         } else {
-            // 没有模型数据时使用原来的逻辑
             series = [{
                 name: t('usage.cost'),
                 type: 'bar',
                 barWidth: '60%',
                 itemStyle: {
-                    color: theme.colorPrimary
-                },
-                emphasis: {
-                    itemStyle: {
-                        color: theme.colorPrimaryActive
-                    }
+                    color: chartColors.primary
                 },
                 data: costs
             }];
         }
 
-        // 消费图表配置
         const option = {
             backgroundColor: 'transparent',
             title: {
@@ -316,7 +269,7 @@ export default function UsagePage() {
                 textStyle: {
                     fontSize: 14,
                     fontWeight: 'bold',
-                    color: theme.colorPrimary
+                    color: chartColors.primary
                 }
             },
             grid: {
@@ -333,16 +286,16 @@ export default function UsagePage() {
                 itemGap: 10,
                 textStyle: {
                     fontSize: 12,
-                    color: theme.colorText
+                    color: chartColors.foreground
                 }
             } : undefined,
             tooltip: {
                 trigger: 'axis',
                 confine: true,
-                backgroundColor: theme.colorBgElevated,
-                borderColor: theme.colorBorder,
+                backgroundColor: chartColors.background,
+                borderColor: chartColors.border,
                 textStyle: {
-                    color: theme.colorText
+                    color: chartColors.foreground
                 },
                 formatter: (params: any) => {
                     const dateStr = params[0].axisValue;
@@ -350,28 +303,17 @@ export default function UsagePage() {
 
                     params.forEach((param: any) => {
                         if (param.value > 0) {
-                            let valueText = renderQuota(param.value);
-
                             result += `<div style="display:flex;justify-content:space-between;margin:3px 0">
                   <span style="margin-right:15px">
                     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${param.color};margin-right:5px"></span>
                     ${param.seriesName}:
                   </span>
-                  <span style="font-weight:bold">${valueText}</span>
+                  <span style="font-weight:bold">${renderQuota(param.value)}</span>
                 </div>`;
                         }
                     });
 
                     return result;
-                },
-                axisPointer: {
-                    type: 'shadow',
-                    lineStyle: {
-                        color: 'transparent'
-                    },
-                    crossStyle: {
-                        color: 'transparent'
-                    }
                 }
             },
             xAxis: {
@@ -379,7 +321,7 @@ export default function UsagePage() {
                 data: dates,
                 boundaryGap: true,
                 axisLine: {
-                    lineStyle: { color: theme.colorBorderSecondary }
+                    lineStyle: { color: chartColors.border }
                 },
                 axisTick: { alignWithLabel: true },
                 axisLabel: {
@@ -387,17 +329,11 @@ export default function UsagePage() {
                     rotate: dates.length > 5 ? 30 : 0,
                     fontSize: 11,
                     margin: 10,
-                    formatter: (value: string) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                    },
-                    color: theme.colorTextSecondary,
-                    hideOverlap: false
+                    color: chartColors.muted
                 }
             },
             yAxis: {
                 type: 'value',
-                name: '',
                 axisLine: { show: false },
                 axisTick: { show: false },
                 axisLabel: { show: false },
@@ -406,97 +342,22 @@ export default function UsagePage() {
             series: series
         };
 
-        // 设置配置
         chart.setOption(option);
     };
 
     // 更新请求数图表
-    const updateRequestsChart = (dates: string[], requests: number[], dailyUsageData: any[]) => {
+    const updateRequestsChart = (dates: string[], requests: number[]) => {
         if (!requestsChartRef.current) return;
 
-        // 销毁之前的实例（如果存在）
         if (chartInstancesRef.current['requests']) {
             chartInstancesRef.current['requests'].dispose();
         }
 
-        // 创建新的图表实例
         const chart = echarts.init(requestsChartRef.current);
         chartInstancesRef.current['requests'] = chart;
 
-        // 计算总请求数
         const totalRequests = requests.reduce((sum, current) => sum + current, 0);
 
-        // 检查是否有模型使用数据
-        const hasModelUsage = dailyUsageData.some(item => item.modelUsage && item.modelUsage.length > 0);
-
-        let series: any[] = [];
-
-        if (hasModelUsage) {
-            // 收集所有模型名称
-            const allModels = new Set<string>();
-            dailyUsageData.forEach(item => {
-                if (item.modelUsage) {
-                    item.modelUsage.forEach((model: any) => {
-                        allModels.add(model.modelName);
-                    });
-                }
-            });
-
-            // 为每个模型创建系列数据
-            const modelColors = [
-                theme.colorSuccess,
-                theme.colorPrimary,
-                theme.colorWarning,
-                theme.colorError,
-                theme.colorInfo,
-                '#722ed1',
-                '#eb2f96',
-                '#52c41a',
-                '#fa8c16',
-                '#13c2c2'
-            ];
-
-            Array.from(allModels).forEach((modelName, index) => {
-                const modelData = dailyUsageData.map(item => {
-                    const modelUsage = item.modelUsage?.find((m: any) => m.modelName === modelName);
-                    return modelUsage ? modelUsage.requestCount : 0;
-                });
-
-                series.push({
-                    name: modelName,
-                    type: 'bar',
-                    stack: 'requests',
-                    barWidth: '60%',
-                    itemStyle: {
-                        color: modelColors[index % modelColors.length]
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            opacity: 0.8
-                        }
-                    },
-                    data: modelData
-                });
-            });
-        } else {
-            // 没有模型数据时使用原来的逻辑
-            series = [{
-                name: t('usage.requests'),
-                type: 'bar',
-                barWidth: '60%',
-                itemStyle: {
-                    color: theme.colorSuccess
-                },
-                emphasis: {
-                    itemStyle: {
-                        color: theme.colorSuccessActive
-                    }
-                },
-                data: requests
-            }];
-        }
-
-        // 请求数图表配置
         const option = {
             backgroundColor: 'transparent',
             title: {
@@ -506,61 +367,23 @@ export default function UsagePage() {
                 textStyle: {
                     fontSize: 14,
                     fontWeight: 'bold',
-                    color: theme.colorSuccess
+                    color: chartColors.success
                 }
             },
             grid: {
-                top: hasModelUsage ? 80 : 60,
+                top: 60,
                 right: 20,
                 bottom: 50,
                 left: 0,
                 containLabel: false
             },
-            legend: hasModelUsage ? {
-                top: 40,
-                left: 10,
-                orient: 'horizontal',
-                itemGap: 10,
-                textStyle: {
-                    fontSize: 12,
-                    color: theme.colorText
-                }
-            } : undefined,
             tooltip: {
                 trigger: 'axis',
                 confine: true,
-                backgroundColor: theme.colorBgElevated,
-                borderColor: theme.colorBorder,
+                backgroundColor: chartColors.background,
+                borderColor: chartColors.border,
                 textStyle: {
-                    color: theme.colorText
-                },
-                formatter: (params: any) => {
-                    const dateStr = params[0].axisValue;
-                    let result = `<div style="font-weight:bold;margin-bottom:5px">${t('usage.date')}: ${dateStr}</div>`;
-
-                    params.forEach((param: any) => {
-                        let valueText = param.value;
-                        if (param.value > 0) {
-                            result += `<div style="display:flex;justify-content:space-between;margin:3px 0">
-              <span style="margin-right:15px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${param.color};margin-right:5px"></span>
-                ${param.seriesName}:
-              </span>
-              <span style="font-weight:bold">${valueText}</span>
-            </div>`;
-                        }
-                    });
-
-                    return result;
-                },
-                axisPointer: {
-                    type: 'shadow',
-                    lineStyle: {
-                        color: 'transparent'
-                    },
-                    crossStyle: {
-                        color: 'transparent'
-                    }
+                    color: chartColors.foreground
                 }
             },
             xAxis: {
@@ -568,7 +391,7 @@ export default function UsagePage() {
                 data: dates,
                 boundaryGap: true,
                 axisLine: {
-                    lineStyle: { color: theme.colorBorderSecondary }
+                    lineStyle: { color: chartColors.border }
                 },
                 axisTick: { alignWithLabel: true },
                 axisLabel: {
@@ -576,116 +399,43 @@ export default function UsagePage() {
                     rotate: dates.length > 5 ? 30 : 0,
                     fontSize: 11,
                     margin: 10,
-                    formatter: (value: string) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                    },
-                    color: theme.colorTextSecondary,
-                    hideOverlap: false
+                    color: chartColors.muted
                 }
             },
             yAxis: {
                 type: 'value',
-                name: '',
                 axisLine: { show: false },
                 axisTick: { show: false },
                 axisLabel: { show: false },
                 splitLine: { show: false }
             },
-            series: series
+            series: [{
+                name: t('usage.requests'),
+                type: 'bar',
+                barWidth: '60%',
+                itemStyle: {
+                    color: chartColors.success
+                },
+                data: requests
+            }]
         };
 
-        // 设置配置
         chart.setOption(option);
     };
 
     // 更新令牌数图表
-    const updateTokensChart = (dates: string[], tokens: number[], dailyUsageData: any[]) => {
+    const updateTokensChart = (dates: string[], tokens: number[]) => {
         if (!tokensChartRef.current) return;
 
-        // 销毁之前的实例（如果存在）
         if (chartInstancesRef.current['tokens']) {
             chartInstancesRef.current['tokens'].dispose();
         }
 
-        // 创建新的图表实例
         const chart = echarts.init(tokensChartRef.current);
         chartInstancesRef.current['tokens'] = chart;
 
-        // 计算总令牌数
         const totalTokens = tokens.reduce((sum, current) => sum + current, 0);
 
-        // 检查是否有模型使用数据
-        const hasModelUsage = dailyUsageData.some(item => item.modelUsage && item.modelUsage.length > 0);
-
-        let series: any[] = [];
-
-        if (hasModelUsage) {
-            // 收集所有模型名称
-            const allModels = new Set<string>();
-            dailyUsageData.forEach(item => {
-                if (item.modelUsage) {
-                    item.modelUsage.forEach((model: any) => {
-                        allModels.add(model.modelName);
-                    });
-                }
-            });
-
-            // 为每个模型创建系列数据
-            const modelColors = [
-                theme.colorWarning,
-                theme.colorPrimary,
-                theme.colorSuccess,
-                theme.colorError,
-                theme.colorInfo,
-                '#722ed1',
-                '#eb2f96',
-                '#52c41a',
-                '#fa8c16',
-                '#13c2c2'
-            ];
-
-            Array.from(allModels).forEach((modelName, index) => {
-                const modelData = dailyUsageData.map(item => {
-                    const modelUsage = item.modelUsage?.find((m: any) => m.modelName === modelName);
-                    return modelUsage ? modelUsage.tokenCount : 0;
-                });
-
-                series.push({
-                    name: modelName,
-                    type: 'bar',
-                    stack: 'tokens',
-                    barWidth: '60%',
-                    itemStyle: {
-                        color: modelColors[index % modelColors.length]
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            opacity: 0.8
-                        }
-                    },
-                    data: modelData
-                });
-            });
-        } else {
-            // 没有模型数据时使用原来的逻辑
-            series = [{
-                name: t('usage.tokenCount'),
-                type: 'bar',
-                barWidth: '60%',
-                itemStyle: {
-                    color: theme.colorWarning
-                },
-                emphasis: {
-                    itemStyle: {
-                        color: theme.colorWarningActive
-                    }
-                },
-                data: tokens
-            }];
-        }
-
-        // 令牌数图表配置
         const option = {
             backgroundColor: 'transparent',
             title: {
@@ -695,62 +445,23 @@ export default function UsagePage() {
                 textStyle: {
                     fontSize: 14,
                     fontWeight: 'bold',
-                    color: theme.colorWarning
+                    color: chartColors.warning
                 }
             },
             grid: {
-                top: hasModelUsage ? 80 : 60,
+                top: 60,
                 right: 20,
                 bottom: 50,
                 left: 0,
                 containLabel: false
             },
-            legend: hasModelUsage ? {
-                top: 40,
-                left: 10,
-                orient: 'horizontal',
-                itemGap: 10,
-                textStyle: {
-                    fontSize: 12,
-                    color: theme.colorText
-                }
-            } : undefined,
             tooltip: {
                 trigger: 'axis',
                 confine: true,
-                backgroundColor: theme.colorBgElevated,
-                borderColor: theme.colorBorder,
+                backgroundColor: chartColors.background,
+                borderColor: chartColors.border,
                 textStyle: {
-                    color: theme.colorText
-                },
-                formatter: (params: any) => {
-                    const dateStr = params[0].axisValue;
-                    let result = `<div style="font-weight:bold;margin-bottom:5px">${t('usage.date')}: ${dateStr}</div>`;
-
-                    params.forEach((param: any) => {
-                        if (param.value > 0) {
-                            let valueText = renderNumber(param.value);
-
-                        result += `<div style="display:flex;justify-content:space-between;margin:3px 0">
-              <span style="margin-right:15px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${param.color};margin-right:5px"></span>
-                ${param.seriesName}:
-              </span>
-              <span style="font-weight:bold">${valueText}</span>
-            </div>`;
-                        }
-                    });
-
-                    return result;
-                },
-                axisPointer: {
-                    type: 'shadow',
-                    lineStyle: {
-                        color: 'transparent'
-                    },
-                    crossStyle: {
-                        color: 'transparent'
-                    }
+                    color: chartColors.foreground
                 }
             },
             xAxis: {
@@ -758,7 +469,7 @@ export default function UsagePage() {
                 data: dates,
                 boundaryGap: true,
                 axisLine: {
-                    lineStyle: { color: theme.colorBorderSecondary }
+                    lineStyle: { color: chartColors.border }
                 },
                 axisTick: { alignWithLabel: true },
                 axisLabel: {
@@ -766,26 +477,27 @@ export default function UsagePage() {
                     rotate: dates.length > 5 ? 30 : 0,
                     fontSize: 11,
                     margin: 10,
-                    formatter: (value: string) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                    },
-                    color: theme.colorTextSecondary,
-                    hideOverlap: false
+                    color: chartColors.muted
                 }
             },
             yAxis: {
                 type: 'value',
-                name: '',
                 axisLine: { show: false },
                 axisTick: { show: false },
                 axisLabel: { show: false },
                 splitLine: { show: false }
             },
-            series: series
+            series: [{
+                name: t('usage.tokenCount'),
+                type: 'bar',
+                barWidth: '60%',
+                itemStyle: {
+                    color: chartColors.warning
+                },
+                data: tokens
+            }]
         };
 
-        // 设置配置
         chart.setOption(option);
     };
 
@@ -796,7 +508,6 @@ export default function UsagePage() {
             tokenCount: new Array(data.dailyUsage.length).fill(0)
         };
 
-        // 按照日期倒序排列
         const sortedDailyUsage = [...data.dailyUsage].sort((a: any, b: any) => {
             return new Date(a.date).getTime() - new Date(b.date).getTime();
         });
@@ -804,13 +515,11 @@ export default function UsagePage() {
         sortedDailyUsage.forEach((daily, index) => {
             const requests = data.serviceRequests.filter(
                 (req: any) => {
-                    // 聊天完成类别特殊处理
                     if (apiEndpoint === '/v1/chat/completions') {
                         return (req.apiEndpoint.startsWith('/v1/chat/completions') ||
                             req.apiEndpoint.startsWith('/v1/completions')) &&
                             req.date === daily.date;
                     }
-                    // 其他类别正常匹配
                     return req.apiEndpoint.startsWith(apiEndpoint) && req.date === daily.date;
                 }
             );
@@ -829,61 +538,29 @@ export default function UsagePage() {
     const updateChart = (chartRef: any, title: string, dates: any, seriesData: any, hasTokens: boolean) => {
         if (!chartRef.current) return;
 
-        // 销毁之前的实例（如果存在）
         if (chartInstancesRef.current[title]) {
             chartInstancesRef.current[title].dispose();
         }
 
-        // 创建新的图表实例
         const chart = echarts.init(chartRef.current);
         chartInstancesRef.current[title] = chart;
 
-        // 基本配置 - 使用简化配置，专注于解决日期标签显示问题
         const option = {
             backgroundColor: 'transparent',
             grid: {
-                top: 30,        // 使用固定像素值
-                right: 20,      // 不需要右侧空间，因为不再使用双Y轴
-                bottom: 50,     // 确保底部有足够空间
-                left: 50,       // 为Y轴留出足够空间
+                top: 30,
+                right: 20,
+                bottom: 50,
+                left: 50,
                 containLabel: true
             },
             tooltip: {
                 trigger: 'axis',
-                confine: true, // 确保提示框在图表区域内
-                backgroundColor: theme.colorBgElevated,
-                borderColor: theme.colorBorder,
+                confine: true,
+                backgroundColor: chartColors.background,
+                borderColor: chartColors.border,
                 textStyle: {
-                    color: theme.colorText
-                },
-                axisPointer: {
-                    type: 'shadow',
-                    lineStyle: {
-                        color: 'transparent'
-                    },
-                    crossStyle: {
-                        color: 'transparent'
-                    }
-                },
-                formatter: (params: any) => {
-                    const dateStr = params[0].axisValue;
-                    let result = `<div style="font-weight:bold;margin-bottom:5px">${t('usage.date')}: ${dateStr}</div>`;
-
-                    params.forEach((param: any) => {
-                        let valueText = param.seriesName === t('usage.spend')
-                            ? renderQuota(param.value)
-                            : renderNumber(param.value);
-
-                        result += `<div style="display:flex;justify-content:space-between;margin:3px 0">
-              <span style="margin-right:15px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${param.color};margin-right:5px"></span>
-                ${param.seriesName}:
-              </span>
-              <span style="font-weight:bold">${valueText}</span>
-            </div>`;
-                    });
-
-                    return result;
+                    color: chartColors.foreground
                 }
             },
             legend: hasTokens ? {
@@ -900,17 +577,15 @@ export default function UsagePage() {
                 data: dates,
                 boundaryGap: true,
                 axisLine: {
-                    lineStyle: { color: theme.colorBorderSecondary }
+                    lineStyle: { color: chartColors.border }
                 },
                 axisTick: { alignWithLabel: true },
                 axisLabel: {
-                    interval: 0,                  // 显示所有标签
+                    interval: 0,
                     rotate: dates.length > 5 ? 30 : 0,
                     fontSize: 11,
                     margin: 10,
-                    formatter: (value: any) => value,
-                    color: theme.colorTextSecondary,
-                    hideOverlap: false
+                    color: chartColors.muted
                 }
             },
             yAxis: {
@@ -918,15 +593,15 @@ export default function UsagePage() {
                 name: hasTokens ? t('usage.quantity') : t('usage.requests'),
                 axisLine: {
                     show: true,
-                    lineStyle: { color: theme.colorPrimary }
+                    lineStyle: { color: chartColors.primary }
                 },
                 axisTick: { show: true },
                 axisLabel: {
-                    color: theme.colorTextSecondary
+                    color: chartColors.muted
                 },
                 splitLine: {
                     lineStyle: {
-                        color: theme.colorSplit,
+                        color: chartColors.border,
                         type: 'dashed'
                     }
                 }
@@ -938,12 +613,7 @@ export default function UsagePage() {
                     stack: '总量',
                     barWidth: '40%',
                     itemStyle: {
-                        color: theme.colorPrimary
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            color: theme.colorPrimaryActive
-                        }
+                        color: chartColors.primary
                     },
                     data: seriesData.requestCount
                 },
@@ -953,12 +623,7 @@ export default function UsagePage() {
                     stack: '总量',
                     barWidth: '40%',
                     itemStyle: {
-                        color: theme.colorSuccess
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            color: theme.colorSuccessActive
-                        }
+                        color: chartColors.success
                     },
                     data: seriesData.tokenCount
                 }
@@ -968,40 +633,25 @@ export default function UsagePage() {
                     type: 'bar',
                     barWidth: '40%',
                     itemStyle: {
-                        color: theme.colorPrimary
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            color: theme.colorPrimaryActive
-                        }
+                        color: chartColors.primary
                     },
                     data: seriesData.requestCount
                 }
             ]
         };
 
-        // 设置配置
         chart.setOption(option);
     };
 
     // 导出数据
     const handleExport = () => {
-        // 如果未选择或选择的是空字符串，则导出所有Token的数据
-        const tokenKey = !selectedApiKey || selectedApiKey === '' ? undefined : selectedApiKey;
-
-        console.log('导出数据', {
-            tokenKey,
-            startDate: dateRange?.[0]?.format('YYYY-MM-DD'),
-            endDate: dateRange?.[1]?.format('YYYY-MM-DD')
-        });
-
-        // 这里实现导出逻辑，例如创建CSV文件
+        const tokenKey = !selectedApiKey || selectedApiKey === 'all' ? undefined : selectedApiKey;
         const csvContent = generateCSV(usageData);
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `usage-${dateRange?.[0]?.format('YYYY-MM-DD')}-to-${dateRange?.[1]?.format('YYYY-MM-DD')}.csv`);
+        link.setAttribute('download', `usage-${dateRange?.start}-to-${dateRange?.end}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1009,10 +659,8 @@ export default function UsagePage() {
 
     // 生成CSV文件内容
     const generateCSV = (data: any) => {
-        // CSV头部
         let csvContent = `${t('usage.date')},${t('usage.apiEndpoint')},${t('usage.apiName')},${t('usage.model')},${t('usage.requests')},${t('usage.tokenCount')},${t('usage.imageCount')},${t('usage.cost')}\n`;
 
-        // 添加行数据
         if (data.serviceRequests && data.serviceRequests.length > 0) {
             data.serviceRequests.forEach((req: any) => {
                 const date = new Date(req.date).toISOString().split('T')[0];
@@ -1028,20 +676,16 @@ export default function UsagePage() {
     // 初始化并监听窗口大小变化
     useEffect(() => {
         const handleResize = () => {
-            // 确保所有图表实例都调整大小
             Object.values(chartInstancesRef.current).forEach(chart => {
                 chart?.resize();
             });
         };
 
         window.addEventListener('resize', handleResize);
-
-        // 当组件完全挂载后，手动触发一次resize
         setTimeout(handleResize, 300);
 
         return () => {
             window.removeEventListener('resize', handleResize);
-            // 销毁所有图表实例
             Object.values(chartInstancesRef.current).forEach(chart => {
                 chart?.dispose();
             });
@@ -1058,311 +702,365 @@ export default function UsagePage() {
     const audioTranslationData = getCategoryData('/v1/audio/translations');
 
     return (
-        <ConfigProvider
-            theme={{
-                components: {
-                    Card: {
-                        headerBg: 'transparent',
-                        colorBgContainer: theme.colorBgElevated,
-                    },
-                    Statistic: {
-                        contentFontSize: 24,
-                    }
-                },
-            }}
-        >
-            <div style={{ padding: '0 16px' }}>
-                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                    <Col flex="auto">
-                        <Select
-                            placeholder={t('usage.selectApiKey')}
-                            style={{ width: 300 }}
-                            options={tokenOptions}
-                            onChange={(value) => setSelectedApiKey(value)}
-                            loading={loading}
-                            showSearch
-                            optionFilterProp="label"
-                            allowClear
-                            value={selectedApiKey}
-                        />
-                    </Col>
-                    <Col>
-                        <Space>
-                            <RangePicker
-                                value={dateRange}
-                                onChange={(dates) => {
-                                    if (dates) {
-                                        setDateRange(dates as [Dayjs, Dayjs]);
-                                    } else {
-                                        setDateRange(null);
-                                    }
-                                }}
-                            />
-                            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled={loading}>
-                                {t('usage.exportData')}
-                            </Button>
-                        </Space>
-                    </Col>
-                </Row>
+        <div className="p-6 space-y-6 bg-background min-h-screen">
+            {/* Header with filters */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight">{t('usage.title')}</h1>
+                    <p className="text-muted-foreground">{t('usage.subtitle')}</p>
+                </div>
 
-                <Row gutter={[16, 16]}>
-                    <Col span={24}>
-                        <Card style={cardStyle} loading={loading}>
-                            <Row>
-                                <Col span={24}>
-                                    <Row gutter={[16, 16]}>
-                                        <Col xs={24} md={12}>
-                                            <div style={{ position: 'relative' }}>
-                                                <div
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: 0,
-                                                        left: 0,
-                                                        right: 0,
-                                                        height: '4px',
-                                                        borderRadius: '8px 8px 0 0'
-                                                    }}
-                                                />
-                                                <div
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: 12,
-                                                        left: 12,
-                                                        fontWeight: 'bold',
-                                                        fontSize: '16px',
-                                                        color: theme.colorPrimary
-                                                    }}
-                                                >
-                                                    {t('usage.spendStatistics')}
-                                                </div>
-                                                <div
-                                                    ref={dailyUsageChartRef}
-                                                    style={{
-                                                        height: 380,
-                                                        background: theme.colorBgContainer,
-                                                        borderRadius: 8,
-                                                        paddingTop: 40
-                                                    }}
-                                                />
-                                            </div>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Row>
-                                                <Col span={24}>
-                                                    <div style={{ position: 'relative' }}>
-                                                        <div
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: 0,
-                                                                left: 0,
-                                                                right: 0,
-                                                                height: '4px',
-                                                                borderRadius: '8px 8px 0 0'
-                                                            }}
-                                                        />
-                                                        <div
-                                                            ref={requestsChartRef}
-                                                            style={{
-                                                                height: 180,
-                                                                background: theme.colorBgContainer,
-                                                                borderRadius: 8,
-                                                                boxShadow: '0 3px 10px rgba(0, 0, 0, 0.1)',
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                            <Row style={{ marginTop: 20 }}>
-                                                <Col span={24}>
-                                                    <div style={{ position: 'relative' }}>
-                                                        <div
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: 0,
-                                                                left: 0,
-                                                                right: 0,
-                                                                height: '4px',
-                                                                borderRadius: '8px 8px 0 0'
-                                                            }}
-                                                        />
-                                                        <div
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: 12,
-                                                                left: 12,
-                                                                fontWeight: 'bold',
-                                                                fontSize: '16px',
-                                                                color: theme.colorWarning
-                                                            }}
-                                                        >
-                                                            {t('usage.tokensStatistics')}
-                                                        </div>
-                                                        <div
-                                                            ref={tokensChartRef}
-                                                            style={{
-                                                                height: 180,
-                                                                background: theme.colorBgContainer,
-                                                                borderRadius: 8,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                        </Col>
-                                    </Row>
-                                </Col>
-                            </Row>
-                        </Card>
-                    </Col>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <Select value={selectedApiKey} onValueChange={setSelectedApiKey}>
+                            <SelectTrigger className="w-[200px]">
+                                <SelectValue placeholder={t('usage.selectApiKey')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {tokenOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                    <Col span={24}>
-                        <Divider orientation="left">{t('usage.apiCapabilities')}</Divider>
-                        <Row gutter={[16, 16]}>
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<MessageOutlined />} {t('usage.chatCompletions')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.requests')}</Text>
-                                                <Text>{chatCompletionsData.requestCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.tokenCount')}</Text>
-                                                <Text>{renderNumber(chatCompletionsData.tokenCount)}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.cost')}</Text>
-                                                <Text>{renderQuota(chatCompletionsData.cost)}</Text>
-                                            </Flexbox>
-                                        </Space>
-                                        <div ref={chatCompletionChartRef} style={{ height: 320, marginTop: 16 }} />
-                                    </>
-                                </Card>
-                            </Col>
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex gap-2">
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="start-date" className="sr-only">Start Date</Label>
+                                <Input
+                                    type="date"
+                                    id="start-date"
+                                    value={dateRange?.start || ''}
+                                    onChange={(e) => setDateRange(prev => prev ? {...prev, start: e.target.value} : {start: e.target.value, end: ''})}
+                                    className="w-[140px]"
+                                />
+                            </div>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="end-date" className="sr-only">End Date</Label>
+                                <Input
+                                    type="date"
+                                    id="end-date"
+                                    value={dateRange?.end || ''}
+                                    onChange={(e) => setDateRange(prev => prev ? {...prev, end: e.target.value} : {start: '', end: e.target.value})}
+                                    className="w-[140px]"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<FileImageOutlined />} {t('usage.images')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.requests')}</Text>
-                                                <Text>{imagesData.requestCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.imageCount')}</Text>
-                                                <Text>{imagesData.imageCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.cost')}</Text>
-                                                <Text>{renderQuota(imagesData.cost)}</Text>
-                                            </Flexbox>
-                                        </Space>
-                                        <div ref={imagesChartRef} style={{ height: 320, marginTop: 16 }} />
-                                    </>
-                                </Card>
-                            </Col>
-
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<BuildOutlined />} {t('usage.embeddings')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <Space direction="vertical" style={{ width: '100%' }}>
-                                        <Flexbox horizontal justify="space-between">
-                                            <Text>{t('usage.requests')}</Text>
-                                            <Text>{embeddingsData.requestCount}</Text>
-                                        </Flexbox>
-                                        <Flexbox horizontal justify="space-between">
-                                            <Text>{t('usage.inputTokens')}</Text>
-                                            <Text>{embeddingsData.tokenCount}</Text>
-                                        </Flexbox>
-                                        <Flexbox horizontal justify="space-between">
-                                            <Text>{t('usage.cost')}</Text>
-                                            <Text>{renderQuota(embeddingsData.cost)}</Text>
-                                        </Flexbox>
-                                    </Space>
-                                    <div ref={embeddingsChartRef} style={{ height: 320, marginTop: 16 }} />
-                                </Card>
-                            </Col>
-
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<SoundOutlined />} {t('usage.audioSpeech')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.requests')}</Text>
-                                                <Text>{audioSpeechData.requestCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.cost')}</Text>
-                                                <Text>{renderQuota(audioSpeechData.cost)}</Text>
-                                            </Flexbox>
-                                        </Space>
-                                        <div ref={audioSpeechChartRef} style={{ height: 320, marginTop: 16 }} />
-                                    </>
-                                </Card>
-                            </Col>
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<AudioOutlined />} {t('usage.audioTranscription')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.requests')}</Text>
-                                                <Text>{audioTranscriptionData.requestCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.cost')}</Text>
-                                                <Text>{renderQuota(audioTranscriptionData.cost)}</Text>
-                                            </Flexbox>
-                                        </Space>
-                                        <div ref={audioTranscriptionChartRef} style={{ height: 320, marginTop: 16 }} />
-                                    </>
-                                </Card>
-                            </Col>
-
-                            {/* 音频翻译 */}
-                            <Col xs={24} md={12} lg={8}>
-                                <Card
-                                    title={<Space>{<TranslationOutlined />} {t('usage.audioTranslation')}</Space>}
-                                    style={categoryCardStyle}
-                                    loading={loading}
-                                >
-                                    <>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.requests')}</Text>
-                                                <Text>{audioTranslationData.requestCount}</Text>
-                                            </Flexbox>
-                                            <Flexbox horizontal justify="space-between">
-                                                <Text>{t('usage.cost')}</Text>
-                                                <Text>{renderQuota(audioTranslationData.cost)}</Text>
-                                            </Flexbox>
-                                        </Space>
-                                        <div ref={audioTranslationChartRef} style={{ height: 320, marginTop: 16 }} />
-                                    </>
-                                </Card>
-                            </Col>
-                        </Row>
-                    </Col>
-                </Row>
+                    <Button
+                        onClick={handleExport}
+                        disabled={loading}
+                        variant="outline"
+                        className="gap-2"
+                    >
+                        <Download className="h-4 w-4" />
+                        {t('usage.exportData')}
+                    </Button>
+                </div>
             </div>
-        </ConfigProvider>
+
+            {/* Overview Statistics */}
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card className="col-span-full md:col-span-1">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-primary"></div>
+                            {t('usage.spendStatistics')}
+                        </CardTitle>
+                        <CardDescription>
+                            {t('usage.totalSpendDescription')}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loading ? (
+                            <Skeleton className="h-[380px] w-full" />
+                        ) : (
+                            <div ref={dailyUsageChartRef} className="h-[380px] w-full" />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="grid gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                                {t('usage.requestsStatistics')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <Skeleton className="h-[140px] w-full" />
+                            ) : (
+                                <div ref={requestsChartRef} className="h-[140px] w-full" />
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+                                {t('usage.tokensStatistics')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <Skeleton className="h-[140px] w-full" />
+                            ) : (
+                                <div ref={tokensChartRef} className="h-[140px] w-full" />
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <Separator className="flex-1" />
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <Wrench className="h-5 w-5" />
+                        {t('usage.apiCapabilities')}
+                    </h2>
+                    <Separator className="flex-1" />
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                                    <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                {t('usage.chatCompletions')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{chatCompletionsData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.tokenCount')}</span>
+                                            <Badge variant="secondary">{renderNumber(chatCompletionsData.tokenCount)}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(chatCompletionsData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={chatCompletionChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                                    <Image className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                {t('usage.images')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{imagesData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.imageCount')}</span>
+                                            <Badge variant="secondary">{imagesData.imageCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(imagesData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={imagesChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                                    <Wrench className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                {t('usage.embeddings')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{embeddingsData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.inputTokens')}</span>
+                                            <Badge variant="secondary">{embeddingsData.tokenCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(embeddingsData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={embeddingsChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                                    <Volume2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                </div>
+                                {t('usage.audioSpeech')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{audioSpeechData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(audioSpeechData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={audioSpeechChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg">
+                                    <Headphones className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                </div>
+                                {t('usage.audioTranscription')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{audioTranscriptionData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(audioTranscriptionData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={audioTranscriptionChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="p-2 bg-teal-100 dark:bg-teal-900/20 rounded-lg">
+                                    <Languages className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                                </div>
+                                {t('usage.audioTranslation')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-[320px] w-full" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 mb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.requests')}</span>
+                                            <Badge variant="secondary">{audioTranslationData.requestCount}</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">{t('usage.cost')}</span>
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                                {renderQuota(audioTranslationData.cost)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div ref={audioTranslationChartRef} className="h-[320px] w-full" />
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
     );
-} 
+}

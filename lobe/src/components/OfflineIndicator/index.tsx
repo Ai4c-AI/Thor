@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, Typography } from 'antd';
-import {  DisconnectOutlined } from '@ant-design/icons';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { WifiOff } from 'lucide-react';
 import { addConnectivityListeners, isOnline, processQueuedRequests } from '../../utils/pwa';
-
-const { Text } = Typography;
+import { useTranslation } from 'react-i18next';
 
 /**
  * Offline Indicator Component
@@ -12,6 +11,7 @@ const { Text } = Typography;
  * and attempts to sync data when back online
  */
 const OfflineIndicator: React.FC = () => {
+  const { t } = useTranslation();
   const [online, setOnline] = useState<boolean>(isOnline());
 
   useEffect(() => {
@@ -42,19 +42,15 @@ const OfflineIndicator: React.FC = () => {
   }
   
   return (
-    <Alert
-      type="warning"
-      banner
-      icon={<DisconnectOutlined />}
-      message={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text>您当前处于离线状态，部分功能可能不可用</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            您的更改将在网络恢复后自动同步
-          </Text>
-        </div>
-      }
-    />
+    <Alert className="border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-950 dark:text-orange-100">
+      <WifiOff className="h-4 w-4" />
+      <AlertDescription className="flex items-center justify-between">
+        <span>{t('offline.message')}</span>
+        <span className="text-xs opacity-75">
+          {t('offline.syncNote')}
+        </span>
+      </AlertDescription>
+    </Alert>
   );
 };
 

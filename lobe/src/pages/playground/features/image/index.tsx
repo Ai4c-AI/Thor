@@ -1,17 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Typography, Select, Form, Upload, message, Divider, Row, Col, Image, Grid, Empty } from 'antd';
-import { PictureOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
+// Replaced Ant Design with shadcn/ui components
+import { ImageIcon, Trash2, Upload as UploadIcon } from 'lucide-react';
+import { Button } from '../../../../components/ui/button';
+import { Card, CardContent } from '../../../../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
+import { Textarea } from '../../../../components/ui/textarea';
+import { Separator } from '../../../../components/ui/separator';
+import { toast } from 'sonner';
+import { cn } from '../../../../lib/utils';
 import { Flexbox } from 'react-layout-kit';
 import { useTranslation } from 'react-i18next';
 import { getTokens } from '../../../../services/TokenService';
 import { isMobileDevice } from '../../../../utils/responsive';
-import type { RcFile, UploadFile, UploadProps } from 'antd/es/upload/interface';
+// File types for upload handling
+interface UploadFile {
+    uid: string;
+    name: string;
+    status?: 'uploading' | 'done' | 'error' | 'removed';
+    url?: string;
+    thumbUrl?: string;
+    originFileObj?: File;
+}
 import { processImage } from '../../../../services/ImageService';
-const { Option } = Select;
-const { TextArea } = Input;
-const { Text } = Typography;
-const { useBreakpoint } = Grid;
-const { Dragger } = Upload;
+
+// Using shadcn/ui components directly
 
 // Interface for generated image
 interface GeneratedImage {
@@ -26,14 +38,13 @@ interface GeneratedImage {
 // Interface for source image
 interface SourceImage {
     uid: string;
-    file: RcFile;
+    file: File;
     dataUrl: string;
 }
 
 export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
     const { t } = useTranslation();
-    const screens = useBreakpoint();
-    const isMobile = !screens.md || isMobileDevice();
+    const isMobile = isMobileDevice();
 
     const [tokenOptions, setTokenOptions] = useState<any[]>([]);
     const [selectedToken, setSelectedToken] = useState<string>('');
@@ -68,12 +79,12 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                     const firstToken = res.data.items[0].key;
                     setSelectedToken(firstToken);
                 } else {
-                    message.warning(t('imageFeature.noTokensAvailable'));
+                    toast.error(t('imageFeature.noTokensAvailable'));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch tokens:', error);
-            message.error(t('common.error'));
+            toast.error(t('common.error'));
         }
     };
 
@@ -83,20 +94,30 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
     };
 
     // Handle file upload for img2img
-    const handleUpload: UploadProps['onChange'] = ({ fileList: newFileList }) => {
-        setFileList(newFileList);
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
+
+        const newFileList: UploadFile[] = Array.from(files).map((file, index) => ({
+            uid: `${Date.now()}-${index}`,
+            name: file.name,
+            status: 'done' as const,
+            originFileObj: file
+        }));
+
+        setFileList(prev => [...prev, ...newFileList]);
 
         // Process each file to create source images
         const processFiles = async () => {
             const newSourceImages: SourceImage[] = [];
 
-            for (const file of newFileList) {
-                if (file.originFileObj) {
+            for (const fileItem of newFileList) {
+                if (fileItem.originFileObj) {
                     try {
-                        const dataUrl = await readFileAsDataURL(file.originFileObj);
+                        const dataUrl = await readFileAsDataURL(fileItem.originFileObj);
                         newSourceImages.push({
-                            uid: file.uid,
-                            file: file.originFileObj as RcFile,
+                            uid: fileItem.uid,
+                            file: fileItem.originFileObj,
                             dataUrl
                         });
                     } catch (error) {
@@ -105,14 +126,14 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                 }
             }
 
-            setSourceImages(newSourceImages);
+            setSourceImages(prev => [...prev, ...newSourceImages]);
         };
 
         processFiles();
     };
 
     // Convert file to data URL
-    const readFileAsDataURL = (file: RcFile): Promise<string> => {
+    const readFileAsDataURL = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -130,17 +151,17 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
     // Generate image from text or transform existing image
     const handleGenerateImage = async () => {
         if (!prompt.trim()) {
-            message.warning(t('imageFeature.promptRequired'));
+            toast.error(t('imageFeature.promptRequired'));
             return;
         }
 
         if (!selectedToken) {
-            message.warning(t('imageFeature.tokenRequired'));
+            toast.error(t('imageFeature.tokenRequired'));
             return;
         }
 
         if (!selectedModel) {
-            message.warning(t('imageFeature.modelRequired'));
+            toast.error(t('imageFeature.modelRequired'));
             return;
         }
 
@@ -184,11 +205,11 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                         }
                     } catch (error) {
                         console.error('Failed to process image:', error);
-                        message.error(`Failed to process image: ${sourceImage.file.name}`);
+                        toast.error(`Failed to process image: ${sourceImage.file.name}`);
                     }
                 }
 
-                message.success(t('imageFeature.generateSuccess'));
+                toast.success(t('imageFeature.generateSuccess'));
             } else {
                 // Text-to-image generation using OpenAI
                 const result = await processImage(baseParams);
@@ -205,12 +226,12 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                     };
 
                     setGeneratedImages(prev => [newImage, ...prev]);
-                    message.success(t('imageFeature.generateSuccess'));
+                    toast.success(t('imageFeature.generateSuccess'));
                 }
             }
         } catch (error: any) {
             console.error('Failed to generate image:', error);
-            message.error(`${t('imageFeature.generateFailed')}: ${error.message || 'Unknown error'}`);
+            toast.error(`${t('imageFeature.generateFailed')}: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -228,168 +249,184 @@ export default function ImageFeature({ modelInfo }: { modelInfo: any }) {
                 overflow: 'auto'
             }}
         >
-            <Card
-                style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: 'none',
-                    borderRadius: 0
-                }}
-                bodyStyle={{
-                    flex: '1 1 auto',
-                    padding: 16,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'auto',
-                }}
-            >
+            <Card className="w-full h-full flex flex-col border-none rounded-none">
+                <CardContent className="flex-1 p-4 flex flex-col overflow-auto">
                 <Flexbox direction="vertical" gap={16}>
-                    <Typography.Title level={5}>{t('imageFeature.title')}</Typography.Title>
+                    <h3 className="text-lg font-semibold">{t('imageFeature.title')}</h3>
 
-                    <Form layout="vertical">
-                        <Form.Item label={t('imageFeature.sourceImages')}>
-                            <Dragger
-                                multiple
-                                listType="picture"
-                                fileList={fileList}
-                                onChange={handleUpload}
-                                beforeUpload={() => false}
-                                disabled={loading}
-                                accept="image/*"
-                                style={{ padding: '20px 0' }}
-                            >
-                                <p className="ant-upload-drag-icon">
-                                    <InboxOutlined />
-                                </p>
-                                <p className="ant-upload-text">
-                                    {t('imageFeature.dragImageHint')}
-                                </p>
-                                <p className="ant-upload-hint">
-                                    {t('imageFeature.supportMultipleFiles')}
-                                </p>
-                            </Dragger>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">{t('imageFeature.sourceImages')}</label>
+                            <div className={cn(
+                                "bg-muted/50 border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 transition-colors rounded-lg cursor-pointer p-5"
+                            )}>
+                                <div className="text-center">
+                                    <UploadIcon className="w-12 h-12 text-primary mx-auto mb-4" />
+                                    <p className="text-base font-medium mb-2">
+                                        {t('imageFeature.dragImageHint')}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        {t('imageFeature.supportMultipleFiles')}
+                                    </p>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/*"
+                                        onChange={handleFileSelect}
+                                        disabled={loading}
+                                        className="hidden"
+                                        id="image-upload-simple"
+                                    />
+                                    <label htmlFor="image-upload-simple">
+                                        <Button variant="outline" disabled={loading} asChild>
+                                            <span className="cursor-pointer">
+                                                <UploadIcon className="w-4 h-4 mr-2" />
+                                                Choose Files
+                                            </span>
+                                        </Button>
+                                    </label>
+                                </div>
+                            </div>
 
                             {fileList.length > 0 && (
                                 <Button
-                                    danger
-                                    icon={<DeleteOutlined />}
+                                    variant="destructive"
                                     onClick={handleClearAllImages}
-                                    style={{ marginTop: 8 }}
+                                    className="mt-2"
                                 >
+                                    <Trash2 className="w-4 h-4 mr-2" />
                                     {t('imageFeature.clearAllImages')}
                                 </Button>
                             )}
-                        </Form.Item>
+                        </div>
 
-                        <Form.Item label={hasSourceImages ? t('imageFeature.transformationPrompt') : t('imageFeature.prompt')}>
-                            <TextArea
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                {hasSourceImages ? t('imageFeature.transformationPrompt') : t('imageFeature.prompt')}
+                            </label>
+                            <Textarea
                                 rows={4}
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                                 placeholder={hasSourceImages ? t('imageFeature.transformationPromptPlaceholder') : t('imageFeature.promptPlaceholder')}
                             />
-                        </Form.Item>
+                        </div>
 
-                        <Row gutter={16}>
-                            <Col span={isMobile ? 24 : 8}>
-                                <Form.Item label={t('imageFeature.token')}>
-                                    <Select
-                                        value={selectedToken}
-                                        onChange={handleTokenChange}
-                                        placeholder={t('imageFeature.selectToken')}
-                                        style={{ width: '100%' }}
-                                    >
+                        <div className={cn(
+                            "grid gap-4",
+                            isMobile ? "grid-cols-1" : "grid-cols-3"
+                        )}>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('imageFeature.token')}</label>
+                                <Select
+                                    value={selectedToken}
+                                    onValueChange={handleTokenChange}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder={t('imageFeature.selectToken')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
                                         {tokenOptions.map((token) => (
-                                            <Option key={token.key} value={token.key}>
+                                            <SelectItem key={token.key} value={token.key}>
                                                 {token.name || token.key}
-                                            </Option>
+                                            </SelectItem>
                                         ))}
-                                    </Select>
-                                </Form.Item>
-                            </Col>
-                            <Col span={isMobile ? 24 : 8}>
-                                <Form.Item label={t('imageFeature.model')}>
-                                    <Select
-                                        value={selectedModel}
-                                        onChange={(value) => setSelectedModel(value)}
-                                        placeholder={t('imageFeature.selectModel')}
-                                        style={{ width: '100%' }}
-                                        disabled={!selectedToken}
-                                    >
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('imageFeature.model')}</label>
+                                <Select
+                                    value={selectedModel}
+                                    onValueChange={setSelectedModel}
+                                    disabled={!selectedToken}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder={t('imageFeature.selectModel')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
                                         {modelOptions.map((model) => (
-                                            <Option key={model} value={model}>
+                                            <SelectItem key={model} value={model}>
                                                 {model}
-                                            </Option>
+                                            </SelectItem>
                                         ))}
-                                    </Select>
-                                </Form.Item>
-                            </Col>
-                            <Col span={isMobile ? 24 : 8}>
-                                <Form.Item label={t('imageFeature.imageSize')}>
-                                    <Select
-                                        value={imageSize}
-                                        onChange={(value) => setImageSize(value)}
-                                        style={{ width: '100%' }}
-                                    >
-                                        <Option value="1024x1024">1024 x 1024 ({t('imageFeature.square')})</Option>
-                                        <Option value="1792x1024">1792 x 1024 ({t('imageFeature.landscape')})</Option>
-                                        <Option value="1024x1792">1024 x 1792 ({t('imageFeature.portrait')})</Option>
-                                    </Select>
-                                </Form.Item>
-                            </Col>
-                        </Row>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('imageFeature.imageSize')}</label>
+                                <Select
+                                    value={imageSize}
+                                    onValueChange={setImageSize}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1024x1024">1024 x 1024 ({t('imageFeature.square')})</SelectItem>
+                                        <SelectItem value="1792x1024">1792 x 1024 ({t('imageFeature.landscape')})</SelectItem>
+                                        <SelectItem value="1024x1792">1024 x 1792 ({t('imageFeature.portrait')})</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
 
-                        <Form.Item>
-                            <Button
-                                type="primary"
-                                onClick={handleGenerateImage}
-                                loading={loading}
-                                icon={<PictureOutlined />}
-                                block
-                            >
-                                {hasSourceImages ? t('imageFeature.transformImage') : t('imageFeature.generateImage')}
-                            </Button>
-                        </Form.Item>
-                    </Form>
+                        <Button
+                            onClick={handleGenerateImage}
+                            disabled={loading}
+                            className="w-full"
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    Generating...
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <ImageIcon className="w-4 h-4" />
+                                    {hasSourceImages ? t('imageFeature.transformImage') : t('imageFeature.generateImage')}
+                                </div>
+                            )}
+                        </Button>
+                    </div>
 
-                    <Divider>{t('imageFeature.generatedImages')}</Divider>
+                    <Separator className="my-6" />
+                    <h4 className="text-lg font-semibold mb-4">{t('imageFeature.generatedImages')}</h4>
 
                     {generatedImages.length === 0 ? (
-                        <Empty description={t('imageFeature.noImagesYet')} />
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground">{t('imageFeature.noImagesYet')}</p>
+                        </div>
                     ) : (
-                        <Row gutter={[16, 16]}>
+                        <div className={cn(
+                            "grid gap-4",
+                            isMobile ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+                        )}>
                             {generatedImages.map((img) => (
-                                <Col key={img.id} xs={24} sm={12} md={8} lg={6}>
-                                    <Card
-                                        hoverable
-                                        cover={
-                                            <Image
-                                                alt={img.prompt}
-                                                src={img.url}
-                                                style={{ objectFit: 'cover', height: 200 }}
-                                            />
-                                        }
-                                        bodyStyle={{ padding: '8px 12px' }}
-                                    >
-                                        <div style={{ marginBottom: 8 }}>
-                                            <Text ellipsis style={{ width: '100%' }} title={img.prompt}>
+                                <Card key={img.id} className="overflow-hidden">
+                                    <CardContent className="p-0">
+                                        <img
+                                            alt={img.prompt}
+                                            src={img.url}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        <div className="p-3">
+                                            <p className="text-sm font-medium mb-2 line-clamp-2" title={img.prompt}>
                                                 {img.prompt}
-                                            </Text>
-                                        </div>
-                                        <div>
-                                            <Text type="secondary" style={{ fontSize: '0.8rem' }}>
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
                                                 {img.model} • {img.size}
-                                            </Text>
+                                            </p>
                                         </div>
-                                    </Card>
-                                </Col>
+                                    </CardContent>
+                                </Card>
                             ))}
-                        </Row>
+                        </div>
                     )}
                 </Flexbox>
+                </CardContent>
             </Card>
         </Flexbox>
     );
-} 
+}

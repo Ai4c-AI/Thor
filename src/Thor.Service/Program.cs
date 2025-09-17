@@ -49,6 +49,7 @@ using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Middlewares;
 using Thor.Service.Options;
 using Thor.Service.Service;
+using Thor.Service.Service.AI;
 using Thor.Service.Service.OpenAI;
 using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
@@ -96,6 +97,8 @@ try
     builder.Services.AddEndpointsApiExplorer();
 
     builder.Services.AddMapster();
+
+    builder.Services.AddMiniApis();
 
     if (string.IsNullOrEmpty(CacheOptions.Type) ||
         CacheOptions.Type.Equals("Memory", StringComparison.OrdinalIgnoreCase))
@@ -148,7 +151,6 @@ try
         .AddScoped<LoggerService>()
         .AddScoped<ModelManagerService>()
         .AddScoped<AnthropicChatService>()
-        .AddScoped<ResponsesService>()
         .AddScoped<ProductService>()
         .AddScoped<RateLimitModelService>()
         .AddScoped<SystemService>()
@@ -274,64 +276,65 @@ try
     {
         if (context.Request.Path == "/")
         {
-            if (string.IsNullOrEmpty(ChatCoreOptions.Master))
-            {
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
-                if (File.Exists(path))
-                {
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
-            }
-            else
-            {
-                context.Response.Redirect(ChatCoreOptions.Master);
-                return;
-            }
-        }
-
-        context.Response.Headers["AI-Gateway-Versions"] = "1.0.0.4";
-        context.Response.Headers["AI-Gateway-Name"] = "Thor";
-
-        if (context.Request.Path.Value?.EndsWith(".js") == true)
-        {
-            var path = context.Request.Path.Value;
-
-            // 判断是否存在.br文件
-            var brPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".br");
-            if (File.Exists(brPath))
-            {
-                context.Response.Headers.Append("Content-Encoding", "br");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                context.Response.Headers.Append("Content-Type", "application/javascript");
-
-                await context.Response.SendFileAsync(brPath);
-
-                return;
-            }
-
-            // 判断是否存在.gz文件
-            var gzPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".gz");
-            if (File.Exists(gzPath))
-            {
-                context.Response.Headers.Append("Content-Encoding", "gzip");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                context.Response.Headers.Append("Content-Type", "application/javascript");
-                await context.Response.SendFileAsync(gzPath);
-                return;
-            }
-        }
-        else if (context.Request.Path.Value?.EndsWith(".css") == true)
-        {
-            // 判断是否存在.br文件
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
-                context.Request.Path.Value.TrimStart('/'));
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
             if (File.Exists(path))
             {
-                context.Response.Headers.Append("Content-Type", "text/css");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
                 await context.Response.SendFileAsync(path);
                 return;
+            }
+        }
+
+        context.Response.Headers["AI-Gateway-Versions"] = "1.0.5";
+        context.Response.Headers["AI-Gateway-Name"] = "ThorAPI";
+
+        // 处理静态文件的压缩和缓存
+        var requestPath = context.Request.Path.Value;
+        if (!string.IsNullOrEmpty(requestPath))
+        {
+            var fileExtension = Path.GetExtension(requestPath).ToLowerInvariant();
+            var isStaticFile = fileExtension is ".js" or ".css" or ".html" or ".png" or ".jpg" or ".jpeg" or ".gif" or ".svg" or ".ico" or ".woff" or ".woff2" or ".ttf" or ".eot";
+
+            if (isStaticFile)
+            {
+                var baseFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", requestPath.TrimStart('/'));
+                var servedFile = false;
+
+                // 优先尝试 Brotli 压缩文件
+                var brPath = baseFilePath + ".br";
+                if (File.Exists(brPath))
+                {
+                    context.Response.Headers.Append("Content-Encoding", "br");
+                    context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                    context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                    await context.Response.SendFileAsync(brPath);
+                    servedFile = true;
+                }
+                // 其次尝试 Gzip 压缩文件
+                else
+                {
+                    var gzPath = baseFilePath + ".gz";
+                    if (File.Exists(gzPath))
+                    {
+                        context.Response.Headers.Append("Content-Encoding", "gzip");
+                        context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                        context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                        await context.Response.SendFileAsync(gzPath);
+                        servedFile = true;
+                    }
+                    // 最后使用原始文件
+                    else if (File.Exists(baseFilePath))
+                    {
+                        context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                        context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                        await context.Response.SendFileAsync(baseFilePath);
+                        servedFile = true;
+                    }
+                }
+
+                if (servedFile)
+                {
+                    return;
+                }
             }
         }
 
@@ -339,36 +342,28 @@ try
 
         if (context.Response.StatusCode == 404)
         {
-            if (string.IsNullOrEmpty(ChatCoreOptions.Master))
+            // 尝试直接查找文件
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
+                context.Request.Path.Value.TrimStart('/'));
+
+            if (File.Exists(path))
             {
-                // 判断是否存在文件
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
-                    context.Request.Path.Value.TrimStart('/'));
-
-                if (File.Exists(path))
-                {
-                    context.Response.StatusCode = 200;
-                    context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                    context.Response.Headers.Append("Content-Type",
-                        HttpContextExtensions.GetContentType(Path.GetExtension(path)));
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
-
-                // 返回index.html
-                path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
-
-                if (File.Exists(path))
-                {
-                    context.Response.StatusCode = 200;
-                    context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
+                context.Response.StatusCode = 200;
+                context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                context.Response.Headers.Append("Content-Type",
+                    HttpContextExtensions.GetContentType(Path.GetExtension(path)));
+                await context.Response.SendFileAsync(path);
+                return;
             }
-            else
+
+            // 返回index.html作为SPA fallback
+            path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
+
+            if (File.Exists(path))
             {
-                context.Response.Redirect(ChatCoreOptions.Master);
+                context.Response.StatusCode = 200;
+                context.Response.Headers.Append("Cache-Control", "no-cache"); // index.html不缓存
+                await context.Response.SendFileAsync(path);
                 return;
             }
         }
@@ -1085,14 +1080,6 @@ try
         .WithDescription("获取用户请求")
         .WithOpenApi();
 
-    app.MapPost("/v1/responses",
-            async (ResponsesService responsesService, HttpContext context, ResponsesInput input) =>
-            {
-                await responsesService.ExecuteAsync(context, input);
-            })
-        .WithDescription("OpenAI Responses")
-        .WithOpenApi();
-
     // 对话补全请求
     app.MapPost("/v1/chat/completions",
             async (ChatService service, HttpContext httpContext, ThorChatCompletionsRequest request) =>
@@ -1171,6 +1158,8 @@ try
             await chatService.SpeechAsync(context, request);
         });
     
+    app.MapMiniApis();
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();

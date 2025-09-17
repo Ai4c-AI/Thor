@@ -1,0 +1,48 @@
+/* Ant Design 图标颜色覆盖 - 确保使用灰色主题 */
+
+/* 强制 ThunderboltOutlined 图标使用灰色 */
+.anticon-thunderbolt {
+  color: #6b7280 !important;
+}
+
+.dark .anticon-thunderbolt {
+  color: #9ca3af !important;
+}
+
+/* 强制所有 Ant Design 图标继承父元素颜色 */
+.anticon {
+  color: inherit !important;
+}
+
+/* 特定图标的灰色样式 */
+.anticon-thunderbolt,
+.anticon-global,
+.anticon-menu,
+.anticon-close {
+  color: #6b7280 !important;
+}
+
+.dark .anticon-thunderbolt,
+.dark .anticon-global,
+.dark .anticon-menu,
+.dark .anticon-close {
+  color: #9ca3af !important;
+}
+
+/* 按钮内的图标保持白色 */
+button .anticon-rocket {
+  color: white !important;
+}
+
+/* 确保悬停状态正确 */
+button:hover .anticon-thunderbolt,
+button:hover .anticon-global,
+button:hover .anticon-menu {
+  color: #374151 !important;
+}
+
+.dark button:hover .anticon-thunderbolt,
+.dark button:hover .anticon-global,
+.dark button:hover .anticon-menu {
+  color: #f3f4f6 !important;
+}

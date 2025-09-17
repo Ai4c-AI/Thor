@@ -6,28 +6,6 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-FROM node:20.18-alpine3.21 AS lobe
-WORKDIR /src
-
-# 设置npm镜像源以加速ARM64构建
-RUN npm config set registry https://registry.npmmirror.com
-RUN yarn config set registry https://registry.npmmirror.com
-
-# 安装必需的工具
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    libc6-compat
-
-# 复制package文件优先，利用缓存
-COPY lobe/package*.json lobe/yarn.lock* ./
-RUN yarn install --frozen-lockfile --network-timeout 100000 || npm install --force
-
-# 复制源代码并构建
-COPY lobe .
-RUN yarn run build || npm run build
-
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -83,5 +61,5 @@ RUN dotnet publish "./Thor.Service.csproj" -c $BUILD_CONFIGURATION -o /app/publi
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-COPY --from=lobe /src/dist ./wwwroot
+COPY lobe/dist ./wwwroot
 ENTRYPOINT ["dotnet", "Thor.Service.dll"]

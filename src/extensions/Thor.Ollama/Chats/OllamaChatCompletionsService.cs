@@ -41,7 +41,7 @@ namespace Thor.Ollama.Chats
                         properties.Add(definition.Key, new Properties()
                         {
                             Description = definition.Value.Description ?? string.Empty,
-                            Type = definition.Value.Type,
+                            Type = definition.Value.typeStr,
                             Enum = definition.Value.Enum?.ToArray(),
                         });
                     }
@@ -56,7 +56,7 @@ namespace Thor.Ollama.Chats
                             {
                                 Properties = properties,
                                 Required = tool?.Function?.Parameters?.Required?.ToArray(),
-                                Type = tool?.Function?.Parameters?.Type,
+                                Type = tool?.Function?.Parameters?.typeStr,
                             }
                         }
                     });
@@ -98,7 +98,7 @@ namespace Thor.Ollama.Chats
             }
 
             var toolsResult = new List<ThorToolCall>();
-            if (result.message?.ToolCalls!= null && result.message.ToolCalls.Count() >0)
+            if (result.message?.ToolCalls!= null && result.message.ToolCalls.Any())
             {
                 foreach (var content in result.message.ToolCalls)
                 {
@@ -159,7 +159,7 @@ namespace Thor.Ollama.Chats
                         properties.Add(definition.Key, new Properties()
                         {
                             Description = definition.Value.Description ?? string.Empty,
-                            Type = definition.Value.Type,
+                            Type = definition.Value.typeStr,
                             Enum = definition.Value.Enum?.ToArray(),
                         });
                     }
@@ -174,7 +174,7 @@ namespace Thor.Ollama.Chats
                             {
                                 Properties = properties,
                                 Required = tool?.Function?.Parameters?.Required?.ToArray(),
-                                Type = tool?.Function?.Parameters?.Type,
+                                Type = tool?.Function?.Parameters?.typeStr,
                             }
                         }
                     });

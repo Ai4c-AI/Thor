@@ -296,8 +296,6 @@ try {
         document.title = title;
     }
 } catch (e) {
-    console.log(e);
-
 }
 
 /**

@@ -1,115 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Select, Switch, InputNumber, DatePicker, message, Tabs, Typography } from 'antd';
-import { updateAnnouncement } from '../../../services/AnnouncementService';
+import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from 'react-markdown';
-import styled from 'styled-components';
-import dayjs from 'dayjs';
 
-const { TextArea } = Input;
-const { Option } = Select;
-const { Text } = Typography;
+// shadcn/ui components
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
-const MarkdownPreview = styled.div`
-  .markdown-content {
-    font-size: 14px;
-    line-height: 1.6;
-    color: #666;
-    padding: 12px;
-    border: 1px solid #d9d9d9;
-    border-radius: 6px;
-    background: #fafafa;
-    min-height: 120px;
-    
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 16px;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: #262626;
-    }
-    
-    h1 { font-size: 20px; }
-    h2 { font-size: 18px; }
-    h3 { font-size: 16px; }
-    h4 { font-size: 14px; }
-    h5 { font-size: 12px; }
-    h6 { font-size: 12px; }
-    
-    p {
-      margin-bottom: 12px;
-    }
-    
-    ul, ol {
-      margin-bottom: 12px;
-      padding-left: 20px;
-    }
-    
-    li {
-      margin-bottom: 4px;
-    }
-    
-    code {
-      background: #f5f5f5;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 12px;
-    }
-    
-    pre {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 6px;
-      overflow-x: auto;
-      margin-bottom: 12px;
-      
-      code {
-        background: none;
-        padding: 0;
-      }
-    }
-    
-    blockquote {
-      border-left: 4px solid #1890ff;
-      padding-left: 12px;
-      margin: 12px 0;
-      color: #595959;
-      font-style: italic;
-    }
-    
-    a {
-      color: #1890ff;
-      text-decoration: none;
-      
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-    
-    img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 4px;
-      margin: 8px 0;
-    }
-    
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 12px 0;
-      
-      th, td {
-        border: 1px solid #f0f0f0;
-        padding: 8px 12px;
-        text-align: left;
-      }
-      
-      th {
-        background: #fafafa;
-        font-weight: 600;
-      }
-    }
-  }
-`;
+// Services
+import { updateAnnouncement } from '../../../services/AnnouncementService';
 
 interface Announcement {
   id: string;
@@ -129,188 +52,313 @@ interface EditAnnouncementProps {
   announcement: Announcement | null;
 }
 
-const EditAnnouncement: React.FC<EditAnnouncementProps> = ({ visible, onCancel, onSuccess, announcement }) => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [content, setContent] = useState('');
+interface FormData {
+  title: string;
+  content: string;
+  type: string;
+  enabled: boolean;
+  pinned: boolean;
+  order: number;
+  expireTime: string;
+}
 
+const EditAnnouncement: React.FC<EditAnnouncementProps> = ({ visible, onCancel, onSuccess, announcement }) => {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
+    title: '',
+    content: '',
+    type: 'info',
+    enabled: true,
+    pinned: false,
+    order: 0,
+    expireTime: ''
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Populate form when announcement changes
   useEffect(() => {
     if (announcement && visible) {
-      const formData = {
-        ...announcement,
-        expireTime: announcement.expireTime ? dayjs(announcement.expireTime) : null
-      };
-      form.setFieldsValue(formData);
-      setContent(announcement.content || '');
+      const expireTime = announcement.expireTime
+        ? new Date(announcement.expireTime).toISOString().slice(0, 16)
+        : '';
+
+      setFormData({
+        title: announcement.title,
+        content: announcement.content,
+        type: announcement.type,
+        enabled: announcement.enabled,
+        pinned: announcement.pinned,
+        order: announcement.order,
+        expireTime
+      });
+      setErrors({});
     } else if (!visible) {
-      // 当模态框关闭时重置状态
-      setContent('');
+      // Reset form when modal closes
+      setFormData({
+        title: '',
+        content: '',
+        type: 'info',
+        enabled: true,
+        pinned: false,
+        order: 0,
+        expireTime: ''
+      });
+      setErrors({});
     }
-  }, [announcement, visible, form]);
+  }, [announcement, visible]);
+
+  const updateFormData = (field: keyof FormData, value: unknown) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.title.trim()) {
+      newErrors.title = t('announcement.titleRequired');
+    }
+
+    if (!formData.content.trim()) {
+      newErrors.content = t('announcement.contentRequired');
+    }
+
+    if (!formData.type) {
+      newErrors.type = t('announcement.typeRequired');
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async () => {
+    if (!validateForm() || !announcement) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const values = await form.validateFields();
-      setLoading(true);
-      
-      // 确保内容值被正确获取
       const submitData = {
-        ...values,
-        content: content || values.content, // 优先使用 state 中的 content
-        expireTime: values.expireTime ? values.expireTime.toISOString() : null
+        ...formData,
+        expireTime: formData.expireTime ? new Date(formData.expireTime).toISOString() : null
       };
 
-      const result = await updateAnnouncement(announcement!.id, submitData);
-      
+      const result = await updateAnnouncement(announcement.id, submitData);
+
       if (result.success) {
-        message.success('公告更新成功');
+        toast.success(t('announcement.updateSuccess'));
         onSuccess();
       } else {
-        message.error(result.message || '更新失败');
+        toast.error(result.message || t('announcement.updateFailed'));
       }
     } catch (error) {
-      console.error('更新公告失败:', error);
-      message.error('更新失败');
+      console.error('Failed to update announcement:', error);
+      toast.error(t('announcement.updateFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    form.resetFields();
-    setContent('');
+    setFormData({
+      title: '',
+      content: '',
+      type: 'info',
+      enabled: true,
+      pinned: false,
+      order: 0,
+      expireTime: ''
+    });
+    setErrors({});
     onCancel();
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setContent(value);
-    form.setFieldsValue({ content: value });
+  const getTypeColor = (type: string): string => {
+    switch (type) {
+      case 'success': return 'text-green-600';
+      case 'warning': return 'text-orange-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-blue-600';
+    }
   };
 
-  const tabItems = [
-    {
-      key: 'edit',
-      label: '编辑',
-      children: (
-        <TextArea
-          rows={8}
-          placeholder="请输入公告内容，支持 Markdown 格式&#10;&#10;示例：&#10;# 一级标题&#10;## 二级标题&#10;**粗体文字**&#10;*斜体文字*&#10;`代码`&#10;- 列表项&#10;> 引用&#10;[链接文字](http://example.com)"
-          showCount
-          maxLength={2000}
-          value={content}
-          onChange={handleContentChange}
-        />
-      )
-    },
-    {
-      key: 'preview',
-      label: '预览',
-      children: (
-        <MarkdownPreview>
-          <div className="markdown-content">
-            {content ? (
-              <ReactMarkdown>{content}</ReactMarkdown>
-            ) : (
-              <Text type="secondary">请在编辑区域输入内容以查看预览效果</Text>
+  return (
+    <Dialog open={visible} onOpenChange={handleCancel}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('announcement.editTitle')}</DialogTitle>
+          <DialogDescription>
+            {t('announcement.editDescription')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Title */}
+          <div className="space-y-2">
+            <Label htmlFor="title">{t('announcement.titleField')} *</Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => updateFormData('title', e.target.value)}
+              placeholder={t('announcement.titlePlaceholder')}
+              className={errors.title ? "border-destructive" : ""}
+            />
+            {errors.title && (
+              <p className="text-sm text-destructive">{errors.title}</p>
             )}
           </div>
-        </MarkdownPreview>
-      )
-    }
-  ];
 
-  return (
-    <Modal
-      title="编辑公告"
-      open={visible}
-      onOk={handleSubmit}
-      onCancel={handleCancel}
-      confirmLoading={loading}
-      width={700}
-      destroyOnClose
-    >
-      <Form form={form} layout="vertical">
-        <Form.Item
-          name="title"
-          label="公告标题"
-          rules={[{ required: true, message: '请输入公告标题' }]}
-        >
-          <Input placeholder="请输入公告标题" />
-        </Form.Item>
+          {/* Content with Tabs */}
+          <div className="space-y-2">
+            <Label htmlFor="content">
+              {t('announcement.contentField')} *
+              <span className="text-muted-foreground text-sm ml-2">
+                ({t('announcement.markdownSupport')})
+              </span>
+            </Label>
+            <Tabs defaultValue="edit" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="edit">{t('announcement.editTab')}</TabsTrigger>
+                <TabsTrigger value="preview">{t('announcement.previewTab')}</TabsTrigger>
+              </TabsList>
 
-        <Form.Item
-          name="content"
-          label={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              公告内容
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                支持 Markdown 格式
-              </Text>
-            </div>
-          }
-          rules={[{ required: true, message: '请输入公告内容' }]}
-        >
-          <div>
-            <Tabs items={tabItems} />
+              <TabsContent value="edit" className="mt-4">
+                <Textarea
+                  id="content"
+                  rows={8}
+                  value={formData.content}
+                  onChange={(e) => updateFormData('content', e.target.value)}
+                  placeholder={t('announcement.contentPlaceholder')}
+                  className={errors.content ? "border-destructive" : ""}
+                />
+                <div className="text-xs text-muted-foreground mt-2">
+                  {formData.content.length}{t('announcement.charactersLimit')}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="preview" className="mt-4">
+                <div className="border rounded-md p-4 min-h-[200px] bg-muted/30">
+                  {formData.content ? (
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>{formData.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      {t('announcement.previewEmpty')}
+                    </p>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+            {errors.content && (
+              <p className="text-sm text-destructive">{errors.content}</p>
+            )}
           </div>
-        </Form.Item>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            name="type"
-            label="公告类型"
-            rules={[{ required: true, message: '请选择公告类型' }]}
-          >
-            <Select placeholder="请选择公告类型">
-              <Option value="info">信息</Option>
-              <Option value="success">成功</Option>
-              <Option value="warning">警告</Option>
-              <Option value="error">错误</Option>
-            </Select>
-          </Form.Item>
+          {/* Type and Order */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="type">{t('announcement.typeField')} *</Label>
+              <Select value={formData.type} onValueChange={(value) => updateFormData('type', value)}>
+                <SelectTrigger className={errors.type ? "border-destructive" : ""}>
+                  <SelectValue placeholder={t('announcement.selectType')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">
+                    <span className={getTypeColor('info')}>{t('announcement.typeInfo')}</span>
+                  </SelectItem>
+                  <SelectItem value="success">
+                    <span className={getTypeColor('success')}>{t('announcement.typeSuccess')}</span>
+                  </SelectItem>
+                  <SelectItem value="warning">
+                    <span className={getTypeColor('warning')}>{t('announcement.typeWarning')}</span>
+                  </SelectItem>
+                  <SelectItem value="error">
+                    <span className={getTypeColor('error')}>{t('announcement.typeError')}</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.type && (
+                <p className="text-sm text-destructive">{errors.type}</p>
+              )}
+            </div>
 
-          <Form.Item
-            name="order"
-            label="排序权重"
-            tooltip="数值越大越靠前"
-          >
-            <InputNumber min={0} placeholder="排序权重" style={{ width: '100%' }} />
-          </Form.Item>
+            <div className="space-y-2">
+              <Label htmlFor="order">
+                {t('announcement.orderField')}
+                <span className="text-muted-foreground text-sm ml-2">
+                  ({t('announcement.orderHint')})
+                </span>
+              </Label>
+              <Input
+                id="order"
+                type="number"
+                min="0"
+                value={formData.order}
+                onChange={(e) => updateFormData('order', parseInt(e.target.value) || 0)}
+                placeholder={t('announcement.orderField')}
+              />
+            </div>
+          </div>
+
+          {/* Switches */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="enabled"
+                checked={formData.enabled}
+                onCheckedChange={(checked) => updateFormData('enabled', checked)}
+              />
+              <Label htmlFor="enabled">
+                {formData.enabled ? t('announcement.enabled') : t('announcement.disabled')}
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="pinned"
+                checked={formData.pinned}
+                onCheckedChange={(checked) => updateFormData('pinned', checked)}
+              />
+              <Label htmlFor="pinned">
+                {formData.pinned ? t('announcement.pinned') : t('announcement.normal')}
+              </Label>
+            </div>
+          </div>
+
+          {/* Expire Time */}
+          <div className="space-y-2">
+            <Label htmlFor="expireTime">
+              {t('announcement.expireTimeField')}
+              <span className="text-muted-foreground text-sm ml-2">
+                ({t('announcement.expireTimeHint')})
+              </span>
+            </Label>
+            <Input
+              id="expireTime"
+              type="datetime-local"
+              value={formData.expireTime}
+              onChange={(e) => updateFormData('expireTime', e.target.value)}
+              className="w-full"
+            />
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            name="enabled"
-            label="是否启用"
-            valuePropName="checked"
-          >
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-          </Form.Item>
-
-          <Form.Item
-            name="pinned"
-            label="是否置顶"
-            valuePropName="checked"
-          >
-            <Switch checkedChildren="置顶" unCheckedChildren="普通" />
-          </Form.Item>
-        </div>
-
-        <Form.Item
-          name="expireTime"
-          label="过期时间"
-          tooltip="不设置则永不过期"
-        >
-          <DatePicker
-            showTime
-            placeholder="选择过期时间（可选）"
-            style={{ width: '100%' }}
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancel} disabled={loading}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? t('announcement.updating') : t('announcement.edit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default EditAnnouncement; 
+export default EditAnnouncement;

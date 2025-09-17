@@ -52,6 +52,36 @@ public class StatisticsDto
     /// 充值最近数据
     /// </summary>
     public List<StatisticsNumberDto> RechargeData { get; set; } = null;
+
+    /// <summary>
+    /// 平均每分钟请求数 (RPM)
+    /// </summary>
+    public decimal AverageRPM { get; set; }
+
+    /// <summary>
+    /// 平均每分钟Token数 (TPM)
+    /// </summary>
+    public decimal AverageTPM { get; set; }
+
+    /// <summary>
+    /// 实时RPM (最近1小时)
+    /// </summary>
+    public decimal RealtimeRPM { get; set; }
+
+    /// <summary>
+    /// 实时TPM (最近1小时)
+    /// </summary>
+    public decimal RealtimeTPM { get; set; }
+
+    /// <summary>
+    /// RPM历史数据（按小时统计）
+    /// </summary>
+    public List<StatisticsNumberDto> RPMHistory { get; set; } = new List<StatisticsNumberDto>();
+
+    /// <summary>
+    /// TPM历史数据（按小时统计）
+    /// </summary>
+    public List<StatisticsNumberDto> TPMHistory { get; set; } = new List<StatisticsNumberDto>();
 }
 
 

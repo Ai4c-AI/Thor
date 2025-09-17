@@ -1,275 +1,196 @@
 import { memo, useMemo, useCallback } from "react";
 import { Outlet } from "react-router-dom";
-import { Layout, theme, Button, Tooltip, Typography, ConfigProvider, Space, Divider } from "antd";
-import { Avatar, Header, ThemeSwitch } from "@lobehub/ui";
-import { Dropdown } from "antd";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import useThemeStore from "../store/theme";
-import { Flexbox } from "react-layout-kit";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
-import styled from "styled-components";
-import { motion } from "framer-motion";
 import { LayoutProps } from "./type";
-import { HomeOutlined } from "@ant-design/icons";
-import PwaInstall from "../components/PwaInstall";
+import { Home, Sun, Moon, MonitorSpeaker, LogOut, Settings, User } from "lucide-react";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import { cn } from "@/lib/utils";
 
-const { Content, Footer, Sider } = Layout;
-const { Text, Title } = Typography;
-
-// 样式组件
-const LogoContainer = styled(Flexbox)`
-  padding: 16px 0;
-  transition: all 0.3s;
-`;
-
-const LogoText = styled(Title)`
-  cursor: pointer;
-  user-select: none;
-  margin: 0 !important;
-  transition: all 0.3s;
-`;
-
-// 使用函数方式传递theme，避免类型错误
-const StyledContent = styled(Content)(({ theme }: any) => `
-  margin: ${theme?.token?.marginMD || 16}px;
-  transition: all 0.3s;
-  flex: 1;
-  overflow: auto;
-  overflow-x: hidden !important;
-  display: flex;
-  flex-direction: column;
-  
-  @media (max-width: 576px) {
-    margin: ${theme?.token?.marginSM || 8}px;
-  }
-`);
-
-const ContentWrapper = styled(motion.div)(({ theme }: any) => `
-  padding: ${theme?.token?.paddingLG || 24}px;
-  min-height: 0;
-  flex: 1;
-  background: ${theme?.token?.colorBgContainer || '#fff'};
-  border-radius: ${theme?.token?.borderRadiusLG || 8}px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s;
-  overflow: auto;
-  
-  @media (max-width: 576px) {
-    padding: ${theme?.token?.paddingMD || 16}px;
-  }
-`);
-
-const StyledSider = styled(Sider)`
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  z-index: 10;
-  
-  .ant-layout-sider-children {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-`;
-
-const StyledFooter = styled(Footer)(({ theme }: any) => `
-  text-align: center;
-  background: transparent;
-  padding: ${theme?.token?.paddingSM || 8}px;
-`);
-
-// 页面过渡动画
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 }
-};
-
-// 用户下拉菜单Hook
-const useUserDropdownItems = () => {
-  const { t, i18n } = useTranslation();
+// 用户下拉菜单组件
+const UserDropdown = memo(() => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  
-  return useMemo(() => ({
-    items: [
-      {
-        key: 'account',
-        label: t('nav.setting'),
-        onClick: () => navigate('/current')
-      },
-      {
-        key: 'current',
-        label: t('nav.current'),
-        onClick: () => navigate('/current')
-      },
-      {
-        key: 'divider',
-        type: 'divider' as const
-      },
-      {
-        key: 'logout',
-        label: t('common.logout'),
-        onClick: () => {
-          localStorage.removeItem('token');
-          navigate('/login');
-        },
-        danger: true
-      }
-    ]
-  }), [t, i18n.language, navigate]);
-};
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  }, [navigate]);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Avatar className="cursor-pointer h-10 w-10 border-2 border-border hover:border-ring transition-colors">
+          <AvatarImage src="/logo.png" alt="User" />
+          <AvatarFallback>U</AvatarFallback>
+        </Avatar>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => navigate('/current')}>
+          <User className="mr-2 h-4 w-4" />
+          {t('nav.current')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/setting')}>
+          <Settings className="mr-2 h-4 w-4" />
+          {t('nav.setting')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+          <LogOut className="mr-2 h-4 w-4" />
+          {t('common.logout')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+UserDropdown.displayName = "UserDropdown";
 
 // 侧边栏组件
 const Sidebar = memo(({ nav }: { nav: React.ReactNode }) => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
-  
+
   const handleLogoClick = useCallback(() => {
     navigate('/');
   }, [navigate]);
-  
+
   return (
-    <StyledSider 
-      width={240} 
-      theme="light"
-      style={{ background: token.colorBgContainer }}
-    >
-      <LogoContainer align="center" justify="center">
-        <Tooltip title="Thor AI 平台管理系统" placement="right">
-          <Flexbox gap={token.marginXS} align="center" justify="center" horizontal onClick={handleLogoClick}>
-            <Avatar 
-              src='/logo.png' 
-              size={40} 
-              shape="square" 
-              style={{ 
-                borderRadius: token.borderRadiusSM,
-                boxShadow: `0 2px 8px ${token.colorPrimaryBg}` 
-              }} 
-            />
-            <LogoText level={4}>Thor</LogoText>
-          </Flexbox>
-        </Tooltip>
-      </LogoContainer>
-      
-      <Divider style={{ margin: `0 ${token.marginSM}px` }} />
-      
-      <div style={{ flex: 1, overflowY: 'auto', padding: `${token.paddingSM}px 0` }}>
-        {nav}
+    <aside className="w-60 bg-card border-r border-border flex flex-col">
+      <div className="flex flex-col h-full">
+        {/* Logo */}
+        <div className="p-4 border-b border-border">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center justify-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={handleLogoClick}
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src="/logo.png" alt="Thor" />
+                    <AvatarFallback>T</AvatarFallback>
+                  </Avatar>
+                  <h1 className="text-xl font-bold text-foreground">
+                    Thor
+                  </h1>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Thor AI Platform Management System</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {nav}
+        </div>
       </div>
-    </StyledSider>
+    </aside>
   );
 });
 
 Sidebar.displayName = "DesktopSidebar";
 
+// 主题切换组件
+const ThemeToggle = memo(() => {
+  const { t } = useTranslation();
+  const { themeMode, toggleTheme } = useThemeStore();
+
+  const handleThemeSwitch = useCallback((mode: 'light' | 'dark' | 'auto') => {
+    toggleTheme(mode);
+  }, [toggleTheme]);
+
+  const themeIcons = {
+    light: <Sun className="h-4 w-4" />,
+    dark: <Moon className="h-4 w-4" />,
+    auto: <MonitorSpeaker className="h-4 w-4" />
+  };
+
+  return (
+    <TooltipProvider>
+      <div className="flex items-center space-x-1 bg-muted rounded-md p-1">
+        {(['light', 'dark', 'auto'] as const).map((mode) => (
+          <Tooltip key={mode}>
+            <TooltipTrigger asChild>
+              <Button
+                variant={themeMode === mode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleThemeSwitch(mode)}
+                className="h-8 w-8 p-0"
+              >
+                {themeIcons[mode]}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{t(`common.theme.${mode}`)}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+    </TooltipProvider>
+  );
+});
+
+ThemeToggle.displayName = "ThemeToggle";
+
 // 头部操作组件
 const HeaderActions = memo(() => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { themeMode, toggleTheme } = useThemeStore();
-  const dropdownItems = useUserDropdownItems();
-  const { token } = theme.useToken();
-  
+
   const handleModelClick = useCallback(() => {
     navigate('/model');
   }, [navigate]);
-  
-  const handleThemeSwitch = useCallback((model: any) => {
-    toggleTheme(model);
-  }, [toggleTheme]);
-  
+
   return (
-    <Space size={token.marginSM}>
-      <Button 
-        icon={<HomeOutlined />}
+    <div className="flex items-center gap-4">
+      <Button
+        variant="outline"
         onClick={handleModelClick}
+        className="gap-2"
       >
+        <Home className="h-4 w-4" />
         {t('nav.model')}
       </Button>
       <LanguageSwitcher />
-      <ThemeSwitch 
-        onThemeSwitch={handleThemeSwitch}
-        themeMode={themeMode} 
-      />
-      <Dropdown menu={dropdownItems} trigger={['click']}>
-        <Avatar 
-          src='/logo.png' 
-          size={40} 
-          style={{ 
-            cursor: 'pointer',
-            boxShadow: `0 2px 8px ${token.colorPrimaryBg}`
-          }} 
-        />
-      </Dropdown>
-    </Space>
+      <ThemeToggle />
+      <UserDropdown />
+    </div>
   );
 });
 
 HeaderActions.displayName = "HeaderActions";
 
-// 主内容区域
-const MainContent = memo(() => {
-  const { token } = theme.useToken();
-  
-  return (
-    <StyledContent theme={{ token }}>
-      <ContentWrapper
-        variants={pageVariants}
-        initial="initial"
-        style={{
-          overflow: 'auto',
-          overflowX: 'hidden',
-          height: '100%',
-        }}
-        animate="animate"
-        exit="exit"
-        transition={{ duration: 0.3 }}
-        theme={{ token }}
-      >
-        <Outlet />
-      </ContentWrapper>
-    </StyledContent>
-  );
-});
-
-MainContent.displayName = "MainContent";
-
 // 主布局组件
-const LayoutPage = memo<LayoutProps>(({ nav }) => {
-  const { token } = theme.useToken();
-  
+const DesktopLayout = memo<LayoutProps>(({ nav }) => {
   return (
-    <ConfigProvider
-      theme={{
-        components: {
-          Layout: {
-            siderBg: token.colorBgContainer,
-            headerBg: token.colorBgContainer,
-            bodyBg: token.colorBgLayout,
-          }
-        }
-      }}
-    >
-      <div style={{ position: 'relative' }}>
-        <AnnouncementBanner />
-        <Layout style={{ minHeight: "100vh", height: "100vh", overflow: "hidden" }}>
-          <Sidebar nav={nav} />
-          <Layout style={{ background: token.colorBgLayout, height: "100%", overflow: "auto" }}>
-            <Header 
-              actions={<HeaderActions />} 
-              style={{
-                boxShadow: `0 2px 8px rgba(0, 0, 0, 0.06)`,
-                zIndex: 9,
-              }}
-            />
-            <MainContent />
-          </Layout>
-        </Layout>
+    <div className="relative">
+      <AnnouncementBanner />
+      <div className="min-h-screen h-screen overflow-hidden bg-background flex">
+        <Sidebar nav={nav} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="flex justify-end items-center px-6 h-16 bg-background border-b border-border z-10">
+            <HeaderActions />
+          </header>
+          <main className="m-4 flex flex-col flex-1 overflow-auto">
+            <div className="bg-card rounded-lg border border-border p-6 flex-1 min-h-0 overflow-auto">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </ConfigProvider>
+    </div>
   );
 });
 
-LayoutPage.displayName = "DesktopMainLayout";
+DesktopLayout.displayName = "DesktopMainLayout";
 
-export default LayoutPage;
+export default DesktopLayout;

@@ -1,224 +1,355 @@
 import { useEffect, useState } from "react";
 import { getModels } from "../../../services/ModelService";
-import { message, Drawer } from 'antd';
-import { Button, Select, Form, Input } from 'antd'
 import { createRateLimitModel } from "../../../services/RateLimitModelService";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 
-interface ICreateChannelProps {
+const formSchema = z.object({
+  name: z.string().min(1, "请输入限流策略名称"),
+  description: z.string().optional(),
+  strategy: z.string().min(1, "请选择限流策略"),
+  limit: z.number().min(1, "请输入策略数量").max(99999),
+  value: z.number().min(1, "请输入限流数量").max(99999),
+  whiteList: z.array(z.string()),
+  blackList: z.array(z.string()),
+  model: z.array(z.string()).min(1, "请选择模型"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+interface ICreateRateLimitProps {
     onSuccess: () => void;
     visible: boolean;
     onCancel: () => void;
 }
 
-export default function CreateChannel({
+export default function CreateRateLimit({
     onSuccess,
     visible,
     onCancel
-}: ICreateChannelProps) {
-    const [models, setModels] = useState<any>();
-    const [input, setInput] = useState<FieldType>({
-        name: '',
-        description: '',
-        whiteList: [],
-        blackList: [],
-        enable: false,
-        model: [],
-        strategy: '',
-        limit: 0,
-        value: 0,
+}: ICreateRateLimitProps) {
+    const [models, setModels] = useState<string[]>([]);
+    const [whiteList, setWhiteList] = useState<string[]>([]);
+    const [blackList, setBlackList] = useState<string[]>([]);
+    const [selectedModels, setSelectedModels] = useState<string[]>([]);
+    const [newIpInput, setNewIpInput] = useState("");
+    const [newBlackIpInput, setNewBlackIpInput] = useState("");
+
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: "",
+            description: "",
+            strategy: "",
+            limit: 1,
+            value: 1,
+            whiteList: [],
+            blackList: [],
+            model: [],
+        },
     });
 
-
-    type FieldType = {
-        name?: string;
-        description?: string;
-        whiteList: string[];
-        blackList: string[];
-        enable: boolean;
-        model: string[];
-        strategy: string;
-        limit: number;
-        value: number;
+    const loadModels = async () => {
+        try {
+            const res = await getModels();
+            if (res.success) {
+                setModels(res.data);
+            } else {
+                toast.error(res.message);
+            }
+        } catch (error) {
+            toast.error("获取模型列表失败");
+        }
     };
-
-    function loading() {
-
-        getModels()
-            .then(res => {
-                if (res.success) {
-                    setModels(res.data);
-                } else {
-                    message.error({
-                        content: res.message
-                    });
-                }
-            })
-
-    }
 
     useEffect(() => {
         if (visible) {
-            loading();
+            loadModels();
+            form.reset();
+            setWhiteList([]);
+            setBlackList([]);
+            setSelectedModels([]);
+            setNewIpInput("");
+            setNewBlackIpInput("");
         }
-    }, [visible]);
+    }, [visible, form]);
 
-    function handleSubmit(values: any) {
+    const onSubmit = async (values: FormValues) => {
+        try {
+            const submitData = {
+                ...values,
+                whiteList,
+                blackList,
+                model: selectedModels,
+            };
 
-        // 判断是否选择了模型
-        if (!values.model || values.model.length === 0) {
-            message.error({
-                content: '请选择模型'
-            });
-            return;
+            const result = await createRateLimitModel(submitData);
+            if (result.success) {
+                toast.success("创建成功");
+                onSuccess();
+            } else {
+                toast.error(result.message);
+            }
+        } catch (error) {
+            toast.error("创建失败");
         }
+    };
 
-        createRateLimitModel(values)
-            .then((item) => {
-                if (item.success) {
-                    message.success({
-                        content: '创建成功',
-                    });
-                    onSuccess();
-                } else {
-                    message.error({
-                        content: item.message
-                    });
-                }
-            });
-    }
+    const addIpToWhiteList = () => {
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (newIpInput && ipPattern.test(newIpInput) && !whiteList.includes(newIpInput)) {
+            setWhiteList([...whiteList, newIpInput]);
+            setNewIpInput("");
+        } else {
+            toast.error("请输入正确的IP地址");
+        }
+    };
 
-    return <Drawer
-        open={visible}
-        width={500}
-        title="创建限流策略"
-        onClose={() => onCancel()}
-    >
-        <Form onFinish={(values: any) => handleSubmit(values)} style={{ width: 400 }}>
+    const addIpToBlackList = () => {
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (newBlackIpInput && ipPattern.test(newBlackIpInput) && !blackList.includes(newBlackIpInput)) {
+            setBlackList([...blackList, newBlackIpInput]);
+            setNewBlackIpInput("");
+        } else {
+            toast.error("请输入正确的IP地址");
+        }
+    };
 
-            <Form.Item<FieldType>
-                label="限流策略名称"
-                name="name"
-                rules={[{ required: true, message: '请输入限流策略名称' }]}
-            >
-                <Input value={input.name} onChange={(v) => {
-                    setInput({ ...input, name: v.target.value })
-                }} />
-            </Form.Item>
+    const removeFromWhiteList = (ip: string) => {
+        setWhiteList(whiteList.filter(item => item !== ip));
+    };
 
-            <Form.Item<FieldType>
-                label="描述"
-                name="description"
-            >
-                <Input value={input.description}
-                    onChange={(v) => setInput({ ...input, description: v.target.value })} />
-            </Form.Item>
-            <Form.Item<FieldType>
-                label="限流策略"
-                name="strategy"
-                rules={[{ required: true, message: '请选择限流策略' }]}
-            >
-                <Select style={{ width: '100%' }}
-                    value={input.strategy}
-                    onChange={(v) => setInput({ ...input, strategy: v })}
-                    options={[
-                        {
-                            label: '秒',
-                            value: 's'
-                        },
-                        {
-                            label: '分钟',
-                            value: 'm'
-                        },
-                        {
-                            label: '小时',
-                            value: 'h'
-                        },
-                        {
-                            label: '天',
-                            value: 'd'
-                        }
-                    ]}
-                    placeholder="限流策略">
-                </Select>
-            </Form.Item>
-            <Form.Item<FieldType>
-                label="策略数量"
-                name="limit"
-                rules={[
-                    { required: true, message: '请输入策略数量' },
-                ]}
-            >
-                <Input
-                    type='number'
-                    value={input.limit}
-                    max={99999}
-                    min={1}
-                    onChange={(v) => {
-                        setInput({ ...input, limit: parseInt(v.target.value) })
-                    }} />
-            </Form.Item>
-            <Form.Item<FieldType>
-                label="限流数量"
-                name="value"
-                rules={[
-                    { required: true, message: '请输入限流数量' },
-                ]}
-            >
-                <Input
-                    type='number'
-                    value={input.value}
-                    max={99999}
-                    min={1}
-                    onChange={(v) => {
-                        setInput({ ...input, value: parseInt(v.target.value) })
-                    }} />
-            </Form.Item>
+    const removeFromBlackList = (ip: string) => {
+        setBlackList(blackList.filter(item => item !== ip));
+    };
 
-            <Form.Item<FieldType>
-                label="白名单"
-                name="whiteList"
-                // 正则表达式验证是否是ip地址
-                rules={[{ pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: '请输入正确的ip地址' }]}
-            >
-                <Select mode="tags" style={{ width: '100%' }}
-                    defaultActiveFirstOption={true}
-                    allowClear
-                    value={input.whiteList}
-                    onChange={(v) => setInput({ ...input, whiteList: v })}
-                    placeholder="白名单">
-                </Select>
-            </Form.Item>
-            <Form.Item<FieldType>
-                label="黑名单"
-                name="blackList"
-                // 正则表达式验证是否是ip地址
-                rules={[{ pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: '请输入正确的ip地址' }]}
-            >
-                <Select mode="tags" style={{ width: '100%' }}
-                    defaultActiveFirstOption={true}
-                    value={input.blackList}
-                    allowClear
-                    onChange={(v) => setInput({ ...input, blackList: v })}
-                    placeholder="黑名单">
-                </Select>
-            </Form.Item>
-            <Form.Item<FieldType>
-                label="模型"
-                name="model"
-                rules={[{ required: true, message: '请选择模型' }]}
-            >
-                <Select mode="multiple" style={{ width: '100%' }}
-                    defaultActiveFirstOption={true}
-                    allowClear
-                    value={input.model}
-                    onChange={(v) => setInput({ ...input, model: v })}
-                    options={models && models.map((model: any) => {
-                        return { label: model, value: model }
-                    })}
-                    placeholder="模型">
-                </Select>
-            </Form.Item>
-            <Button type='primary' block htmlType='submit'>提交</Button>
-        </Form>
-    </Drawer>;
+    const toggleModel = (model: string) => {
+        if (selectedModels.includes(model)) {
+            setSelectedModels(selectedModels.filter(m => m !== model));
+        } else {
+            setSelectedModels([...selectedModels, model]);
+        }
+    };
+
+    return (
+        <Sheet open={visible} onOpenChange={onCancel}>
+            <SheetContent className="min-w-[600px] overflow-y-auto">
+                <SheetHeader>
+                    <SheetTitle>创建限流策略</SheetTitle>
+                    <SheetDescription>
+                        配置新的限流策略来管理API调用频率
+                    </SheetDescription>
+                </SheetHeader>
+
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>限流策略名称</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="请输入限流策略名称" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>描述</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="请输入描述信息" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="strategy"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>限流策略</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="请选择限流策略" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="s">秒</SelectItem>
+                                            <SelectItem value="m">分钟</SelectItem>
+                                            <SelectItem value="h">小时</SelectItem>
+                                            <SelectItem value="d">天</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="limit"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>策略数量</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={99999}
+                                                placeholder="1"
+                                                {...field}
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="value"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>限流数量</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={99999}
+                                                placeholder="1"
+                                                {...field}
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm">IP白名单</CardTitle>
+                                <CardDescription>这些IP地址将不受限流限制</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="请输入IP地址 (例: 192.168.1.1)"
+                                        value={newIpInput}
+                                        onChange={(e) => setNewIpInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addIpToWhiteList()}
+                                    />
+                                    <Button type="button" onClick={addIpToWhiteList} variant="outline">
+                                        添加
+                                    </Button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {whiteList.map((ip) => (
+                                        <Badge key={ip} variant="secondary" className="flex items-center gap-1">
+                                            {ip}
+                                            <X
+                                                className="h-3 w-3 cursor-pointer"
+                                                onClick={() => removeFromWhiteList(ip)}
+                                            />
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm">IP黑名单</CardTitle>
+                                <CardDescription>这些IP地址将被完全禁止访问</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="请输入IP地址 (例: 192.168.1.1)"
+                                        value={newBlackIpInput}
+                                        onChange={(e) => setNewBlackIpInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addIpToBlackList()}
+                                    />
+                                    <Button type="button" onClick={addIpToBlackList} variant="outline">
+                                        添加
+                                    </Button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {blackList.map((ip) => (
+                                        <Badge key={ip} variant="destructive" className="flex items-center gap-1">
+                                            {ip}
+                                            <X
+                                                className="h-3 w-3 cursor-pointer"
+                                                onClick={() => removeFromBlackList(ip)}
+                                            />
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm">选择模型</CardTitle>
+                                <CardDescription>选择需要应用此限流策略的模型</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                                    {models.map((model) => (
+                                        <div
+                                            key={model}
+                                            className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                                selectedModels.includes(model)
+                                                    ? 'bg-primary text-primary-foreground border-primary'
+                                                    : 'bg-background hover:bg-muted'
+                                            }`}
+                                            onClick={() => toggleModel(model)}
+                                        >
+                                            <div className="text-sm font-medium">{model}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {selectedModels.length === 0 && (
+                                    <p className="text-sm text-destructive mt-2">请至少选择一个模型</p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button type="submit" className="flex-1" disabled={selectedModels.length === 0}>
+                                创建策略
+                            </Button>
+                            <Button type="button" variant="outline" onClick={onCancel}>
+                                取消
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </SheetContent>
+        </Sheet>
+    );
 }

@@ -1,30 +1,95 @@
-import { useEffect, useState } from "react";
-import { Button, Switch, message, Tag, Dropdown, InputNumber, Table, Space, Card, Typography, Select, Row, Col, Upload } from 'antd';
-import { LoadingOutlined, ReloadOutlined, PlusOutlined, SearchOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { Remove, UpdateOrder, controlAutomatically, disable, getChannels, test, downloadImportTemplate, importChannel } from "../../services/ChannelService";
+import { ApiResponse, PaginatedResponse, Channel } from "@/types/api";
+import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import {
+  Search,
+  RefreshCw,
+  Plus,
+  Download,
+  Upload,
+  MoreHorizontal,
+  Loader2,
+  Timer,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Trash2,
+  Power,
+  PowerOff
+} from "lucide-react";
+
+// shadcn/ui components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+// Services
+import {
+  Remove,
+  UpdateOrder,
+  controlAutomatically,
+  disable,
+  getChannels,
+  test,
+  downloadImportTemplate,
+  importChannel,
+  bulkRemove,
+  bulkEnable,
+  bulkDisable
+} from "../../services/ChannelService";
 import { renderQuota } from "../../utils/render";
-import { Input } from "@lobehub/ui";
 import { getTypes } from "../../services/ModelService";
+import { getList } from "../../services/UserGroupService";
+
+// Components
 import CreateChannel from "./features/CreateChannel";
 import UpdateChannel from "./features/UpdateChannel";
-import { useTranslation } from "react-i18next";
-import { getList } from "../../services/UserGroupService";
-import { ConfigProvider, theme } from 'antd';
-import { Flexbox } from "react-layout-kit";
-
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 export default function ChannelPage() {
   const { t } = useTranslation();
-  const { token } = theme.useToken();
 
-  const [columns, setColumns] = useState<any[]>([]);
   const [createVisible, setCreateVisible] = useState(false);
   const [updateVisible, setUpdateVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [updateValue, setUpdateValue] = useState({} as any);
-  const [data, setData] = useState<any[]>([]);
+  const [updateValue, setUpdateValue] = useState<Channel | null>(null);
+  const [data, setData] = useState<Channel[]>([]);
   const [total, setTotal] = useState(0);
   const [input, setInput] = useState({
     page: 1,
@@ -33,8 +98,10 @@ export default function ChannelPage() {
     group: '',
   });
   const [testingChannels, setTestingChannels] = useState<string[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<Channel[]>([]);
   const [importing, setImporting] = useState(false);
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [bulkOperating, setBulkOperating] = useState(false);
 
   useEffect(() => {
     getList().then((res) => {
@@ -44,257 +111,28 @@ export default function ChannelPage() {
     });
   }, []);
 
-  useEffect(() => {
-    setColumns([
-      {
-        title: t('channel.channelName'),
-        dataIndex: 'name',
-        fixed: 'left',
-        width: 150,
-      },
-      {
-        title: t('channel.status'),
-        width: 120,
-        dataIndex: 'disable',
-        render: (value: any, item: any) => {
-          return <Switch
-            checkedChildren={<Text type="danger">{t('channel.disable')}</Text>}
-            unCheckedChildren={<Text type="success">{t('channel.enable')}</Text>}
-            checked={value}
-            onChange={() => {
-              disable(item.id)
-                .then((response) => {
-                  response.success 
-                    ? message.success(t('channel.operationSuccess'))
-                    : message.error(t('channel.operationFailed'));
-                  loadingData();
-                }, () => message.error(t('channel.operationFailed')));
-            }}
-            style={{ width: '50px' }}
-          />
-        }
-      },
-      {
-        title: t('channel.autoCheck'),
-        width: 120,
-        dataIndex: 'controlAutomatically',
-        render: (value: any, item: any) => {
-          return <Switch
-            onChange={() => {
-              controlAutomatically(item.id)
-                .then((response) => {
-                  response.success 
-                    ? message.success(t('channel.operationSuccess'))
-                    : message.error(t('channel.operationFailed'));
-                  loadingData();
-                }, () => message.error(t('channel.operationFailed')));
-            }}
-            checkedChildren={<Text type="danger">{t('channel.disable')}</Text>}
-            unCheckedChildren={<Text type="success">{t('channel.enable')}</Text>}
-            checked={!value}
-            style={{ width: '50px' }}
-          />
-        }
-      },
-      {
-        width: 120,
-        title: t('channel.channelType'),
-        dataIndex: 'typeName',
-        render: (value: any) => {
-          return <Tag color={token.colorBgBlur}>{value}</Tag>
-        }
-      },
-      {
-        title: t('channel.responseTime'),
-        width: 120,
-        dataIndex: 'responseTime',
-        render: (value: any, item: any) => {
-          const isLoading = testingChannels.includes(item.id);
-          
-          if (value) {
-            // Color based on response time
-            let color = token.colorSuccess;
-            if (value < 3000) {
-              color = token.colorSuccess;
-            } else if (value < 5000) {
-              color = token.colorWarning;
-            } else {
-              color = token.colorError;
-            }
-
-            return <Tag
-              color={color}
-              onClick={() => !isLoading && testToken(item.id)}
-              icon={isLoading ? <LoadingOutlined /> : null}
-              style={{ cursor: 'pointer' }}
-            >
-              {isLoading ? t('channel.testing') : `${(value / 1000).toFixed(1)} ${t('channel.seconds')}`}
-            </Tag>
-          } else {
-            return <Tag 
-              onClick={() => !isLoading && testToken(item.id)}
-              icon={isLoading ? <LoadingOutlined /> : null}
-              style={{ cursor: 'pointer' }}
-            >
-              {isLoading ? t('channel.testing') : t('channel.notTested')}
-            </Tag>
-          }
-        }
-      },
-      {
-        title: t('channel.createdAt'),
-        width: 150,
-        dataIndex: 'createdAt',
-      },
-      {
-        title: t('channel.totalConsumption'),
-        dataIndex: 'quota',
-        width: 120,
-        render: (value: any) => {
-          return <Tag color={token.colorPrimary}>{renderQuota(value, 2)}</Tag>
-        }
-      },
-      {
-        title: t('channel.quota'),
-        dataIndex: 'remainQuota',
-        width: 100,
-        render: (value: any) => {
-          return <Text
-            style={{
-              color: token.colorPrimary,
-            }}
-          >{value}</Text>
-        }
-      },
-      {
-        title: t('channel.groups'),
-        dataIndex: 'groups',
-        width: 150,
-        render: (value: any) => {
-          return (
-            <Space wrap>
-              {value.map((item: any, index: number) => (
-                <Tag key={index} color={token.colorPrimaryBg}>{item}</Tag>
-              ))}
-            </Space>
-          );
-        }
-      },
-      {
-        title: t('channel.channelWeight'),
-        width: 120,
-        dataIndex: 'order',
-        render: (value: any, item: any) => {
-          return <InputNumber
-            onChange={(v) => {
-              if (v !== null) {
-                item.order = v;
-                data.forEach((x: any) => {
-                  if (x.id === item.id) {
-                    x.order = v;
-                  }
-                })
-                setData([...data]);
-              }
-            }}
-            onBlur={() => {
-              UpdateOrder(item.id, item.order)
-                .then((response) => {
-                  response.success 
-                    ? message.success(t('channel.operationSuccess'))
-                    : message.error(t('channel.operationFailed'));
-                  loadingData();
-                }, () => message.error(t('channel.operationFailed')));
-            }}
-            value={value}
-            style={{ width: '80px' }}
-            min={0}
-          />
-        }
-      },
-      {
-        title: t('channel.operations'),
-        fixed: 'right',
-        width: 100,
-        dataIndex: 'operate',
-        render: (_v: any, item: any) => {
-          return (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 1,
-                    label: t('common.edit'),
-                    onClick: () => {
-                      setUpdateValue(item);
-                      setUpdateVisible(true);
-                    }
-                  },
-                  {
-                    key: 2,
-                    label: item.disable ? t('channel.enable') : t('channel.disable'),
-                    onClick: () => {
-                      disable(item.id)
-                        .then((response) => {
-                          response.success 
-                            ? message.success(t('channel.operationSuccess'))
-                            : message.error(t('channel.operationFailed'));
-                          loadingData();
-                        }, () => message.error(t('channel.operationFailed')));
-                    }
-                  },
-                  {
-                    key: 3,
-                    label: item.controlAutomatically ? t('channel.enableAutoCheck') : t('channel.disableAutoCheck'),
-                    onClick: () => {
-                      controlAutomatically(item.id)
-                        .then((response) => {
-                          response.success 
-                            ? message.success(t('channel.operationSuccess'))
-                            : message.error(t('channel.operationFailed'));
-                          loadingData();
-                        }, () => message.error(t('channel.operationFailed')));
-                    }
-                  },
-                  {
-                    key: 4,
-                    label: t('common.delete'),
-                    danger: true,
-                    onClick: () => removeToken(item.id)
-                  }
-                ]
-              }}
-            >
-              <Button type="primary">{t('common.operate')}</Button>
-            </Dropdown>
-          );
-        },
-      },
-    ]);
-  }, [t, testingChannels, token, data]);
-
   function removeToken(id: string) {
     Remove(id)
       .then((response) => {
         if (response.success) {
-          message.success(t('common.deleteSuccess'));
+          toast.success(t('common.deleteSuccess'));
           loadingData();
         } else {
-          message.error(t('common.deleteFailed'));
+          toast.error(t('common.deleteFailed'));
         }
       });
   }
 
   function testToken(id: string) {
     setTestingChannels(prev => [...prev, id]);
-    
+
     test(id)
       .then((response) => {
         if (response.success) {
-          message.success(t('channel.connectionSuccess'));
+          toast.success(t('channel.connectionSuccess'));
           loadingData();
         } else {
-          message.error(response.message || t('channel.connectionFailed'));
+          toast.error(response.message || t('channel.connectionFailed'));
         }
       })
       .finally(() => {
@@ -302,12 +140,12 @@ export default function ChannelPage() {
       });
   }
 
-  function loadingData() {
+  const loadingData = useCallback(() => {
     setLoading(true);
     getChannels(input.page, input.pageSize, input.keyword, input.group ? [input.group] : undefined)
-      .then((response: any) => {
+      .then((response: ApiResponse<PaginatedResponse<Channel>>) => {
         if (response.success) {
-          const values = response.data.items as any[];
+          const values = response.data.items;
           getTypes()
             .then(res => {
               if (res.success) {
@@ -323,31 +161,29 @@ export default function ChannelPage() {
                 setData([...values]);
                 setTotal(response.data.total);
               } else {
-                message.error(res.message || t('common.operateFailed'));
+                toast.error(res.message || t('common.operateFailed'));
               }
             });
         } else {
-          message.error(response.message || t('common.operateFailed'));
+          toast.error(response.message || t('common.operateFailed'));
         }
       })
       .finally(() => {
         setLoading(false);
       });
-  }
+  }, [input.page, input.pageSize, input.keyword, input.group, t]);
 
   useEffect(() => {
     loadingData();
-  }, [input]);
+  }, [loadingData]);
 
-  // 下载导入模板
+  // Download template
   function handleDownloadTemplate() {
     downloadImportTemplate()
       .then((response) => {
-        console.log(response);
         if (response.success || response instanceof Blob) {
-          // 如果响应直接是 Blob 或者包含数据
-          const blob = response instanceof Blob ? response : new Blob([response.data || response], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          const blob = response instanceof Blob ? response : new Blob([response.data || response], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
           });
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
@@ -357,185 +193,616 @@ export default function ChannelPage() {
           link.click();
           document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
-          message.success(t('channel.downloadSuccess'));
+          toast.success(t('channel.downloadSuccess'));
         } else {
-          message.error(response.message || t('channel.downloadFailed'));
+          toast.error(response.message || t('channel.downloadFailed'));
         }
       })
-      .catch((error) => {
-        console.log(error);
-        message.error(t('channel.downloadFailed'));
+      .catch(() => {
+        toast.error(t('channel.downloadFailed'));
       });
   }
 
-  // 处理文件导入
-  function handleImport(file: File) {
+  // Handle file import
+  function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     setImporting(true);
     importChannel(file)
       .then((response) => {
         if (response.success) {
-          message.success(t('channel.importSuccess'));
-          loadingData(); // 重新加载数据
+          toast.success(t('channel.importSuccess'));
+          loadingData();
         } else {
-          message.error(response.message || t('channel.importFailed'));
+          toast.error(response.message || t('channel.importFailed'));
         }
       })
       .catch(() => {
-        message.error(t('channel.importFailed'));
+        toast.error(t('channel.importFailed'));
       })
       .finally(() => {
         setImporting(false);
       });
-    
-    return false; // 阻止默认上传行为
+
+    // Reset input
+    event.target.value = '';
   }
 
-  return (
-    <ConfigProvider theme={{
-      components: {
-        Card: {
-          headerBg: token.colorBgContainer,
-          headerFontSize: 16,
-          headerFontSizeSM: 14,
-        },
-        Table: {
-          headerBg: token.colorBgContainer,
-        }
+  function handleDisableChannel(id: string) {
+    disable(id)
+      .then((response) => {
+        response.success
+          ? toast.success(t('channel.operationSuccess'))
+          : toast.error(t('channel.operationFailed'));
+        loadingData();
+      }, () => toast.error(t('channel.operationFailed')));
+  }
+
+  function handleControlAutomatically(id: string) {
+    controlAutomatically(id)
+      .then((response) => {
+        response.success
+          ? toast.success(t('channel.operationSuccess'))
+          : toast.error(t('channel.operationFailed'));
+        loadingData();
+      }, () => toast.error(t('channel.operationFailed')));
+  }
+
+  function handleOrderUpdate(id: string, newOrder: number) {
+    UpdateOrder(id, newOrder)
+      .then((response) => {
+        response.success
+          ? toast.success(t('channel.operationSuccess'))
+          : toast.error(t('channel.operationFailed'));
+        loadingData();
+      }, () => toast.error(t('channel.operationFailed')));
+  }
+
+  // 批量操作函数
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedChannels(data.map(item => item.id));
+    } else {
+      setSelectedChannels([]);
+    }
+  }
+
+  function handleSelectChannel(channelId: string, checked: boolean) {
+    if (checked) {
+      setSelectedChannels(prev => [...prev, channelId]);
+    } else {
+      setSelectedChannels(prev => prev.filter(id => id !== channelId));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedChannels.length === 0) return;
+
+    setBulkOperating(true);
+    try {
+      const response = await bulkRemove(selectedChannels);
+      if (response.success) {
+        toast.success(t('channel.bulkDeleteSuccess'));
+        setSelectedChannels([]);
+        loadingData();
+      } else {
+        toast.error(response.message || t('channel.bulkDeleteFailed'));
       }
-    }}>
-      <Card 
-        bordered={false}
-        style={{ marginBottom: token.marginMD }}
-      >
-        <Flexbox gap={token.marginLG}>
-          <Row gutter={[16, 16]} align="middle" style={{ width: '100%' }}>
-            <Col xs={24} md={12}>
-              <Title level={4} style={{ margin: 0 }}>{t('channel.title')}</Title>
-            </Col>
-            <Col xs={24} md={12}>
-              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-                <Input 
-                  value={input.keyword} 
-                  onChange={(e) => {
-                    setInput({
-                      ...input,
-                      keyword: e.target.value,
-                    });
-                  }} 
-                  style={{ width: 200 }} 
+    } catch (error) {
+      toast.error(t('channel.bulkDeleteFailed'));
+    } finally {
+      setBulkOperating(false);
+    }
+  }
+
+  async function handleBulkEnable() {
+    if (selectedChannels.length === 0) return;
+
+    setBulkOperating(true);
+    try {
+      const response = await bulkEnable(selectedChannels);
+      if (response.success) {
+        toast.success(t('channel.bulkEnableSuccess'));
+        setSelectedChannels([]);
+        loadingData();
+      } else {
+        toast.error(response.message || t('channel.bulkEnableFailed'));
+      }
+    } catch (error) {
+      toast.error(t('channel.bulkEnableFailed'));
+    } finally {
+      setBulkOperating(false);
+    }
+  }
+
+  async function handleBulkDisable() {
+    if (selectedChannels.length === 0) return;
+
+    setBulkOperating(true);
+    try {
+      const response = await bulkDisable(selectedChannels);
+      if (response.success) {
+        toast.success(t('channel.bulkDisableSuccess'));
+        setSelectedChannels([]);
+        loadingData();
+      } else {
+        toast.error(response.message || t('channel.bulkDisableFailed'));
+      }
+    } catch (error) {
+      toast.error(t('channel.bulkDisableFailed'));
+    } finally {
+      setBulkOperating(false);
+    }
+  }
+
+  const getResponseTimeVariant = (responseTime: number) => {
+    if (responseTime < 3000) return "default";
+    if (responseTime < 5000) return "secondary";
+    return "destructive";
+  };
+
+  const getResponseTimeIcon = (responseTime: number) => {
+    if (responseTime < 3000) return CheckCircle;
+    if (responseTime < 5000) return AlertCircle;
+    return XCircle;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="text-2xl font-bold">{t('channel.title')}</CardTitle>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
                   placeholder={t('common.search')}
-                  prefix={<SearchOutlined />}
+                  value={input.keyword}
+                  onChange={(e) => setInput({ ...input, keyword: e.target.value })}
+                  className="pl-10 min-w-[200px]"
                 />
-                
-                <Select
-                  placeholder={t('channel.selectGroups')}
-                  allowClear
-                  style={{ width: 200 }}
-                  value={input.group || undefined}
-                  onChange={(value) => {
-                    setInput({
-                      ...input,
-                      group: value,
-                    });
-                  }}
-                >
+              </div>
+
+              {/* Group Filter */}
+              <Select
+                value={input.group || "all"}
+                onValueChange={(value) => setInput({ ...input, group: value === "all" ? "" : value })}
+              >
+                <SelectTrigger className="min-w-[200px]">
+                  <SelectValue placeholder={t('channel.selectGroups')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
                   {groups.map((group) => (
-                    <Option key={group.code} value={group.code}>
-                      <Flexbox gap={8} horizontal>
+                    <SelectItem key={group.code} value={group.code}>
+                      <div className="flex items-center gap-2">
                         <span>{group.name}</span>
-                        <span style={{ fontSize: 12, color: token.colorTextSecondary }}>{group.description}</span>
-                        <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-                          <span>{t('channel.rate')}：</span>
-                          {group.rate}
+                        <span className="text-xs text-muted-foreground">
+                          {group.description}
                         </span>
-                      </Flexbox>
-                    </Option>
+                        <Badge variant="outline" className="text-xs">
+                          {t('channel.rate')}: {group.rate}
+                        </Badge>
+                      </div>
+                    </SelectItem>
                   ))}
-                </Select>
-                
-                <Button 
-                  icon={<DownloadOutlined />}
-                  onClick={handleDownloadTemplate}
-                >
-                  {t('channel.downloadTemplate')}
-                </Button>
-                
-                <Upload
+                </SelectContent>
+              </Select>
+
+              {/* Bulk Action Buttons */}
+              {selectedChannels.length > 0 && (
+                <>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={bulkOperating}
+                        className="text-green-600 border-green-600 hover:bg-green-50"
+                      >
+                        {bulkOperating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Power className="h-4 w-4" />
+                        )}
+                        {t('channel.bulkEnable')} ({selectedChannels.length})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('channel.confirmBulkEnable')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('channel.confirmBulkEnableDescription', { count: selectedChannels.length })}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleBulkEnable}>
+                          {t('common.confirm')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={bulkOperating}
+                        className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                      >
+                        {bulkOperating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <PowerOff className="h-4 w-4" />
+                        )}
+                        {t('channel.bulkDisable')} ({selectedChannels.length})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('channel.confirmBulkDisable')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('channel.confirmBulkDisableDescription', { count: selectedChannels.length })}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleBulkDisable}>
+                          {t('common.confirm')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={bulkOperating}
+                        className="text-red-600 border-red-600 hover:bg-red-50"
+                      >
+                        {bulkOperating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        {t('channel.bulkDelete')} ({selectedChannels.length})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('channel.confirmBulkDelete')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('channel.confirmBulkDeleteDescription', { count: selectedChannels.length })}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
+                          {t('common.confirm')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <Button variant="outline" onClick={handleDownloadTemplate}>
+                <Download className="h-4 w-4" />
+                {t('channel.downloadTemplate')}
+              </Button>
+
+              <div className="relative">
+                <input
+                  type="file"
                   accept=".xlsx,.xls"
-                  showUploadList={false}
-                  beforeUpload={handleImport}
-                >
-                  <Button 
-                    icon={<UploadOutlined />}
-                    loading={importing}
-                  >
-                    {t('channel.importTemplate')}
-                  </Button>
-                </Upload>
-                
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => loadingData()}
-                >
-                  {t('common.refresh')}
+                  onChange={handleImport}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={importing}
+                />
+                <Button variant="outline" disabled={importing}>
+                  {importing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  {t('channel.importTemplate')}
                 </Button>
-                
-                <Button 
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setCreateVisible(true)}
-                >
-                  {t('channel.createChannel')}
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Flexbox>
+              </div>
+
+              <Button variant="outline" onClick={() => loadingData()}>
+                <RefreshCw className="h-4 w-4" />
+                {t('common.refresh')}
+              </Button>
+
+              <Button onClick={() => setCreateVisible(true)}>
+                <Plus className="h-4 w-4" />
+                {t('channel.createChannel')}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
       </Card>
 
-      <Card bordered={false}>
-        <Table
-          columns={columns}
-          dataSource={data}
-          scroll={{
-            y: 'calc(100vh - 350px)',
-            x: 'max-content'
-          }}
-          loading={loading}
-          rowKey={row => row.id}
-          pagination={{
-            total: total,
-            pageSize: input.pageSize,
-            current: input.page,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `${t('common.total')}: ${total}`,
-            onChange: (page, pageSize) => {
-              setInput({
-                ...input,
-                page,
-                pageSize,
-              });
-            },
-          }}
-        />
+      {/* Table Card */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={data.length > 0 && selectedChannels.length === data.length}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[150px]">{t('channel.channelName')}</TableHead>
+                  <TableHead className="w-[120px]">{t('channel.status')}</TableHead>
+                  <TableHead className="w-[120px]">{t('channel.autoCheck')}</TableHead>
+                  <TableHead className="w-[120px]">{t('channel.channelType')}</TableHead>
+                  <TableHead className="w-[150px]">{t('channel.responseTime')}</TableHead>
+                  <TableHead className="w-[150px]">{t('channel.createdAt')}</TableHead>
+                  <TableHead className="w-[120px]">{t('channel.totalConsumption')}</TableHead>
+                  <TableHead className="w-[100px]">{t('channel.quota')}</TableHead>
+                  <TableHead className="w-[150px]">{t('channel.groups')}</TableHead>
+                  <TableHead className="w-[120px]">{t('channel.channelWeight')}</TableHead>
+                  <TableHead className="w-[100px]">{t('channel.operations')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                      <p className="mt-2 text-muted-foreground">Loading...</p>
+                    </TableCell>
+                  </TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="text-center py-8">
+                      <p className="text-muted-foreground">No data available</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.map((item) => {
+                    const isLoading = testingChannels.includes(item.id);
+                    const ResponseTimeIcon = item.responseTime ? getResponseTimeIcon(item.responseTime) : Timer;
+
+                    return (
+                      <TableRow key={item.id} className="hover:bg-muted/50">
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedChannels.includes(item.id)}
+                            onCheckedChange={(checked) => handleSelectChannel(item.id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={!item.disable}
+                              onCheckedChange={() => handleDisableChannel(item.id)}
+                            />
+                            <span className={`text-xs ${item.disable ? 'text-destructive' : 'text-green-600'}`}>
+                              {item.disable ? t('channel.disable') : t('channel.enable')}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={!item.controlAutomatically}
+                              onCheckedChange={() => handleControlAutomatically(item.id)}
+                            />
+                            <span className={`text-xs ${item.controlAutomatically ? 'text-destructive' : 'text-green-600'}`}>
+                              {item.controlAutomatically ? t('channel.disable') : t('channel.enable')}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge variant="outline">{item.typeName}</Badge>
+                        </TableCell>
+
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => !isLoading && testToken(item.id)}
+                            disabled={isLoading}
+                            className="h-auto p-1"
+                          >
+                            <Badge
+                              variant={item.responseTime ? getResponseTimeVariant(item.responseTime) : "outline"}
+                              className="flex items-center gap-1 cursor-pointer"
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <ResponseTimeIcon className="h-3 w-3" />
+                              )}
+                              {isLoading
+                                ? t('channel.testing')
+                                : item.responseTime
+                                  ? `${(item.responseTime / 1000).toFixed(1)} ${t('channel.seconds')}`
+                                  : t('channel.notTested')
+                              }
+                            </Badge>
+                          </Button>
+                        </TableCell>
+
+                        <TableCell className="text-muted-foreground text-sm">
+                          {item.createdAt}
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {renderQuota(item.quota, 2)}
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="text-primary font-medium">
+                          {item.remainQuota}
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {item.groups?.map((group: string, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {group}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.order}
+                            onChange={(e) => {
+                              const newOrder = parseInt(e.target.value);
+                              if (!isNaN(newOrder)) {
+                                item.order = newOrder;
+                                setData([...data]);
+                              }
+                            }}
+                            onBlur={() => handleOrderUpdate(item.id, item.order)}
+                            className="w-20 text-center"
+                            min={0}
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setUpdateValue(item);
+                                  setUpdateVisible(true);
+                                }}
+                              >
+                                {t('common.edit')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDisableChannel(item.id)}
+                              >
+                                {item.disable ? t('channel.enable') : t('channel.disable')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleControlAutomatically(item.id)}
+                              >
+                                {item.controlAutomatically
+                                  ? t('channel.enableAutoCheck')
+                                  : t('channel.disableAutoCheck')
+                                }
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => removeToken(item.id)}
+                              >
+                                {t('common.delete')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && data.length > 0 && (
+            <div className="flex items-center justify-between p-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                {t('common.total')}: {total}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInput({ ...input, page: Math.max(1, input.page - 1) })}
+                  disabled={input.page <= 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">{input.page}</span>
+                  <span className="text-sm text-muted-foreground">/</span>
+                  <span className="text-sm text-muted-foreground">
+                    {Math.ceil(total / input.pageSize)}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInput({ ...input, page: input.page + 1 })}
+                  disabled={input.page >= Math.ceil(total / input.pageSize)}
+                >
+                  Next
+                </Button>
+                <Select
+                  value={input.pageSize.toString()}
+                  onValueChange={(value) => setInput({ ...input, pageSize: parseInt(value), page: 1 })}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
-      <CreateChannel visible={createVisible} onSuccess={() => {
-        setCreateVisible(false);
-        loadingData();
-      }} onCancel={() => {
-        setCreateVisible(false);
-      }} />
+      {/* Dialogs */}
+      <CreateChannel
+        visible={createVisible}
+        onSuccess={() => {
+          setCreateVisible(false);
+          loadingData();
+        }}
+        onCancel={() => {
+          setCreateVisible(false);
+        }}
+      />
 
-      <UpdateChannel visible={updateVisible} value={updateValue} onSuccess={() => {
-        setUpdateVisible(false);
-        loadingData();
-        setUpdateValue({} as any);
-      }} onCancel={() => {
-        setUpdateVisible(false);
-        setUpdateValue({} as any);
-      }} />
-    </ConfigProvider>
+      <UpdateChannel
+        visible={updateVisible}
+        value={updateValue}
+        onSuccess={() => {
+          setUpdateVisible(false);
+          loadingData();
+          setUpdateValue(null);
+        }}
+        onCancel={() => {
+          setUpdateVisible(false);
+          setUpdateValue(null);
+        }}
+      />
+    </div>
   );
 }
