@@ -4,8 +4,11 @@ using Making.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Exceptions;
+using Thor.Abstractions.Fal;
 using Thor.Abstractions.Images;
 using Thor.Abstractions.Midjourney;
+using Thor.Core.DataAccess;
+using Thor.Domain.Shared;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 
@@ -22,8 +25,82 @@ public class MidjourneyService(
     RateLimitModelService rateLimitModelService,
     ImageService imageService,
     LoggerService loggerService,
+    ImageTaskLoggerService imageTaskLoggerService,
+    ILoggerDbContext dbContext,
     ILogger<MidjourneyService> logger) : AIService(serviceProvider, imageService)
 {
+    /// <summary>
+    /// 处理响应并记录图片任务日志
+    /// </summary>
+    private async Task<string> ProcessResponseAndLogTask(
+        HttpResponseMessage responseMessage,
+        ThorImageTaskType taskType,
+        string prompt,
+        string model,
+        long quota,
+        string? tokenName,
+        string? userName,
+        string? userId,
+        string channelId,
+        string? channelName,
+        string ip,
+        string userAgent,
+        string url,
+        int totalTime,
+        object taskParameters)
+    {
+        var isSuccess = responseMessage.IsSuccessStatusCode;
+
+        // 提取TaskId用于图片任务日志
+        string? taskId = null;
+        string? errorMessage = null;
+        var responseContent = await responseMessage.Content.ReadAsStringAsync();
+
+        try
+        {
+            if (isSuccess)
+            {
+                var json = JsonSerializer.Deserialize<CreateMidjourneyResultDto>(responseContent);
+                taskId = json.result;
+            }
+            else
+            {
+                errorMessage = await responseMessage.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Failed to parse response for TaskId extraction: {Error}", ex.Message);
+        }
+
+        // 记录图片任务日志
+        if (!string.IsNullOrEmpty(taskId))
+        {
+            await imageTaskLoggerService.CreateTaskAsync(
+                taskId: taskId,
+                taskType: taskType,
+                prompt: prompt,
+                model: model,
+                quota: quota,
+                tokenName: tokenName,
+                userName: userName,
+                userId: userId,
+                channelId: channelId,
+                channelName: channelName,
+                ip: ip,
+                userAgent: userAgent,
+                url: url,
+                totalTime: totalTime,
+                organizationId: null,
+                isSuccess: isSuccess,
+                errorMessage: errorMessage,
+                taskParameters: taskParameters
+            );
+        }
+
+        return responseContent;
+    }
+
     [HttpPost("/submit/imagine")]
     public async Task SubmitImagine(SubmitImagineInput input, HttpContext context)
     {
@@ -71,15 +148,27 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
-
-        await loggerService.CreateConsumeAsync("/mj/submit/imagine",
-            string.Format(ConsumerImageTemplate, rate.PromptRate, userGroup.Rate),
+        // 处理响应并记录图片任务日志
+        var responseContent = await ProcessResponseAndLogTask(
+            responseMessage,
+            ThorImageTaskType.Imagine,
+            input.Prompt,
             model,
-            0, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+            (long)quota,
+            token?.Key,
+            user?.UserName,
+            user?.Id,
+            channel.Id,
+            channel.Name,
+            context.GetIpAddress(),
+            context.GetUserAgent(),
+            "/mj/submit/imagine",
+            (int)sw.ElapsedMilliseconds,
+            input);
+
+        // 设置响应头并发送内容给客户端
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
 
         await userService.ConsumeAsync(user!.Id, (long)quota, 0, token?.Key, channel.Id, model);
     }
@@ -131,15 +220,27 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
-
-        await loggerService.CreateConsumeAsync("/mj/submit/blend",
-            string.Format(ConsumerImageTemplate, rate.PromptRate, userGroup.Rate),
+        // 处理响应并记录图片任务日志
+        var responseContent = await ProcessResponseAndLogTask(
+            responseMessage,
+            ThorImageTaskType.Blend,
+            $"Blend images: {string.Join(", ", input.Base64Array?.Select(img => $"[Image:{img[..Math.Min(20, img.Length)]}...]") ?? [])}",
             model,
-            0, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+            (long)quota,
+            token?.Key,
+            user?.UserName,
+            user?.Id,
+            channel.Id,
+            channel.Name,
+            context.GetIpAddress(),
+            context.GetUserAgent(),
+            "/mj/submit/blend",
+            (int)sw.ElapsedMilliseconds,
+            input);
+
+        // 设置响应头并发送内容给客户端
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
 
         await userService.ConsumeAsync(user!.Id, (long)quota, 0, token?.Key, channel.Id, model);
     }
@@ -191,15 +292,27 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
-
-        await loggerService.CreateConsumeAsync("/mj/submit/describe",
-            string.Format(ConsumerImageTemplate, rate.PromptRate, userGroup.Rate),
+        // 处理响应并记录图片任务日志
+        var responseContent = await ProcessResponseAndLogTask(
+            responseMessage,
+            ThorImageTaskType.Describe,
+            $"Describe image: [Base64:{input.Base64[..Math.Min(20, input.Base64.Length)]}...]",
             model,
-            0, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+            (long)quota,
+            token?.Key,
+            user?.UserName,
+            user?.Id,
+            channel.Id,
+            channel.Name,
+            context.GetIpAddress(),
+            context.GetUserAgent(),
+            "/mj/submit/describe",
+            (int)sw.ElapsedMilliseconds,
+            input);
+
+        // 设置响应头并发送内容给客户端
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
 
         await userService.ConsumeAsync(user!.Id, (long)quota, 0, token?.Key, channel.Id, model);
     }
@@ -251,15 +364,27 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
-
-        await loggerService.CreateConsumeAsync("/mj/submit/shorten",
-            string.Format(ConsumerImageTemplate, rate.PromptRate, userGroup.Rate),
+        // 处理响应并记录图片任务日志
+        var responseContent = await ProcessResponseAndLogTask(
+            responseMessage,
+            ThorImageTaskType.Shorten,
+            $"Shorten prompt: {input.Prompt}",
             model,
-            0, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+            (long)quota,
+            token?.Key,
+            user?.UserName,
+            user?.Id,
+            channel.Id,
+            channel.Name,
+            context.GetIpAddress(),
+            context.GetUserAgent(),
+            "/mj/submit/shorten",
+            (int)sw.ElapsedMilliseconds,
+            input);
+
+        // 设置响应头并发送内容给客户端
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
 
         await userService.ConsumeAsync(user!.Id, (long)quota, 0, token?.Key, channel.Id, model);
     }
@@ -311,15 +436,27 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
-
-        await loggerService.CreateConsumeAsync("/mj/submit/modal",
-            string.Format(ConsumerImageTemplate, rate.PromptRate, userGroup.Rate),
+        // 处理响应并记录图片任务日志
+        var responseContent = await ProcessResponseAndLogTask(
+            responseMessage,
+            ThorImageTaskType.Modal,
+            $"Modal operation: {input.TaskId}",
             model,
-            0, 0, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+            (long)quota,
+            token?.Key,
+            user?.UserName,
+            user?.Id,
+            channel.Id,
+            channel.Name,
+            context.GetIpAddress(),
+            context.GetUserAgent(),
+            "/mj/submit/modal",
+            (int)sw.ElapsedMilliseconds,
+            input);
+
+        // 设置响应头并发送内容给客户端
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
 
         await userService.ConsumeAsync(user!.Id, (long)quota, 0, token?.Key, channel.Id, model);
     }
@@ -368,14 +505,46 @@ public class MidjourneyService(
 
         sw.Stop();
 
-        context.Response.Headers.ContentType = "application/json";
-        await responseMessage.Content.CopyToAsync(context.Response.Body);
+        // 读取响应内容
+        var responseContent = await responseMessage.Content.ReadAsStringAsync();
 
-        await loggerService.CreateConsumeAsync("/mj/task/list-by-condition",
-            string.Format(ConsumerImageTemplate, 0, 0),
-            model,
-            0, 0, 0, token?.Key, user?.UserName, user?.Id, channel.Id,
-            channel.Name, context.GetIpAddress(), context.GetUserAgent(), false, (int)sw.ElapsedMilliseconds,
-            string.Empty);
+        // 如果查询成功，尝试关联本地任务日志
+        if (responseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responseContent))
+        {
+            try
+            {
+                var responseJson = JsonSerializer.Deserialize<GetTaskListByConditionDto[]>(responseContent);
+                var taskIds = responseJson.Select(taskElement => taskElement.id)
+                    .Where(taskId => !string.IsNullOrEmpty(taskId)).ToList();
+
+                // 查询本地任务日志
+                if (taskIds.Any())
+                {
+                    // 更新任务状态
+                    foreach (var taskElement in responseJson)
+                    {
+                        if (taskElement.status == "SUCCESS")
+                        {
+                            await dbContext.ImageTaskLoggers.Where(x =>
+                                    x.TaskId == taskElement.id && x.TaskStatus != ThorImageTaskStatus.Completed)
+                                .ExecuteUpdateAsync(a =>
+                                    a.SetProperty(x => x.TaskStatus, ThorImageTaskStatus.Completed)
+                                        .SetProperty(x => x.Progress, 100)
+                                        .SetProperty(x => x.ImageUrls,
+                                            JsonSerializer.Serialize(
+                                                responseJson.Select(x => x.imageUrl).ToArray(), ThorJsonSerializer
+                                                    .DefaultOptions)));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Failed to process task list response: {Error}", ex.Message);
+            }
+        }
+
+        context.Response.Headers.ContentType = "application/json";
+        await context.Response.WriteAsync(responseContent);
     }
 }

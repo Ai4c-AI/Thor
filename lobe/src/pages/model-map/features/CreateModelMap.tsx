@@ -157,21 +157,56 @@ export default function CreateModelMap({ visible, onSuccess, onCancel }: CreateM
           {/* 源模型选择 */}
           <div className="space-y-2">
             <Label htmlFor="modelId">{t('modelMap.sourceModelId')}</Label>
-            <Select
-              value={formData.modelId}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, modelId: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('modelMap.sourceModelId')} />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((model: any) => (
-                  <SelectItem key={model} value={model}>
-                    {model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select
+                  value={formData.modelId}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, modelId: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select from list..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.map((model: any) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-1">
+                <Input
+                  placeholder="Or type custom model..."
+                  className="flex-1 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const value = e.currentTarget.value.trim();
+                      if (value) {
+                        setFormData(prev => ({ ...prev, modelId: value }));
+                        e.currentTarget.value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    const input = e.currentTarget.parentElement?.querySelector('input');
+                    const value = input?.value.trim();
+                    if (value) {
+                      setFormData(prev => ({ ...prev, modelId: value }));
+                      if (input) input.value = '';
+                    }
+                  }}
+                >
+                  Set
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* 用户组选择 */}
@@ -252,21 +287,55 @@ export default function CreateModelMap({ visible, onSuccess, onCancel }: CreateM
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <Label className="text-sm">{t('modelMap.targetModelId')}</Label>
-                        <Select
-                          value={item.modelId}
-                          onValueChange={(value) => updateModelMapItem(index, 'modelId', value)}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder={t('modelMap.targetModelId')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {models.map((model: any) => (
-                              <SelectItem key={model} value={model}>
-                                {model}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="mt-1 space-y-2">
+                          <Select
+                            value={item.modelId}
+                            onValueChange={(value) => updateModelMapItem(index, 'modelId', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select from list..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {models.map((model: any) => (
+                                <SelectItem key={model} value={model}>
+                                  {model}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1">
+                            <Input
+                              placeholder="Or type custom model..."
+                              className="flex-1 text-xs"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const value = e.currentTarget.value.trim();
+                                  if (value) {
+                                    updateModelMapItem(index, 'modelId', value);
+                                    e.currentTarget.value = '';
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="px-2 text-xs"
+                              onClick={(e) => {
+                                const input = e.currentTarget.parentElement?.querySelector('input');
+                                const value = input?.value.trim();
+                                if (value) {
+                                  updateModelMapItem(index, 'modelId', value);
+                                  if (input) input.value = '';
+                                }
+                              }}
+                            >
+                              Set
+                            </Button>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="w-24">

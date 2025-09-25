@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Thor.Domain.Chats;
+using Thor.Domain.Images;
 using Thor.Domain.Users;
 using Thor.Service.Domain;
 
@@ -247,6 +248,54 @@ public static class EntityConfigExtensions
                         : JsonSerializer.Deserialize<Dictionary<string, string>>(item, JsonSerializerOptions));
         });
 
+        modelBuilder.Entity<ImageTaskLogger>(options =>
+        {
+            options.HasKey(x => x.Id);
+            options
+                .Property(e => e.Id).ValueGeneratedOnAdd();
+
+            options.HasIndex(x => x.Creator);
+
+            options.HasIndex(x => x.TaskId);
+
+            options.HasIndex(x => x.TaskType);
+
+            options.HasIndex(x => x.TaskStatus);
+
+            options.HasIndex(x => x.ModelName);
+
+            options.HasIndex(x => x.UserName);
+
+            options.HasIndex(x => x.UserId);
+
+            options.HasIndex(x => x.ChannelId);
+
+            options.HasIndex(x => x.OrganizationId);
+
+            options.HasIndex(x => x.CreatedAt);
+
+            options.Property(x => x.Metadata)
+                .HasConversion(item => JsonSerializer.Serialize(item, JsonSerializerOptions),
+                    item => string.IsNullOrEmpty(item)
+                        ? new Dictionary<string, string>()
+                        : JsonSerializer.Deserialize<Dictionary<string, string>>(item, JsonSerializerOptions));
+
+            // TaskType 枚举转换
+            options.Property(x => x.TaskType)
+                .HasConversion<int>();
+
+            // TaskStatus 枚举转换
+            options.Property(x => x.TaskStatus)
+                .HasConversion<int>();
+
+            // 设置字段长度
+            options.Property(x => x.TaskId).HasMaxLength(100);
+            options.Property(x => x.ModelName).HasMaxLength(100);
+            options.Property(x => x.UserName).HasMaxLength(100);
+            options.Property(x => x.ChannelName).HasMaxLength(100);
+            options.Property(x => x.TokenName).HasMaxLength(100);
+        });
+
         modelBuilder.Entity<Tracing>(options =>
         {
             options.HasKey(x => x.Id);
@@ -269,19 +318,6 @@ public static class EntityConfigExtensions
                     item => string.IsNullOrEmpty(item)
                         ? new List<Tracing>()
                         : JsonSerializer.Deserialize<List<Tracing>>(item, JsonSerializerOptions));
-        });
-
-        modelBuilder.Entity<RequestLog>(options =>
-        {
-            options.HasKey(x => x.Id);
-            options
-                .Property(e => e.Id).ValueGeneratedOnAdd();
-
-            options.HasIndex(x => x.Creator);
-
-            options.HasIndex(x => x.ChatLoggerId);
-
-            options.HasIndex(x => x.RoutePath);
         });
 
         return modelBuilder;

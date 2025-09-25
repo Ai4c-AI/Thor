@@ -10,20 +10,17 @@ using Thor.Abstractions.Dtos;
 using Thor.Abstractions.Embeddings;
 using Thor.Abstractions.Embeddings.Dtos;
 using Thor.Abstractions.Exceptions;
-using Thor.Abstractions.Images;
-using Thor.Abstractions.Images.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.RequestModels;
-using Thor.Abstractions.ObjectModels.ObjectModels.ResponseModels;
 using Thor.Abstractions.Realtime;
 using Thor.Abstractions.Realtime.Dto;
 using Thor.Domain.Chats;
+using Thor.Domain.Users;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 using Thor.Service.Infrastructure;
-using Thor.Service.Infrastructure.Middlewares;
 
-namespace Thor.Service.Service.OpenAI;
+namespace Thor.Service.Service.AI;
 
 /// <summary>
 /// 对话服务
@@ -35,6 +32,7 @@ namespace Thor.Service.Service.OpenAI;
 /// <param name="rateLimitModelService"></param>
 /// <param name="userService"></param>
 /// <param name="loggerService"></param>
+/// <param name="channelGroupFailoverService"></param>
 public sealed partial class ChatService(
     IServiceProvider serviceProvider,
     ChannelService channelService,
@@ -43,11 +41,11 @@ public sealed partial class ChatService(
     RateLimitModelService rateLimitModelService,
     UserService userService,
     UserGroupService userGroupService,
-    RequestLogService requestLogService,
     ILogger<ChatService> logger,
     ModelMapService modelMapService,
     LoggerService loggerService,
-    ContextPricingService contextPricingService)
+    ContextPricingService contextPricingService,
+    ChannelGroupFailoverService channelGroupFailoverService)
     : AIService(serviceProvider, imageService)
 {
     public async ValueTask EmbeddingAsync(HttpContext context, ThorEmbeddingInput input)
@@ -331,11 +329,7 @@ public sealed partial class ChatService(
             request.MaxTokens = null;
             request.Temperature = null;
         }
-
-        var log = requestLogService.BeginRequestLog(context.Request.Path, request);
-
-        RequestLogContext.SetCurrent(log);
-
+        
         var rateLimit = 0;
         string? responseBody = null;
         Exception? lastException = null;
@@ -436,13 +430,9 @@ public sealed partial class ChatService(
                         IncludeUsage = true
                     };
 
-                    (requestToken, responseToken, responseBody) =
+                    (requestToken, responseToken) =
                         await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
-                    if (!string.IsNullOrEmpty(responseBody))
-                    {
-                        StreamResponseInterceptor.AddContent(ref responseBody);
-                    }
                 }
                 else
                 {
@@ -450,8 +440,6 @@ public sealed partial class ChatService(
                         await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
                 }
-
-                await requestLogService.EndRequestLog(log, 200);
 
                 var quota = requestToken * rate.PromptRate;
 
@@ -529,8 +517,6 @@ public sealed partial class ChatService(
             {
                 context.Response.StatusCode = 400;
                 await context.WriteErrorAsync($"当前{request.Model}模型未设置倍率,请联系管理员设置倍率", "400");
-                await requestLogService.EndRequestLog(log, 400,
-                    $"当前{request.Model}模型未设置倍率,请联系管理员设置倍率");
             }
         }
         catch (ForbiddenException forbiddenException)
@@ -541,7 +527,6 @@ public sealed partial class ChatService(
 
             if (rateLimit > 50)
             {
-                await requestLogService.EndRequestLog(log, 403, forbiddenException.Message, lastException);
                 context.Response.StatusCode = 403;
             }
             else
@@ -558,7 +543,6 @@ public sealed partial class ChatService(
             // TODO：限流重试次数
             if (rateLimit > 50)
             {
-                await requestLogService.EndRequestLog(log, 429, "对话模型请求限流", lastException);
                 context.Response.StatusCode = 429;
             }
             else
@@ -574,32 +558,25 @@ public sealed partial class ChatService(
                 context.Response.StatusCode = 402;
             }
 
-            await requestLogService.EndRequestLog(log, 402, "抱歉，您的额度不足",
-                insufficientQuotaException);
             await context.WriteOpenAIErrorAsync(insufficientQuotaException.Message, "402");
         }
         catch (RateLimitException)
         {
             context.Response.StatusCode = 429;
-            await requestLogService.EndRequestLog(log, 429, "抱歉，您的请求过于频繁，请稍后再试");
         }
         catch (UnauthorizedAccessException e)
         {
             context.Response.StatusCode = 401;
-            await requestLogService.EndRequestLog(log, 401, "未授权访问", e);
         }
         catch (OpenAIErrorException error)
         {
             context.Response.StatusCode = 400;
             await context.WriteErrorAsync(error.Message, error.Code);
-            await requestLogService.EndRequestLog(log, 400, error.Message, error);
         }
         catch (NotModelException modelException)
         {
             context.Response.StatusCode = 400;
             await context.WriteOpenAIErrorAsync(modelException.Message, "400");
-            await requestLogService.EndRequestLog(log, 400, modelException.Message,
-                modelException);
         }
         catch (Exception e)
         {
@@ -610,7 +587,6 @@ public sealed partial class ChatService(
             {
                 context.Response.StatusCode = 400;
                 await context.WriteOpenAIErrorAsync(e.Message, "500");
-                await requestLogService.EndRequestLog(log, 400, e.Message, e);
             }
             else
             {
@@ -907,7 +883,6 @@ public sealed partial class ChatService(
             if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
 
             result = await openService.ChatCompletionsAsync(request, platformOptions);
-            StreamResponseInterceptor.AddContent(result);
 
             await context.Response.WriteAsJsonAsync(result);
 
@@ -938,15 +913,12 @@ public sealed partial class ChatService(
             if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
 
             result = await openService.ChatCompletionsAsync(request, platformOptions);
-            StreamResponseInterceptor.AddContent(result);
 
             await context.Response.WriteAsJsonAsync(result);
         }
         else
         {
             result = await openService.ChatCompletionsAsync(request, platformOptions);
-            StreamResponseInterceptor.AddContent(result);
-
             await context.Response.WriteAsJsonAsync(result);
         }
 
@@ -1387,7 +1359,7 @@ public sealed partial class ChatService(
     /// <param Name="openService"></param>
     /// <param name="rate"></param>
     /// <returns></returns>
-    private async ValueTask<(int requestToken, int responseToken, string?)> StreamChatCompletionsHandlerAsync(
+    private async ValueTask<(int requestToken, int responseToken)> StreamChatCompletionsHandlerAsync(
         HttpContext context,
         ThorChatCompletionsRequest input, ChatChannel channel, IThorChatCompletionsService openService, User user,
         ModelManager rate)
@@ -1533,7 +1505,7 @@ public sealed partial class ChatService(
         }
 
 
-        return (requestToken, responseToken, StreamResponseInterceptor.GetCollectedContent());
+        return (requestToken, responseToken);
     }
 
 
@@ -1563,5 +1535,382 @@ public sealed partial class ChatService(
         if (ratios.TryGetValue(size, out var ratio)) return (decimal)ratio;
 
         return 1;
+    }
+
+    /// <summary>
+    /// 带故障转移的对话补全方法
+    /// 替换原有的ChatCompletionsAsync方法以支持分组级故障转移
+    /// </summary>
+    /// <param name="context">HTTP上下文</param>
+    /// <param name="request">对话请求</param>
+    /// <returns></returns>
+    public async Task ChatCompletionsWithFailoverAsync(HttpContext context, ThorChatCompletionsRequest request)
+    {
+        using var chatCompletions = Activity.Current?.Source.StartActivity("对话补全调用_故障转移");
+
+        var model = request.Model;
+
+        // 处理模型参数
+        ProcessModelParameters(request);
+
+        try
+        {
+            var organizationId = GetOrganizationId(context);
+
+            if (!ModelManagerService.PromptRate.TryGetValue(request.Model, out var rate))
+            {
+                context.Response.StatusCode = 400;
+                await context.WriteErrorAsync($"当前{request.Model}模型未设置倍率,请联系管理员设置倍率", "400");
+                return;
+            }
+
+            var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+            await rateLimitModelService.CheckAsync(request.Model, user.Id);
+            TokenService.CheckModel(request.Model, token, context);
+
+            request.Model = await modelMapService.ModelMap(request.Model);
+
+            // 创建故障转移上下文
+            var failoverContext = new ChannelGroupFailoverService.GroupFailoverContext
+            {
+                Model = request.Model,
+                User = user,
+                Token = token,
+                PreferredGroups = channelService.GetAvailableGroups(user, token),
+                IsResponses = false
+            };
+
+            // 记录请求信息
+            logger.LogInformation("开始故障转移请求：模型 {Model}, 用户 {User}, 可用分组 [{Groups}]",
+                request.Model, user?.UserName, string.Join(", ", failoverContext.PreferredGroups));
+
+            // 执行带故障转移的请求
+            var success = await ExecuteWithFailoverAsync(context, request, failoverContext, rate, organizationId, model);
+
+            if (!success)
+            {
+                context.Response.StatusCode = 500;
+                await context.WriteOpenAIErrorAsync("所有渠道分组都不可用，请稍后重试", "500");
+            }
+        }
+        catch (InsufficientQuotaException insufficientQuotaException)
+        {
+            context.Response.StatusCode = 402;
+            await context.WriteOpenAIErrorAsync(insufficientQuotaException.Message, "402");
+        }
+        catch (RateLimitException)
+        {
+            context.Response.StatusCode = 429;
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            context.Response.StatusCode = 401;
+        }
+        catch (NotModelException modelException)
+        {
+            context.Response.StatusCode = 400;
+            await context.WriteOpenAIErrorAsync(modelException.Message, "400");
+        }
+        catch (Exception e)
+        {
+            context.Response.StatusCode = 500;
+            await context.WriteOpenAIErrorAsync(e.Message, "500");
+        }
+    }
+
+    /// <summary>
+    /// 执行带故障转移的请求
+    /// </summary>
+    /// <param name="context">HTTP上下文</param>
+    /// <param name="request">请求对象</param>
+    /// <param name="failoverContext">故障转移上下文</param>
+    /// <param name="rate">费率配置</param>
+    /// <param name="organizationId">组织ID</param>
+    /// <param name="originalModel">原始模型名</param>
+    /// <returns>是否执行成功</returns>
+    private async ValueTask<bool> ExecuteWithFailoverAsync(
+        HttpContext context,
+        ThorChatCompletionsRequest request,
+        ChannelGroupFailoverService.GroupFailoverContext failoverContext,
+        ModelManager rate,
+        string organizationId,
+        string originalModel)
+    {
+        while (failoverContext.CurrentGroupIndex < failoverContext.PreferredGroups.Length)
+        {
+            logger.LogDebug("尝试分组 {GroupIndex}: {GroupName}",
+                failoverContext.CurrentGroupIndex,
+                failoverContext.PreferredGroups[failoverContext.CurrentGroupIndex]);
+
+            // 获取当前分组的可用渠道
+            var availableChannels = await channelGroupFailoverService.GetChannelsWithFailoverAsync(failoverContext);
+
+            if (!availableChannels.Any())
+            {
+                logger.LogWarning("分组 {GroupIndex} 无可用渠道，尝试下一个分组",
+                    failoverContext.CurrentGroupIndex);
+
+                // 切换到下一个分组
+                failoverContext.CurrentGroupIndex++;
+                failoverContext.RetryCount = 0;
+                continue;
+            }
+
+            // 尝试使用当前分组的渠道
+            foreach (var channel in availableChannels)
+            {
+                try
+                {
+                    logger.LogDebug("尝试渠道：{ChannelId} - {ChannelName}", channel.Id, channel.Name);
+
+                    var success = await TryExecuteWithChannelAsync(
+                        context, request, channel, rate, organizationId, originalModel, failoverContext.User);
+
+                    if (success)
+                    {
+                        logger.LogInformation("请求成功完成，使用渠道：{ChannelId} - {ChannelName}",
+                            channel.Id, channel.Name);
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning("渠道 {ChannelId} 执行失败：{Error}", channel.Id, ex.Message);
+
+                    // 记录渠道失败
+                    var shouldContinue = await channelGroupFailoverService.HandleChannelFailureAsync(
+                        failoverContext, channel.Id, ex);
+
+                    if (!shouldContinue)
+                    {
+                        logger.LogError("达到最大重试次数，停止重试");
+                        return false;
+                    }
+
+                    // 如果故障转移逻辑建议切换分组，则跳出当前渠道循环
+                    break;
+                }
+            }
+
+            // 当前分组的所有渠道都失败了，尝试切换到下一个分组
+            if (!await channelGroupFailoverService.HandleChannelFailureAsync(
+                    failoverContext, string.Empty, new Exception("当前分组所有渠道都不可用")))
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 尝试使用指定渠道执行请求
+    /// </summary>
+    /// <param name="context">HTTP上下文</param>
+    /// <param name="request">请求对象</param>
+    /// <param name="channel">渠道信息</param>
+    /// <param name="rate">费率配置</param>
+    /// <param name="organizationId">组织ID</param>
+    /// <param name="originalModel">原始模型名</param>
+    /// <param name="user">用户信息</param>
+    /// <returns>是否执行成功</returns>
+    private async ValueTask<bool> TryExecuteWithChannelAsync(
+        HttpContext context,
+        ThorChatCompletionsRequest request,
+        ChatChannel channel,
+        ModelManager rate,
+        string organizationId,
+        string originalModel,
+        User user)
+    {
+        var userGroup = await userGroupService.GetAsync(channel.Groups);
+        if (userGroup == null)
+        {
+            throw new BusinessException("当前渠道未设置分组，请联系管理员设置分组", "400");
+        }
+
+        // 获取渠道服务
+        var chatCompletionsService = GetKeyedService<IThorChatCompletionsService>(channel.Type);
+        if (chatCompletionsService == null)
+        {
+            throw new BusinessException($"并未实现：{channel.Type} 的服务", "400");
+        }
+
+        // 处理推理努力和思考模式
+        ProcessReasoningAndThinking(request);
+
+        logger.LogInformation("请求模型：{Model} 请求用户：{User} 请求分配渠道：{Name}",
+            request.Model, user?.UserName, channel.Name);
+
+        int requestToken;
+        var responseToken = 0;
+        int cachedTokens = 0;
+
+        var sw = Stopwatch.StartNew();
+
+        if (request.Stream == true)
+        {
+            request.StreamOptions = new ThorStreamOptions() { IncludeUsage = true };
+            (requestToken, responseToken) =
+                await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user, rate);
+        }
+        else
+        {
+            (requestToken, responseToken, cachedTokens) =
+                await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user, rate);
+        }
+
+        // 计算并记录消费
+        await CalculateAndLogConsumptionAsync(
+            rate, userGroup, requestToken, responseToken, cachedTokens,
+            channel, user, null, originalModel, organizationId, context,
+            request.Stream is true, sw.ElapsedMilliseconds);
+
+        return true;
+    }
+
+    /// <summary>
+    /// 处理模型参数
+    /// </summary>
+    /// <param name="request">请求对象</param>
+    private static void ProcessModelParameters(ThorChatCompletionsRequest request)
+    {
+        if (request.MaxCompletionTokens is > 0)
+        {
+            request.MaxTokens = request.MaxCompletionTokens;
+            request.MaxCompletionTokens = null;
+        }
+
+        if (request.Model.StartsWith("gpt-5"))
+        {
+            request.MaxCompletionTokens = request.MaxTokens;
+            request.MaxTokens = null;
+        }
+        else if (request.Model.StartsWith("o3-mini") || request.Model.StartsWith("o4-mini"))
+        {
+            request.MaxCompletionTokens = request.MaxTokens;
+            request.MaxTokens = null;
+            request.Temperature = null;
+        }
+    }
+
+    /// <summary>
+    /// 处理推理努力和思考模式
+    /// </summary>
+    /// <param name="request">请求对象</param>
+    private static void ProcessReasoningAndThinking(ThorChatCompletionsRequest request)
+    {
+        if (request.Model.EndsWith("-high") ||
+            request.Model.EndsWith("-medium") ||
+            request.Model.EndsWith("-minimal") ||
+            request.Model.EndsWith("-low"))
+        {
+            request.ReasoningEffort = request.Model switch
+            {
+                var s when s.EndsWith("-high") => "high",
+                var s when s.EndsWith("-medium") => "medium",
+                var s when s.EndsWith("-minimal") => "minimal",
+                var s when s.EndsWith("-low") => "low",
+                _ => "medium"
+            };
+
+            request.Model = request.Model.Replace("-high", "")
+                .Replace("-medium", "")
+                .Replace("-minimal", "")
+                .Replace("-low", "");
+        }
+
+        if (request.Model.EndsWith("-thinking"))
+        {
+            request.EnableThinking = true;
+            request.Model = request.Model.Replace("-thinking", "");
+        }
+    }
+
+    /// <summary>
+    /// 获取组织ID
+    /// </summary>
+    /// <param name="context">HTTP上下文</param>
+    /// <returns>组织ID</returns>
+    private static string GetOrganizationId(HttpContext context)
+    {
+        context.Request.Headers.TryGetValue("OpenAI-Organization", out var organizationIdHeader);
+        return organizationIdHeader.ToString();
+    }
+
+    /// <summary>
+    /// 计算并记录消费
+    /// </summary>
+    /// <param name="rate">费率配置</param>
+    /// <param name="userGroup">用户组</param>
+    /// <param name="requestToken">请求Token数</param>
+    /// <param name="responseToken">响应Token数</param>
+    /// <param name="cachedTokens">缓存Token数</param>
+    /// <param name="channel">渠道</param>
+    /// <param name="user">用户</param>
+    /// <param name="token">Token</param>
+    /// <param name="model">模型</param>
+    /// <param name="organizationId">组织ID</param>
+    /// <param name="context">HTTP上下文</param>
+    /// <param name="isStream">是否流式</param>
+    /// <param name="elapsedMilliseconds">耗时</param>
+    private async ValueTask CalculateAndLogConsumptionAsync(
+        ModelManager rate,
+        UserGroup userGroup,
+        int requestToken,
+        int responseToken,
+        int cachedTokens,
+        ChatChannel channel,
+        User user,
+        Token? token,
+        string model,
+        string organizationId,
+        HttpContext context,
+        bool isStream,
+        long elapsedMilliseconds)
+    {
+        var quota = requestToken * rate.PromptRate;
+        var completionRatio = rate.CompletionRate ?? GetCompletionRatio(model);
+        quota += responseToken * rate.PromptRate * completionRatio;
+        quota = (decimal)userGroup!.Rate * quota;
+        quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
+
+        if (rate.QuotaType == ModelQuotaType.OnDemand)
+        {
+            if (cachedTokens > 0 && rate.CacheRate > 0)
+            {
+                quota = requestToken * rate.CacheRate.Value;
+                quota += responseToken * rate.CacheRate.Value * completionRatio;
+                quota = (decimal)userGroup!.Rate * quota;
+                quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
+
+                await loggerService.CreateConsumeAsync("/v1/chat/completions",
+                    string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
+                        cachedTokens, rate.CacheRate),
+                    model, requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id,
+                    channel.Id, channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                    isStream, (int)elapsedMilliseconds, organizationId);
+            }
+            else
+            {
+                await loggerService.CreateConsumeAsync("/v1/chat/completions",
+                    string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate),
+                    model, requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id,
+                    channel.Id, channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                    isStream, (int)elapsedMilliseconds, organizationId);
+
+                await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id, model);
+            }
+        }
+        else
+        {
+            await loggerService.CreateConsumeAsync("/v1/chat/completions",
+                string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate), userGroup.Rate),
+                model, requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate),
+                token?.Key, user?.UserName, user?.Id, channel.Id, channel.Name,
+                context.GetIpAddress(), context.GetUserAgent(), isStream, (int)elapsedMilliseconds, organizationId);
+
+            await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key, channel.Id, model);
+        }
     }
 }

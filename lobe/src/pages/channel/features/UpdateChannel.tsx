@@ -2,12 +2,22 @@ import { Channel } from "@/types/api";
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 // shadcn/ui components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -24,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Services
 import { getModels, getTypes } from "../../../services/ModelService";
@@ -45,7 +56,7 @@ interface FormData {
   other: string;
   key: string;
   models: string[];
-  groups: string[];
+  group: string;
   cache: boolean;
   supportsResponses: boolean;
 }
@@ -68,11 +79,12 @@ export default function UpdateChannel({
     other: "",
     key: "",
     models: [],
-    groups: [],
+    group: "",
     cache: false,
     supportsResponses: false
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [groupPopoverOpen, setGroupPopoverOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -113,7 +125,7 @@ export default function UpdateChannel({
         other: value.other || "",
         key: value.key || "",
         models: value.models || [],
-        groups: value.groups || [],
+        group: value.group ? String(value.group) : value.groups?.[0] ?? "",
         cache: value.cache || false,
         supportsResponses: value.supportsResponses || false,
       });
@@ -138,8 +150,8 @@ export default function UpdateChannel({
       newErrors.models = t('channel.modelsRequired');
     }
 
-    if (formData.groups.length === 0) {
-      newErrors.groups = t('channel.groupsRequired');
+    if (!formData.group) {
+      newErrors.group = t('channel.groupsRequired');
     }
 
     if (formData.type === "AWSClaude" && !formData.other.trim()) {
@@ -161,7 +173,10 @@ export default function UpdateChannel({
 
     setIsSubmitting(true);
     try {
-      const submitData = { ...formData };
+      const submitData = {
+        ...formData,
+        groups: formData.group ? [formData.group] : [],
+      };
 
       // Handle Claude cache setting
       if (formData.type === "Claude") {
@@ -298,6 +313,8 @@ export default function UpdateChannel({
     }
   };
 
+  const selectedGroup = groups.find((group) => String(group.code ?? '') === formData.group);
+
   return (
     <Dialog open={visible} onOpenChange={onCancel}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -373,57 +390,44 @@ export default function UpdateChannel({
 
           {/* Groups */}
           <div className="space-y-2">
-            <Label htmlFor="groups">{t('channel.groups')} *</Label>
-            <div className={`border rounded-md p-2 min-h-[40px] ${errors.groups ? "border-destructive" : "border-input"}`}>
-              {formData.groups.length > 0 ? (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {formData.groups.map((group) => {
-                    const groupData = groups.find(g => g.code === group);
-                    return (
-                      <Badge
-                        key={group}
-                        variant="secondary"
-                        className="text-xs cursor-pointer"
-                        onClick={() => {
-                          const newGroups = formData.groups.filter(g => g !== group);
-                          updateFormData('groups', newGroups);
-                        }}
-                      >
-                        {groupData?.name || group} ×
-                      </Badge>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">{t('channel.selectGroups')}</p>
-              )}
-              <Select onValueChange={(value) => {
-                if (!formData.groups.includes(value)) {
-                  updateFormData('groups', [...formData.groups, value]);
-                }
-              }}>
-                <SelectTrigger className="border-0 shadow-none p-0 h-auto">
-                  <SelectValue placeholder="Add group..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.filter(group => !formData.groups.includes(group.code as string)).map((group) => (
-                    <SelectItem key={group.code} value={group.code as string}>
-                      <div className="flex items-center gap-2">
-                        <span>{group.name as string}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {group.description as string}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {t('channel.rate')}: {String(group.rate)}
-                        </Badge>
+            <Label htmlFor="group">{t('channel.groups')} *</Label>
+            <Select
+              value={formData.group}
+              onValueChange={(value) => updateFormData('group', value)}
+            >
+              <SelectTrigger id="group" className={errors.group ? "border-destructive" : ""}>
+                <SelectValue placeholder={t('channel.selectGroups')} />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((group) => {
+                  const value = String(group.code ?? '');
+                  return (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{group.name as string}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {t('channel.rate')}: {String(group.rate ?? '-')}
+                          </Badge>
+                        </div>
+                        {group.description && (
+                          <span className="text-xs text-muted-foreground">
+                            {String(group.description)}
+                          </span>
+                        )}
                       </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {errors.groups && (
-              <p className="text-sm text-destructive">{errors.groups}</p>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {selectedGroup?.description && (
+              <p className="text-xs text-muted-foreground">
+                {String(selectedGroup.description)}
+              </p>
+            )}
+            {errors.group && (
+              <p className="text-sm text-destructive">{errors.group}</p>
             )}
           </div>
 
@@ -450,22 +454,57 @@ export default function UpdateChannel({
               ) : (
                 <p className="text-muted-foreground text-sm">{t('channel.selectModels')}</p>
               )}
-              <Select onValueChange={(value) => {
-                if (!formData.models.includes(value)) {
-                  updateFormData('models', [...formData.models, value]);
-                }
-              }}>
-                <SelectTrigger className="border-0 shadow-none p-0 h-auto">
-                  <SelectValue placeholder="Add model..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.filter(model => !formData.models.includes(model)).map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select onValueChange={(value) => {
+                    if (!formData.models.includes(value)) {
+                      updateFormData('models', [...formData.models, value]);
+                    }
+                  }}>
+                    <SelectTrigger className="border-0 shadow-none p-0 h-auto">
+                      <SelectValue placeholder="Select from list..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.filter(model => !formData.models.includes(model)).map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="Or type custom model..."
+                    className="flex-1 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const value = e.currentTarget.value.trim();
+                        if (value && !formData.models.includes(value)) {
+                          updateFormData('models', [...formData.models, value]);
+                          e.currentTarget.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      const input = e.currentTarget.parentElement?.querySelector('input');
+                      const value = input?.value.trim();
+                      if (value && !formData.models.includes(value)) {
+                        updateFormData('models', [...formData.models, value]);
+                        if (input) input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
             </div>
             {errors.models && (
               <p className="text-sm text-destructive">{errors.models}</p>

@@ -33,7 +33,21 @@ import {
   Sparkles,
   Clock,
   Target,
-  LayoutGrid
+  LayoutGrid,
+  Activity,
+  Box,
+  Star,
+  ArrowUpDown,
+  X,
+  TrendingDown,
+  Zap,
+  Circle,
+  Power,
+  Layers,
+  Info,
+  Cpu,
+  Shield,
+  Globe
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -56,19 +70,19 @@ import { cn } from "@/lib/utils";
 import { getIconByName } from "../../utils/iconutils";
 
 const MODEL_TYPES = [
-  { key: 'all', label: 'All Models', icon: Database, color: 'text-blue-600', count: 0 },
-  { key: 'chat', label: 'Chat Models', icon: MessageSquare, color: 'text-green-600', count: 0 },
-  { key: 'image', label: 'Image Models', icon: Image, color: 'text-purple-600', count: 0 },
-  { key: 'audio', label: 'Audio Models', icon: Volume2, color: 'text-orange-600', count: 0 },
-  { key: 'embedding', label: 'Embedding', icon: Link, color: 'text-pink-600', count: 0 },
-  { key: 'stt', label: 'Speech to Text', icon: Mic, color: 'text-cyan-600', count: 0 },
-  { key: 'tts', label: 'Text to Speech', icon: Speaker, color: 'text-yellow-600', count: 0 }
+  { key: 'all', label: 'All Models', icon: Database, color: 'text-primary', bgColor: 'bg-primary/10', count: 0 },
+  { key: 'chat', label: 'Chat Models', icon: MessageSquare, color: 'text-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-950/20', count: 0 },
+  { key: 'image', label: 'Image Models', icon: Image, color: 'text-violet-600', bgColor: 'bg-violet-50 dark:bg-violet-950/20', count: 0 },
+  { key: 'audio', label: 'Audio Models', icon: Volume2, color: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-950/20', count: 0 },
+  { key: 'embedding', label: 'Embedding', icon: Link, color: 'text-pink-600', bgColor: 'bg-pink-50 dark:bg-pink-950/20', count: 0 },
+  { key: 'stt', label: 'Speech to Text', icon: Mic, color: 'text-cyan-600', bgColor: 'bg-cyan-50 dark:bg-cyan-950/20', count: 0 },
+  { key: 'tts', label: 'Text to Speech', icon: Speaker, color: 'text-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-950/20', count: 0 }
 ];
 
 const STATUS_FILTERS = [
-  { key: 'all', label: 'All Status', icon: BarChart3, color: 'text-slate-600' },
-  { key: 'enabled', label: 'Enabled', icon: CheckCircle, color: 'text-emerald-600' },
-  { key: 'disabled', label: 'Disabled', icon: XCircle, color: 'text-red-600' }
+  { key: 'all', label: 'All Status', icon: BarChart3, color: 'text-muted-foreground', bgColor: 'bg-muted/50' },
+  { key: 'enabled', label: 'Enabled', icon: CheckCircle, color: 'text-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-950/20' },
+  { key: 'disabled', label: 'Disabled', icon: XCircle, color: 'text-destructive', bgColor: 'bg-destructive/10' }
 ];
 
 interface ModelManager {
@@ -155,7 +169,7 @@ export default function ModelManager() {
         setTotal(res.data.total || 0);
       }
     } catch (error) {
-      toast.error('Failed to load models');
+      toast.error(t('common.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -169,7 +183,7 @@ export default function ModelManager() {
         setModelStats(res.data);
       }
     } catch (error) {
-      toast.error('Failed to load statistics');
+      toast.error(t('common.loadFailed'));
     } finally {
       setStatsLoading(false);
     }
@@ -184,7 +198,7 @@ export default function ModelManager() {
         setAvailableTypes(res.data.modelTypes || []);
       }
     } catch (error) {
-      toast.error('Failed to load metadata');
+      toast.error(t('common.loadFailed'));
     }
   };
 
@@ -242,14 +256,14 @@ export default function ModelManager() {
     try {
       const res = await EnableModelManager(id);
       if (res.success) {
-        toast.success(currentStatus ? 'Model disabled successfully' : 'Model enabled successfully');
+        toast.success(currentStatus ? t('modelManager.modelDisabled') : t('modelManager.modelEnabled'));
         loadData();
         loadStats();
       } else {
-        toast.error(res.message || 'Operation failed');
+        toast.error(res.message || t('common.operationFailed'));
       }
     } catch (error) {
-      toast.error('Operation failed');
+      toast.error(t('common.operationFailed'));
     }
   };
 
@@ -257,39 +271,39 @@ export default function ModelManager() {
     try {
       const res = await DeleteModelManager(id);
       if (res.success) {
-        toast.success('Model deleted successfully');
+        toast.success(t('modelManager.deleteSuccess'));
         loadData();
         loadStats();
         loadMetadata();
       } else {
-        toast.error(res.message || 'Delete failed');
+        toast.error(res.message || t('common.deleteFailed'));
       }
     } catch (error) {
-      toast.error('Delete failed');
+      toast.error(t('common.deleteFailed'));
     }
   };
 
   // Render functions
   const renderPrice = (item: ModelManager) => {
     const multiplier = isK ? 1000 : 1000000;
-    const unit = isK ? '1K' : '1M';
+    const unit = isK ? t('modelManager.perK') : t('modelManager.perM');
 
     if (item.quotaType === 1) {
       return (
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="text-xs">
-            Input: {renderQuota(item.promptRate * multiplier, 6)}/{unit}
+            {t('modelManager.input')}: {renderQuota(item.promptRate * multiplier, 6)}/{unit}
           </Badge>
           <Badge variant="outline" className="text-xs">
-            Output: {renderQuota(item.completionRate ? item.completionRate * multiplier : getCompletionRatio(item.model) * multiplier, 6)}/{unit}
+            {t('modelManager.output')}: {renderQuota(item.completionRate ? item.completionRate * multiplier : getCompletionRatio(item.model) * multiplier, 6)}/{unit}
           </Badge>
           {item.isVersion2 && (
             <>
               <Badge variant="secondary" className="text-xs">
-                Audio In: {renderQuota(item.audioPromptRate! * multiplier)}/{unit}
+                {t('modelManager.audioInput')}: {renderQuota(item.audioPromptRate! * multiplier)}/{unit}
               </Badge>
               <Badge variant="outline" className="text-xs">
-                Audio Out: {renderQuota(item.audioOutputRate ? item.audioOutputRate * multiplier : getCompletionRatio(item.model) * multiplier)}/{unit}
+                {t('modelManager.audioOutput')}: {renderQuota(item.audioOutputRate ? item.audioOutputRate * multiplier : getCompletionRatio(item.model) * multiplier)}/{unit}
               </Badge>
             </>
           )}
@@ -298,7 +312,7 @@ export default function ModelManager() {
     } else {
       return (
         <Badge variant="default" className="text-xs">
-          Per Request: {renderQuota(item.promptRate, 6)}
+          {t('modelManager.perRequest')}: {renderQuota(item.promptRate, 6)}
         </Badge>
       );
     }
@@ -315,35 +329,60 @@ export default function ModelManager() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2, delay: index * 0.02 }}
+        transition={{ duration: 0.3, delay: index * 0.03 }}
         className="group cursor-pointer"
         onClick={() => handleModelClick(model)}
       >
         <Card className={cn(
-          "h-full transition-all duration-200 hover:shadow-md",
-          !model.enable && "opacity-60"
+          "h-full transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5",
+          "border border-border/50 bg-card/50 backdrop-blur-sm",
+          !model.enable && "opacity-60",
+          "group-hover:border-primary/20"
         )}>
-          <CardHeader className="space-y-3">
+          <CardHeader className="space-y-4 pb-4">
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
-                  {icon?.icon || <Database className="h-6 w-6" />}
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className={cn(
+                  "relative flex h-14 w-14 items-center justify-center rounded-xl transition-all",
+                  typeConfig.bgColor,
+                  "group-hover:scale-105"
+                )}>
+                  <div className={cn("text-lg transition-colors", typeConfig.color)}>
+                    {icon?.icon || <Database className="h-7 w-7" />}
+                  </div>
+                  {model.enable && (
+                    <div className="absolute -top-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-sm">
+                      <div className="h-2 w-2 bg-white rounded-full" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base font-semibold truncate">
+                  <CardTitle className="text-base font-semibold truncate mb-1 group-hover:text-primary transition-colors">
                     {model.model}
                   </CardTitle>
-                  <CardDescription className="text-sm line-clamp-2">
+                  <CardDescription className="text-sm line-clamp-2 leading-relaxed">
                     {model.description || t('common.noData')}
                   </CardDescription>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <Badge variant={model.enable ? "default" : "secondary"}>
-                  {model.enable ? t('modelManager.modelEnabled') : t('modelManager.modelDisabled')}
+                <Badge
+                  variant={model.enable ? "default" : "secondary"}
+                  className={cn(
+                    "text-xs font-medium transition-all",
+                    model.enable
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+                      : "bg-muted text-muted-foreground border-border"
+                  )}
+                >
+                  {model.enable ? (
+                    <><CheckCircle className="h-3 w-3 mr-1" />{t('modelManager.modelEnabled')}</>
+                  ) : (
+                    <><XCircle className="h-3 w-3 mr-1" />{t('modelManager.modelDisabled')}</>
+                  )}
                 </Badge>
                 {model.isVersion2 && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-400">
                     <Sparkles className="h-3 w-3 mr-1" />
                     V2
                   </Badge>
@@ -354,33 +393,43 @@ export default function ModelManager() {
 
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className={cn("text-xs", typeConfig.color)}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs font-medium",
+                  typeConfig.color,
+                  typeConfig.bgColor,
+                  "border-current/20"
+                )}
+              >
                 <typeConfig.icon className="h-3 w-3 mr-1" />
                 {t(`modelManager.type${model.type.charAt(0).toUpperCase() + model.type.slice(1)}`)}
               </Badge>
             </div>
 
             {model.tags && model.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-2">
                 {model.tags.slice(0, 3).map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
+                  <Badge key={tag} variant="outline" className="text-xs bg-muted/50 text-muted-foreground border-border">
                     {tag}
                   </Badge>
                 ))}
                 {model.tags.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs bg-muted/50 text-muted-foreground border-border">
                     +{model.tags.length - 3}
                   </Badge>
                 )}
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{t('modelManager.modelPrice')}:</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('modelManager.modelPrice')}</span>
               </div>
-              {renderPrice(model)}
+              <div className="space-y-2">
+                {renderPrice(model)}
+              </div>
             </div>
 
             <Separator />
@@ -391,7 +440,7 @@ export default function ModelManager() {
                   size="sm"
                   variant="ghost"
                   onClick={() => setUpdateValue({ value: model, open: true })}
-                  className="h-8 w-8 p-0"
+                  className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -399,23 +448,28 @@ export default function ModelManager() {
                   size="sm"
                   variant="ghost"
                   onClick={() => handleEnableModel(model.id, model.enable)}
-                  className="h-8 w-8 p-0"
+                  className={cn(
+                    "h-9 w-9 p-0",
+                    model.enable
+                      ? "hover:bg-destructive/10 hover:text-destructive"
+                      : "hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
+                  )}
                 >
                   {model.enable ? (
-                    <XCircle className="h-4 w-4 text-destructive" />
+                    <Power className="h-4 w-4" />
                   ) : (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4" />
                   )}
                 </Button>
               </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0 hover:bg-muted">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => handleModelClick(model)}>
                     <Eye className="h-4 w-4 mr-2" />
                     {t('common.view')} {t('common.detail')}
@@ -427,7 +481,7 @@ export default function ModelManager() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => handleDeleteModel(model.id)}
-                    className="text-destructive"
+                    className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     {t('modelManager.deleteModel')}
@@ -462,12 +516,17 @@ export default function ModelManager() {
               )}
               onClick={() => handleModelClick(model)}
             >
-              <Card className="hover:shadow-md transition-all duration-200">
+              <Card className="hover:shadow-md hover:shadow-primary/10 transition-all duration-200 border border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                        {icon?.icon || <Database className="h-5 w-5" />}
+                      <div className={cn(
+                        "flex h-10 w-10 items-center justify-center rounded-lg",
+                        typeConfig.bgColor
+                      )}>
+                        <div className={cn(typeConfig.color)}>
+                          {icon?.icon || <Database className="h-5 w-5" />}
+                        </div>
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -476,6 +535,12 @@ export default function ModelManager() {
                           <Badge variant={model.enable ? "default" : "secondary"} className="text-xs">
                             {model.enable ? t('modelManager.modelEnabled') : t('modelManager.modelDisabled')}
                           </Badge>
+                          {model.isVersion2 && (
+                            <Badge variant="outline" className="text-xs">
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              V2
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground truncate">
                           {model.description || t('common.noData')}
@@ -484,7 +549,7 @@ export default function ModelManager() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <Badge variant="outline" className={cn("text-xs", typeConfig.color)}>
+                      <Badge variant="outline" className={cn("text-xs", typeConfig.color, typeConfig.bgColor)}>
                         <typeConfig.icon className="h-3 w-3 mr-1" />
                         {t(`modelManager.type${model.type.charAt(0).toUpperCase() + model.type.slice(1)}`)}
                       </Badge>
@@ -509,9 +574,9 @@ export default function ModelManager() {
                           className="h-8 w-8 p-0"
                         >
                           {model.enable ? (
-                            <XCircle className="h-4 w-4 text-destructive" />
+                            <Power className="h-4 w-4 text-destructive" />
                           ) : (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-4 w-4 text-emerald-600" />
                           )}
                         </Button>
                         <DropdownMenu>
@@ -554,50 +619,66 @@ export default function ModelManager() {
         value: modelStats.total,
         icon: Database,
         description: t('modelManager.title'),
-        color: 'text-blue-600'
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        trend: '+12%',
+        trendUp: true
       },
       {
         label: t('modelManager.modelEnabled'),
         value: modelStats.enabled,
         icon: CheckCircle,
         description: t('common.enabled'),
-        color: 'text-green-600'
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
+        trend: '+8%',
+        trendUp: true
       },
       {
         label: t('modelManager.modelDisabled'),
         value: modelStats.disabled,
         icon: XCircle,
         description: t('common.disabled'),
-        color: 'text-red-600'
+        color: 'text-destructive',
+        bgColor: 'bg-destructive/10',
+        trend: '-3%',
+        trendUp: false
       },
       {
         label: t('modelManager.typeChat'),
         value: modelStats.chat || 0,
         icon: MessageSquare,
         description: t('modelManager.typeChat'),
-        color: 'text-purple-600'
+        color: 'text-violet-600',
+        bgColor: 'bg-violet-50 dark:bg-violet-950/20',
+        trend: '+15%',
+        trendUp: true
       },
       {
         label: t('common.view'),
         value: filteredAndSortedData.length,
         icon: Eye,
         description: t('common.view'),
-        color: 'text-orange-600'
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50 dark:bg-orange-950/20',
+        trend: '+5%',
+        trendUp: true
       }
     ];
 
     if (statsLoading) {
       return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-8">
           {[...Array(5)].map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="shadow-sm">
               <CardContent className="p-6">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="h-8 w-8 rounded" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-6 w-12" />
-                    <Skeleton className="h-4 w-20" />
-                  </div>
+                <div className="flex items-center justify-between mb-4">
+                  <Skeleton className="h-10 w-10 rounded-xl" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-4 w-24" />
                 </div>
               </CardContent>
             </Card>
@@ -607,7 +688,7 @@ export default function ModelManager() {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-8">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -615,16 +696,29 @@ export default function ModelManager() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1, duration: 0.3 }}
           >
-            <Card>
+            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="flex items-center space-x-3">
-                  <div className={cn("p-2 rounded-lg bg-muted", stat.color)}>
-                    <stat.icon className="h-5 w-5" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className={cn("p-3 rounded-xl", stat.bgColor)}>
+                    <stat.icon className={cn("h-5 w-5", stat.color)} />
                   </div>
-                  <div>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <div className="text-xs text-muted-foreground">{stat.label}</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {stat.trendUp ? (
+                      <TrendingUp className="h-3 w-3 text-emerald-600" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3 text-destructive" />
+                    )}
+                    <span className={cn(
+                      "font-medium",
+                      stat.trendUp ? "text-emerald-600" : "text-destructive"
+                    )}>
+                      {stat.trend}
+                    </span>
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold tracking-tight">{stat.value.toLocaleString()}</div>
+                  <div className="text-sm text-muted-foreground line-clamp-1">{stat.label}</div>
                 </div>
               </CardContent>
             </Card>
@@ -650,8 +744,10 @@ export default function ModelManager() {
                 className="w-full justify-between h-auto p-3 text-left"
                 onClick={() => setActiveTypeFilter(type.key)}
               >
-                <div className="flex items-center gap-2">
-                  <type.icon className="h-4 w-4" />
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", type.bgColor)}>
+                    <type.icon className={cn("h-4 w-4", type.color)} />
+                  </div>
                   <span>
                     {type.key === 'all' ? t('common.all') + ' ' + t('nav.modelManager') : t(`modelManager.type${type.key.charAt(0).toUpperCase() + type.key.slice(1)}`)}
                   </span>
@@ -680,8 +776,10 @@ export default function ModelManager() {
                 className="w-full justify-between h-auto p-3 text-left"
                 onClick={() => setActiveStatusFilter(status.key)}
               >
-                <div className="flex items-center gap-2">
-                  <status.icon className="h-4 w-4" />
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", status.bgColor)}>
+                    <status.icon className={cn("h-4 w-4", status.color)} />
+                  </div>
                   <span>
                     {status.key === 'all' ? t('common.all') + ' ' + t('common.status') :
                      status.key === 'enabled' ? t('common.enabled') : t('common.disabled')}
@@ -724,8 +822,8 @@ export default function ModelManager() {
                 onClick={() => setSelectedTags([])}
                 className="w-full"
               >
-                <XCircle className="h-4 w-4 mr-2" />
-                {t('common.delete')} {t('common.all')}
+                <X className="h-4 w-4 mr-2" />
+                {t('common.clear')} {t('common.all')}
               </Button>
             )}
           </div>
@@ -745,7 +843,7 @@ export default function ModelManager() {
             className="w-full"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            {t('common.delete')} {t('common.all')} {t('common.filter')}
+            {t('common.clear')} {t('common.all')} {t('common.filter')}
           </Button>
         </>
       )}
@@ -753,33 +851,43 @@ export default function ModelManager() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <Database className="h-6 w-6" />
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Enhanced Header */}
+      <div className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
+                    <Database className="h-6 w-6" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <div className="h-2 w-2 bg-white rounded-full" />
+                  </div>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">{t('modelManager.title')}</h1>
-                  <p className="text-sm text-muted-foreground">{t('modelManager.modelDescription')}</p>
+                  <h1 className="text-3xl font-bold tracking-tight">{t('modelManager.title')}</h1>
+                  <p className="text-base text-muted-foreground">{t('modelManager.modelDescription')}</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
+                size="lg"
                 onClick={loadData}
                 disabled={loading}
-                className="gap-2"
+                className="gap-2 h-11"
               >
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
                 {t('common.refresh')}
               </Button>
-              <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Button
+                size="lg"
+                onClick={() => setCreateOpen(true)}
+                className="gap-2 h-11 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg"
+              >
                 <Plus className="h-4 w-4" />
                 {t('modelManager.createModel')}
               </Button>
@@ -788,24 +896,25 @@ export default function ModelManager() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="border-b bg-muted/50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-1 items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/* Enhanced Toolbar */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            {/* Search and filters */}
+            <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="relative flex-1 max-w-lg">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t('modelManager.searchModel')}
                   value={input.model}
                   onChange={(e) => setInput({ ...input, model: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && loadData()}
-                  className="pl-9"
+                  className="pl-11 h-11 bg-background border-border shadow-sm"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <Label htmlFor="price-unit" className="text-sm whitespace-nowrap">
+              <div className="flex items-center gap-4 rounded-lg border bg-background p-3">
+                <Label htmlFor="price-unit" className="text-sm font-medium whitespace-nowrap">
                   {t('modelManager.priceUnit')}:
                 </Label>
                 <Switch
@@ -819,13 +928,14 @@ export default function ModelManager() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center border rounded-lg p-1">
+            {/* View controls */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center rounded-lg border bg-background p-1">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="gap-2"
+                  className="gap-2 h-9"
                 >
                   <LayoutGrid className="h-4 w-4" />
                   {t('common.grid')}
@@ -834,42 +944,44 @@ export default function ModelManager() {
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
-                  className="gap-2"
+                  className="gap-2 h-9"
                 >
                   <List className="h-4 w-4" />
                   {t('common.list')}
                 </Button>
               </div>
 
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                <SelectTrigger className="w-32">
-                  <SlidersHorizontal className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">{t('common.name')}</SelectItem>
-                  <SelectItem value="created">{t('common.createdAt')}</SelectItem>
-                  <SelectItem value="type">{t('common.type')}</SelectItem>
-                  <SelectItem value="status">{t('common.status')}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger className="w-40 h-10">
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">{t('common.name')}</SelectItem>
+                    <SelectItem value="created">{t('common.createdAt')}</SelectItem>
+                    <SelectItem value="type">{t('common.type')}</SelectItem>
+                    <SelectItem value="status">{t('common.status')}</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-2"
-              >
-                <TrendingUp className={cn("h-4 w-4", sortOrder === 'desc' && "rotate-180")} />
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="h-10 px-3"
+                >
+                  {sortOrder === 'asc' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                </Button>
+              </div>
 
               <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2 h-10">
                     <Filter className="h-4 w-4" />
                     {t('common.filter')}
                     {(activeTypeFilter !== 'all' || activeStatusFilter !== 'all' || selectedTags.length > 0) && (
-                      <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                      <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs bg-primary/10 text-primary border-primary/20">
                         {[
                           activeTypeFilter !== 'all' ? 1 : 0,
                           activeStatusFilter !== 'all' ? 1 : 0,
@@ -879,9 +991,12 @@ export default function ModelManager() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent>
+                <SheetContent className="w-[400px] sm:w-[540px]">
                   <SheetHeader>
-                    <SheetTitle>{t('common.filter')} {t('nav.modelManager')}</SheetTitle>
+                    <SheetTitle className="flex items-center gap-2">
+                      <Filter className="h-5 w-5" />
+                      {t('common.filter')} {t('nav.modelManager')}
+                    </SheetTitle>
                     <SheetDescription>{t('modelManager.modelDescription')}</SheetDescription>
                   </SheetHeader>
                   <ScrollArea className="h-[calc(100vh-8rem)] mt-6">
@@ -896,7 +1011,7 @@ export default function ModelManager() {
 
       {/* Main Content */}
       <div className="flex-1">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-6 py-6">
           {renderStats()}
 
           <AnimatePresence mode="wait">
@@ -908,17 +1023,17 @@ export default function ModelManager() {
                 exit={{ opacity: 0 }}
                 className={cn(
                   viewMode === 'grid'
-                    ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                    : "space-y-3"
+                    ? "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    : "space-y-4"
                 )}
               >
                 {Array.from({ length: viewMode === 'grid' ? 8 : 5 }).map((_, i) => (
-                  <Card key={i}>
+                  <Card key={i} className="border border-border/50">
                     {viewMode === 'grid' ? (
                       <>
                         <CardHeader>
-                          <div className="flex items-center space-x-3">
-                            <Skeleton className="h-12 w-12 rounded-lg" />
+                          <div className="flex items-center space-x-4">
+                            <Skeleton className="h-14 w-14 rounded-xl" />
                             <div className="space-y-2 flex-1">
                               <Skeleton className="h-4 w-3/4" />
                               <Skeleton className="h-3 w-1/2" />
@@ -955,7 +1070,7 @@ export default function ModelManager() {
                 exit={{ opacity: 0 }}
               >
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <AnimatePresence>
                       {filteredAndSortedData.map((model, index) => renderModelCard(model, index))}
                     </AnimatePresence>
@@ -1000,7 +1115,7 @@ export default function ModelManager() {
                     className="gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
-                    {t('common.delete')} {t('common.all')} {t('common.filter')}
+                    {t('common.clear')} {t('common.all')} {t('common.filter')}
                   </Button>
                 )}
               </motion.div>

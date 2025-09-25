@@ -2,12 +2,22 @@ import { Channel } from "@/types/api";
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 // shadcn/ui components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -24,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Services
 import { getModels, getTypes } from "../../../services/ModelService";
@@ -44,7 +55,7 @@ interface FormData {
   other: string;
   key: string;
   models: string[];
-  groups: string[];
+  group: string;
   cache: boolean;
   supportsResponses: boolean;
 }
@@ -66,11 +77,12 @@ export default function CreateChannel({
     other: "",
     key: "",
     models: [],
-    groups: [],
+    group: "",
     cache: false,
     supportsResponses: false
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [groupPopoverOpen, setGroupPopoverOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -111,11 +123,12 @@ export default function CreateChannel({
         other: "",
         key: "",
         models: [],
-        groups: [],
+        group: "",
         cache: false,
         supportsResponses: false
       });
       setErrors({});
+      setGroupPopoverOpen(false);
     }
   }, [visible, loadData]);
 
@@ -136,8 +149,8 @@ export default function CreateChannel({
       newErrors.models = t('channel.modelsRequired');
     }
 
-    if (formData.groups.length === 0) {
-      newErrors.groups = t('channel.groupsRequired');
+    if (!formData.group) {
+      newErrors.group = t('channel.groupsRequired');
     }
 
     if (formData.type === "AWSClaude" && !formData.other.trim()) {
@@ -159,7 +172,10 @@ export default function CreateChannel({
 
     setIsSubmitting(true);
     try {
-      const submitData = { ...formData };
+      const submitData = {
+        ...formData,
+        groups: formData.group ? [formData.group] : [],
+      };
 
       // Handle Claude cache setting
       if (formData.type === "Claude") {
@@ -296,6 +312,10 @@ export default function CreateChannel({
     }
   };
 
+  const selectedGroup = groups.find((group) => String(group.code ?? '') === formData.group);
+  const groupSearchPlaceholder = t('channel.searchGroups', { defaultValue: 'Search groups...' });
+  const groupEmptyLabel = t('channel.noGroupsFound', { defaultValue: 'No groups found.' });
+
   return (
     <Dialog open={visible} onOpenChange={onCancel}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -371,57 +391,79 @@ export default function CreateChannel({
 
           {/* Groups */}
           <div className="space-y-2">
-            <Label htmlFor="groups">{t('channel.groups')} *</Label>
-            <div className={`border rounded-md p-2 min-h-[40px] ${errors.groups ? "border-destructive" : "border-input"}`}>
-              {formData.groups.length > 0 ? (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {formData.groups.map((group) => {
-                    const groupData = groups.find(g => g.code === group);
-                    return (
-                      <Badge
-                        key={group}
-                        variant="secondary"
-                        className="text-xs cursor-pointer"
-                        onClick={() => {
-                          const newGroups = formData.groups.filter(g => g !== group);
-                          updateFormData('groups', newGroups);
-                        }}
-                      >
-                        {groupData?.name || group} ×
-                      </Badge>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">{t('channel.selectGroups')}</p>
-              )}
-              <Select onValueChange={(value) => {
-                if (!formData.groups.includes(value)) {
-                  updateFormData('groups', [...formData.groups, value]);
-                }
-              }}>
-                <SelectTrigger className="border-0 shadow-none p-0 h-auto">
-                  <SelectValue placeholder="Add group..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.filter(group => !formData.groups.includes(group.code as string)).map((group) => (
-                    <SelectItem key={group.code} value={group.code as string}>
-                      <div className="flex items-center gap-2">
-                        <span>{group.name as string}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {group.description as string}
+            <Label htmlFor="group">{t('channel.groups')} *</Label>
+            <Popover open={groupPopoverOpen} onOpenChange={setGroupPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="group"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={groupPopoverOpen}
+                  className={cn(
+                    "w-full justify-between",
+                    errors.group ? "border-destructive focus-visible:ring-destructive" : "",
+                    selectedGroup ? "" : "text-muted-foreground"
+                  )}
+                >
+                  {selectedGroup ? (
+                    <div className="flex flex-col items-start text-left">
+                      <span className="font-medium">{selectedGroup.name ?? selectedGroup.code}</span>
+                      {selectedGroup.description && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {selectedGroup.description}
                         </span>
-                        <Badge variant="outline" className="text-xs">
-                          {t('channel.rate')}: {String(group.rate)}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {errors.groups && (
-              <p className="text-sm text-destructive">{errors.groups}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <span>{t('channel.selectGroups')}</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0">
+                <Command>
+                  <CommandInput placeholder={groupSearchPlaceholder} />
+                  <CommandEmpty>{groupEmptyLabel}</CommandEmpty>
+                  <CommandList>
+                    <CommandGroup>
+                      {groups.map((group) => {
+                        const value = String(group.code ?? '');
+                        const isSelected = formData.group === value;
+                        return (
+                          <CommandItem
+                            key={value}
+                            value={`${group.name ?? value} ${group.description ?? ''}`}
+                            onSelect={() => {
+                              updateFormData('group', value);
+                              setGroupPopoverOpen(false);
+                            }}
+                          >
+                            <div className="flex w-full items-center justify-between">
+                              <div className="flex flex-col text-left">
+                                <span>{group.name ?? value}</span>
+                                {group.description && (
+                                  <span className="text-xs text-muted-foreground">{group.description}</span>
+                                )}
+                              </div>
+                              <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {selectedGroup && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">
+                  {`${t('channel.rate')}: ${selectedGroup.rate ?? '-'}`}
+                </Badge>
+              </div>
+            )}
+            {errors.group && (
+              <p className="text-sm text-destructive">{errors.group}</p>
             )}
           </div>
 
@@ -448,22 +490,57 @@ export default function CreateChannel({
               ) : (
                 <p className="text-muted-foreground text-sm">{t('channel.selectModels')}</p>
               )}
-              <Select onValueChange={(value) => {
-                if (!formData.models.includes(value)) {
-                  updateFormData('models', [...formData.models, value]);
-                }
-              }}>
-                <SelectTrigger className="border-0 shadow-none p-0 h-auto">
-                  <SelectValue placeholder="Add model..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.filter(model => !formData.models.includes(model)).map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select onValueChange={(value) => {
+                    if (!formData.models.includes(value)) {
+                      updateFormData('models', [...formData.models, value]);
+                    }
+                  }}>
+                    <SelectTrigger className="border-0 shadow-none p-0 h-auto">
+                      <SelectValue placeholder="Select from list..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.filter(model => !formData.models.includes(model)).map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="Or type custom model..."
+                    className="flex-1 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const value = e.currentTarget.value.trim();
+                        if (value && !formData.models.includes(value)) {
+                          updateFormData('models', [...formData.models, value]);
+                          e.currentTarget.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      const input = e.currentTarget.parentElement?.querySelector('input');
+                      const value = input?.value.trim();
+                      if (value && !formData.models.includes(value)) {
+                        updateFormData('models', [...formData.models, value]);
+                        if (input) input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
             </div>
             {errors.models && (
               <p className="text-sm text-destructive">{errors.models}</p>

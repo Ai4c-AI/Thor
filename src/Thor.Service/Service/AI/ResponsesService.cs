@@ -9,7 +9,6 @@ using Thor.Domain.Chats;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
-using Thor.Service.Service.OpenAI;
 
 namespace Thor.Service.Service.AI;
 

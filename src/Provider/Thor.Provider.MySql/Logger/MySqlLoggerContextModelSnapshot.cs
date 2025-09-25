@@ -124,75 +124,6 @@ namespace Thor.Provider.MySql.Logger
                     b.ToTable("Loggers");
                 });
 
-            modelBuilder.Entity("Thor.Domain.Chats.RequestLog", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("ChatLoggerId")
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("ClientIp")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("HttpStatusCode")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsSuccess")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("RequestBody")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("RequestHeaders")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("RequestTime")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ResponseBody")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("ResponseTime")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("RoutePath")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UserAgent")
-                        .HasColumnType("longtext");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChatLoggerId");
-
-                    b.HasIndex("Creator");
-
-                    b.HasIndex("RoutePath");
-
-                    b.ToTable("RequestLogs");
-                });
-
             modelBuilder.Entity("Thor.Domain.Chats.Tracing", b =>
                 {
                     b.Property<string>("Id")
@@ -264,6 +195,129 @@ namespace Thor.Provider.MySql.Logger
                     b.HasIndex("TraceId");
 
                     b.ToTable("Tracings");
+                });
+
+            modelBuilder.Entity("Thor.Domain.Images.ImageTaskLogger", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ChannelId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ChannelName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Creator")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("IP")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ImageUrls")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Modifier")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OrganizationId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<long>("Quota")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("TaskCompletedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("TaskCreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("TaskParameters")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("TaskStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TokenName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("TotalTime")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Creator");
+
+                    b.HasIndex("ModelName");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("TaskStatus");
+
+                    b.HasIndex("TaskType");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserName");
+
+                    b.ToTable("ImageTaskLoggers");
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.ModelStatisticsNumber", b =>

@@ -124,75 +124,6 @@ namespace Thor.Provider.PostgreSQL.Logger
                     b.ToTable("Loggers");
                 });
 
-            modelBuilder.Entity("Thor.Domain.Chats.RequestLog", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ChatLoggerId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ClientIp")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Creator")
-                        .HasColumnType("text");
-
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<int>("HttpStatusCode")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsSuccess")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Modifier")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RequestBody")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RequestHeaders")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RequestTime")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("ResponseBody")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("ResponseTime")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("RoutePath")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("UserAgent")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChatLoggerId");
-
-                    b.HasIndex("Creator");
-
-                    b.HasIndex("RoutePath");
-
-                    b.ToTable("RequestLogs");
-                });
-
             modelBuilder.Entity("Thor.Domain.Chats.Tracing", b =>
                 {
                     b.Property<string>("Id")
@@ -264,6 +195,129 @@ namespace Thor.Provider.PostgreSQL.Logger
                     b.HasIndex("TraceId");
 
                     b.ToTable("Tracings");
+                });
+
+            modelBuilder.Entity("Thor.Domain.Images.ImageTaskLogger", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ChannelId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ChannelName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Creator")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("IP")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrls")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Modifier")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OrganizationId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Quota")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("TaskCompletedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("TaskCreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TaskParameters")
+                        .HasColumnType("text");
+
+                    b.Property<int>("TaskStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TokenName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TotalTime")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Creator");
+
+                    b.HasIndex("ModelName");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("TaskStatus");
+
+                    b.HasIndex("TaskType");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserName");
+
+                    b.ToTable("ImageTaskLoggers");
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.ModelStatisticsNumber", b =>

@@ -12,7 +12,9 @@ import {
   Clock,
   Eye,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Image as ImageIcon,
+  MessageSquare
 } from 'lucide-react';
 import { getLoggers, viewConsumption, Export } from '../../services/LoggerService';
 import { getSimpleList } from '../../services/UserService';
@@ -28,6 +30,8 @@ import { Calendar as CalendarComponent } from '../../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
 import { Skeleton } from '../../components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import ImageTaskLogger from './ImageTaskLogger';
 import { format } from 'date-fns';
 import { renderQuota } from "../../utils/render";
 import { cn } from '../../lib/utils';
@@ -255,37 +259,57 @@ export default function LoggerPage() {
                 {t('logger.title') || '系统日志'}
               </CardTitle>
             </div>
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                {t('common.reset') || '重置'}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFilterVisible(!filterVisible)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                {filterVisible ? '隐藏筛选' : '显示筛选'}
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={handleExport}
-                disabled={exportLoading}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {exportLoading ? '导出中...' : '导出数据'}
-              </Button>
-            </div>
           </div>
         </CardHeader>
       </Card>
+
+      {/* Tabs */}
+      <Tabs defaultValue="chat" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="chat" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            聊天日志
+          </TabsTrigger>
+          <TabsTrigger value="image" className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4" />
+            图片任务
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chat" className="space-y-6">
+          {/* Chat Logger Header Controls */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  {t('common.reset') || '重置'}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilterVisible(!filterVisible)}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  {filterVisible ? '隐藏筛选' : '显示筛选'}
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={handleExport}
+                  disabled={exportLoading}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exportLoading ? '导出中...' : '导出数据'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
       {/* Stats Card */}
       <Card>
@@ -486,72 +510,163 @@ export default function LoggerPage() {
                   ))
                 ) : (
                   data.map((item: any) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleRowExpansion(item.id)}
-                        >
-                          {expandedRows.has(item.id) ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{item.createdAt}</TableCell>
-                      <TableCell>
-                        {item.quota && (
-                          <Badge variant="secondary" className="text-xs">{renderQuota(item.quota, 4)}</Badge>
-                        )}
-                      </TableCell>
-                      {isAdmin && (
+                    <>
+                      <TableRow key={item.id} className="hover:bg-muted/50">
                         <TableCell>
-                          {item.channelName && (
-                            <Badge variant="outline" className="text-xs truncate max-w-[60px]" title={item.channelName}>
-                              {item.channelName}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleRowExpansion(item.id)}
+                          >
+                            {expandedRows.has(item.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{item.createdAt}</TableCell>
+                        <TableCell>
+                          {item.quota && (
+                            <Badge variant="secondary" className="text-xs">{renderQuota(item.quota, 4)}</Badge>
+                          )}
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            {item.channelName && (
+                              <Badge variant="outline" className="text-xs truncate max-w-[60px]" title={item.channelName}>
+                                {item.channelName}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          {item.userName && (
+                            <Badge variant="outline" className="text-xs truncate max-w-[50px]" title={item.userName}>
+                              {item.userName}
                             </Badge>
                           )}
                         </TableCell>
+                        <TableCell>
+                          {item.modelName && (
+                            <Badge
+                              variant="secondary"
+                              className="cursor-pointer text-xs truncate max-w-[100px]"
+                              title={item.modelName}
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.modelName);
+                                toast.success('已复制模型名称');
+                              }}
+                            >
+                              {item.modelName}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className="text-xs">{timeString(item.totalTime)}</Badge>
+                            <Badge variant={item.stream ? "default" : "secondary"} className="text-xs">
+                              {item.stream ? "流" : "非流"}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center text-xs hidden md:table-cell">{item.promptTokens}</TableCell>
+                        <TableCell className="text-center text-xs hidden md:table-cell">{item.completionTokens}</TableCell>
+                        <TableCell className="font-mono text-xs hidden lg:table-cell">{item.ip}</TableCell>
+                        <TableCell className="max-w-[120px] truncate text-xs" title={item.content}>
+                          {item.content}
+                        </TableCell>
+                      </TableRow>
+                      {expandedRows.has(item.id) && (
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={isAdmin ? 11 : 10} className="p-0">
+                            <div className="p-4 space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Clock className="h-4 w-4" />
+                                    时间信息
+                                  </h4>
+                                  <div className="space-y-1 text-xs">
+                                    <div><span className="font-medium">创建时间:</span> {item.createdAt}</div>
+                                    <div><span className="font-medium">总耗时:</span> {timeString(item.totalTime)}</div>
+                                    <div><span className="font-medium">流式处理:</span> {item.stream ? "是" : "否"}</div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    用户信息
+                                  </h4>
+                                  <div className="space-y-1 text-xs">
+                                    <div><span className="font-medium">用户名:</span> {item.userName || "未知"}</div>
+                                    <div><span className="font-medium">用户ID:</span> {item.userId || "未知"}</div>
+                                    <div><span className="font-medium">IP地址:</span> {item.ip || "未知"}</div>
+                                    {isAdmin && item.channelName && (
+                                      <div><span className="font-medium">渠道:</span> {item.channelName}</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Cpu className="h-4 w-4" />
+                                    模型信息
+                                  </h4>
+                                  <div className="space-y-1 text-xs">
+                                    <div><span className="font-medium">模型名称:</span> {item.modelName || "未知"}</div>
+                                    <div><span className="font-medium">提示Token:</span> {item.promptTokens || 0}</div>
+                                    <div><span className="font-medium">完成Token:</span> {item.completionTokens || 0}</div>
+                                    <div><span className="font-medium">消费额度:</span> {item.quota ? renderQuota(item.quota, 4) : "0"}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {item.content && (
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Eye className="h-4 w-4" />
+                                    详细内容
+                                  </h4>
+                                  <div className="bg-background rounded-md p-3 border max-h-40 overflow-y-auto">
+                                    <pre className="text-xs whitespace-pre-wrap font-mono text-foreground">
+                                      {item.content}
+                                    </pre>
+                                  </div>
+                                </div>
+                              )}
+
+                              {(item.promptContent || item.responseContent) && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                  {item.promptContent && (
+                                    <div className="space-y-2">
+                                      <h4 className="text-sm font-semibold">输入内容</h4>
+                                      <div className="bg-background rounded-md p-3 border max-h-32 overflow-y-auto">
+                                        <pre className="text-xs whitespace-pre-wrap font-mono text-foreground">
+                                          {item.promptContent}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {item.responseContent && (
+                                    <div className="space-y-2">
+                                      <h4 className="text-sm font-semibold">输出内容</h4>
+                                      <div className="bg-background rounded-md p-3 border max-h-32 overflow-y-auto">
+                                        <pre className="text-xs whitespace-pre-wrap font-mono text-foreground">
+                                          {item.responseContent}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                      <TableCell>
-                        {item.userName && (
-                          <Badge variant="outline" className="text-xs truncate max-w-[50px]" title={item.userName}>
-                            {item.userName}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {item.modelName && (
-                          <Badge
-                            variant="secondary"
-                            className="cursor-pointer text-xs truncate max-w-[100px]"
-                            title={item.modelName}
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.modelName);
-                              toast.success('已复制模型名称');
-                            }}
-                          >
-                            {item.modelName}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="outline" className="text-xs">{timeString(item.totalTime)}</Badge>
-                          <Badge variant={item.stream ? "default" : "secondary"} className="text-xs">
-                            {item.stream ? "流" : "非流"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center text-xs hidden md:table-cell">{item.promptTokens}</TableCell>
-                      <TableCell className="text-center text-xs hidden md:table-cell">{item.completionTokens}</TableCell>
-                      <TableCell className="font-mono text-xs hidden lg:table-cell">{item.ip}</TableCell>
-                      <TableCell className="max-w-[120px] truncate text-xs" title={item.content}>
-                        {item.content}
-                      </TableCell>
-                    </TableRow>
+                    </>
                   ))
                 )}
               </TableBody>
@@ -559,9 +674,28 @@ export default function LoggerPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between p-4 border-t">
-            <div className="text-sm text-muted-foreground">
-              总计: {total}
+          <div className="flex flex-col gap-4 p-4 border-t sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                总计: {total}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">每页显示:</span>
+                <Select
+                  value={input.pageSize.toString()}
+                  onValueChange={(value) => setInput({ ...input, pageSize: parseInt(value), page: 1 })}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <Button
@@ -595,6 +729,12 @@ export default function LoggerPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="image" className="space-y-6">
+          <ImageTaskLogger />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

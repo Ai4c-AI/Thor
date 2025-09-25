@@ -8,7 +8,7 @@ using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 
-namespace Thor.Service.Service.OpenAI;
+namespace Thor.Service.Service.AI;
 
 partial class ChatService
 {

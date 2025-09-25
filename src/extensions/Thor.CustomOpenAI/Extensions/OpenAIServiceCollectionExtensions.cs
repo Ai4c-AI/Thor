@@ -68,7 +68,7 @@ public static class OpenAIServiceCollectionExtensions
         services.AddKeyedSingleton<IThorAudioService, OpenAIAudioService>(CustomeOpenAIPlatformOptions
             .PlatformCode);
 
-        services.AddKeyedSingleton<IThorResponsesService, OpenAIResponsesService>(CustomeOpenAIPlatformOptions.PlatformCode);
+        services.AddKeyedSingleton<IThorResponsesService, CustomOpenAIResponsesService>(CustomeOpenAIPlatformOptions.PlatformCode);
 
         // 注册OpenAI到Claude适配器服务
         services.AddKeyedSingleton<IAnthropicChatCompletionsService>(CustomeOpenAIPlatformOptions.PlatformCode, 

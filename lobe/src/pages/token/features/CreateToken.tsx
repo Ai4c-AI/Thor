@@ -9,6 +9,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Switch } from '../../../components/ui/switch';
+import GroupSelector, { UserGroupDto } from '../components/GroupSelector';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '../../../components/ui/sheet';
 import { Card, CardContent } from '../../../components/ui/card';
@@ -32,13 +33,13 @@ export default function CreateToken({
     onCancel
 }: CreateTokenProps) {
     const { t } = useTranslation();
-    const [models, setModels] = useState<any>();
-    const [groups, setGroups] = useState<any[]>([]);
+    const [models, setModels] = useState<string[]>([]);
+    const [groups, setGroups] = useState<UserGroupDto[]>([]);
 
     useEffect(() => {
         getCurrentList()
             .then((res) => {
-                setGroups(res.data);
+                setGroups(Array.isArray(res.data) ? res.data : []);
             })
     }, []);
 
@@ -58,7 +59,7 @@ export default function CreateToken({
         getModels()
             .then(res => {
                 if (res.success) {
-                    setModels(res.data);
+                    setModels(Array.isArray(res.data) ? res.data : []);
                 } else {
                     toast.error(res.message);
                 }
@@ -113,14 +114,16 @@ export default function CreateToken({
 
     return (
         <Sheet open={visible} onOpenChange={(open) => !open && onCancel()}>
-            <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-                <SheetHeader>
+            <SheetContent className="sm:max-w-[600px] overflow-y-auto p-0">
+                <SheetHeader className="px-6 pt-6">
                     <SheetTitle>{t('token.createToken') || '创建Token'}</SheetTitle>
                 </SheetHeader>
 
-                <div className="space-y-8 py-6">
+                <div style={{
+                    padding:12
+                }} className="grid gap-6 pb-6">
                     {/* Token Name */}
-                    <div className="space-y-2">
+                    <div className="grid gap-2 px-6">
                         <Label htmlFor="name">{t('token.name') || 'Token名称'} *</Label>
                         <Input
                             id="name"
@@ -138,11 +141,11 @@ export default function CreateToken({
 
                     {/* Token Configuration */}
                     <Card>
-                        <CardContent className="space-y-6 pt-6">
+                        <CardContent className="grid gap-6 p-6">
                             {/* Quota Settings Section */}
-                            <div className="space-y-4">
+                            <div className="grid gap-4">
                                 <div className="flex items-center justify-between">
-                                    <div>
+                                    <div className="grid gap-1">
                                         <Label className="text-base font-medium">{t('token.unlimitedQuota') || '无限额度'}</Label>
                                         <p className="text-sm text-muted-foreground">{t('token.unlimitedQuotaDesc') || '启用后Token将不受额度限制'}</p>
                                     </div>
@@ -153,9 +156,9 @@ export default function CreateToken({
                                 </div>
 
                                 {!input.unlimitedQuota && (
-                                    <div className="space-y-2">
+                                    <div className="grid gap-2">
                                         <Label htmlFor="quota">{t('token.quota') || '额度'}</Label>
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center gap-2">
                                             <Input
                                                 id="quota"
                                                 type="number"
@@ -173,7 +176,7 @@ export default function CreateToken({
                             </div>
 
                             {/* Expiration Settings Section */}
-                            <div className="space-y-4 border-t pt-4">
+                            <div className="grid gap-4 border-t pt-4">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <Label className="text-base font-medium">{t('token.neverExpire') || '永不过期'}</Label>
@@ -217,57 +220,42 @@ export default function CreateToken({
                     </Card>
 
                     {/* User Groups */}
-                    <div className="space-y-3">
-                        <div>
-                            <Label className="text-base font-medium">{t('token.groups') || '用户组'} *</Label>
-                            <p className="text-sm text-muted-foreground">{t('token.userGroupDesc') || '选择Token所属的用户组'}</p>
-                        </div>
-                        <Select
-                            value={input.groups[0] || ""}
-                            onValueChange={(value) => setInput({ ...input, groups: [value] })}
-                        >
-                            <SelectTrigger className={cn(
-                                "w-full",
-                                input.groups.length === 0 && "border-red-200 focus:border-red-300"
-                            )}>
-                                <SelectValue placeholder={t('token.selectUserGroup') || '请选择用户组'} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {groups.map((group) => (
-                                    <SelectItem key={group.code} value={group.code}>
-                                        <div className="flex items-center justify-between w-full">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{group.name}</span>
-                                                <span className="text-xs text-muted-foreground">{group.description}</span>
-                                            </div>
-                                            <Badge variant="outline" className="ml-2">
-                                                {t('token.rate') || '倍率'}: {group.rate}
-                                            </Badge>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {input.groups.length === 0 && (
-                            <p className="text-xs text-red-600">请选择一个用户组</p>
-                        )}
-                    </div>
+                    <Card>
+                        <CardContent className="grid gap-4 p-6">
+                            <div className="grid gap-1">
+                                <Label className="text-base font-medium">{t('token.groups') || '用户组'} *</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {t('token.userGroupDesc') || '选择一个或多个用户组，拖动调整优先级'}
+                                </p>
+                            </div>
+                            <GroupSelector
+                                groups={groups}
+                                value={input.groups}
+                                onChange={(next) => setInput({ ...input, groups: next })}
+                                placeholder={t('token.selectUserGroup') || '请选择用户组'}
+                                invalid={input.groups.length === 0}
+                            />
+                            {input.groups.length === 0 && (
+                                <p className="text-xs text-red-600">请选择至少一个用户组</p>
+                            )}
+                        </CardContent>
+                    </Card>
 
                     {/* Advanced Settings */}
                     <Card>
-                        <CardContent className="space-y-6 pt-6">
-                            <div>
+                        <CardContent className="grid gap-6 p-6">
+                            <div className="grid gap-1">
                                 <Label className="text-base font-medium">{t('token.advancedSettings') || '高级设置'}</Label>
                                 <p className="text-sm text-muted-foreground">{t('token.advancedSettingsDesc') || '可选配置，用于限制Token的使用范围'}</p>
                             </div>
 
                             {/* Model Restrictions */}
-                            <div className="space-y-3">
-                                <div>
+                            <div className="grid gap-3">
+                                <div className="grid gap-1">
                                     <Label className="text-sm font-medium">{t('token.modelLimitLabel') || '模型限制'}</Label>
                                     <p className="text-xs text-muted-foreground">{t('token.modelLimitDesc') || '限制该Token可以使用的模型，不选择则无限制'}</p>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="grid gap-3">
                                     {input.limitModels.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
                                             {input.limitModels.map((model: string, index: number) => (
@@ -306,12 +294,12 @@ export default function CreateToken({
                             </div>
 
                             {/* IP Whitelist */}
-                            <div className="space-y-3 border-t pt-4">
-                                <div>
+                            <div className="grid gap-3 border-t pt-4">
+                                <div className="grid gap-1">
                                     <Label className="text-sm font-medium">{t('token.whiteIpList') || 'IP白名单'}</Label>
                                     <p className="text-xs text-muted-foreground">{t('token.ipWhitelistDesc') || '限制该Token只能从指定IP地址使用，不设置则无限制'}</p>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="grid gap-3">
                                     {input.whiteIpList.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
                                             {input.whiteIpList.map((ip: string, index: number) => (
@@ -348,7 +336,7 @@ export default function CreateToken({
                     </Card>
                 </div>
 
-                <SheetFooter className="gap-2">
+                <SheetFooter className="gap-2 px-6 pb-6">
                     <Button variant="outline" onClick={onCancel} className="flex-1">
                         {t('common.cancel') || '取消'}
                     </Button>

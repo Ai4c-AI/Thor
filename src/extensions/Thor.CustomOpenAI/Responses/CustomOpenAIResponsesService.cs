@@ -15,13 +15,13 @@ using Thor.Abstractions.Responses.Dto;
 
 namespace Thor.CustomOpenAI.Responses;
 
-public sealed class OpenAIResponsesService(ILogger<OpenAIResponsesService> logger) : IThorResponsesService
+public sealed class CustomOpenAIResponsesService(ILogger<CustomOpenAIResponsesService> logger) : IThorResponsesService
 {
     public async Task<ResponsesDto> GetResponseAsync(ResponsesInput input, ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         using var openai =
-            Activity.Current?.Source.StartActivity("CustomeOpenAI 对话补全");
+            Activity.Current?.Source.StartActivity("OpenAI 对话补全");
 
         var response = await HttpClientFactory.GetHttpClient(options.Address).PostJsonAsync(
             options?.Address.TrimEnd('/') + "/responses",
@@ -63,7 +63,7 @@ public sealed class OpenAIResponsesService(ILogger<OpenAIResponsesService> logge
         CancellationToken cancellationToken = default)
     {
         using var openai =
-            Activity.Current?.Source.StartActivity("CustomeOpenAI 对话补全");
+            Activity.Current?.Source.StartActivity("OpenAI 对话补全");
 
         var response = await HttpClientFactory.GetHttpClient(options.Address).PostJsonAsync(
             options?.Address.TrimEnd('/') + "/responses",
@@ -72,25 +72,22 @@ public sealed class OpenAIResponsesService(ILogger<OpenAIResponsesService> logge
         openai?.SetTag("Model", input.Model);
         openai?.SetTag("Response", response.StatusCode.ToString());
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        switch (response.StatusCode)
         {
-            throw new BusinessException("渠道未登录,请联系管理人员", "401");
-        }
+            case HttpStatusCode.Unauthorized:
+                throw new BusinessException("渠道未登录,请联系管理人员", "401");
+            // 如果限流则抛出限流异常
+            case HttpStatusCode.TooManyRequests:
+                throw new ThorRateLimitException();
+            // 大于等于400的状态码都认为是异常
+            case >= HttpStatusCode.BadRequest:
+            {
+                var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}", options.Address,
+                    response.StatusCode, error);
 
-        // 如果限流则抛出限流异常
-        if (response.StatusCode == HttpStatusCode.TooManyRequests)
-        {
-            throw new ThorRateLimitException();
-        }
-
-        // 大于等于400的状态码都认为是异常
-        if (response.StatusCode >= HttpStatusCode.BadRequest)
-        {
-            var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}", options.Address,
-                response.StatusCode, error);
-
-            throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
+                throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
+            }
         }
 
 
@@ -104,10 +101,6 @@ public sealed class OpenAIResponsesService(ILogger<OpenAIResponsesService> logge
         var @event = string.Empty;
         while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
         {
-            // 新接口返回格式
-            // event: response.created
-            // data: {"type":"response.created","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-4.1-2025-04-14","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
-
             if (string.IsNullOrWhiteSpace(line))
             {
                 continue;

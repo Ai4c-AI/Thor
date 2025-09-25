@@ -24,6 +24,8 @@ using Thor.Core.Extensions;
 using Thor.CustomOpenAI.Extensions;
 using Thor.DeepSeek.Extensions;
 using Thor.Domain.Chats;
+using Thor.Domain.Images;
+using Thor.Domain.Shared;
 using Thor.Domain.Users;
 using Thor.ErnieBot.Extensions;
 using Thor.GCPClaude.Extensions;
@@ -50,10 +52,11 @@ using Thor.Service.Infrastructure.Middlewares;
 using Thor.Service.Options;
 using Thor.Service.Service;
 using Thor.Service.Service.AI;
-using Thor.Service.Service.OpenAI;
 using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
 using Thor.VolCenGine.Extensions;
+using MiniExcelLibs;
+using ChatService = Thor.Service.Service.AI.ChatService;
 using Product = Thor.Service.Domain.Product;
 using TracingService = Thor.Service.Service.TracingService;
 
@@ -69,8 +72,6 @@ try
         Args = args,
         ContentRootPath = AppContext.BaseDirectory,
     });
-
-    ThorOptions.Initialize(builder.Configuration);
 
     // 添加Windows服务支持
     if (OperatingSystem.IsWindows())
@@ -138,16 +139,18 @@ try
         .AddCustomAuthentication()
         .AddHttpContextAccessor()
         .AddScoped<IEventHandler<ChatLogger>, ChatLoggerEventHandler>()
+        .AddScoped<IEventHandler<ImageTaskLogger>, ImageTaskLoggerEventHandler>()
         .AddScoped<IEventHandler<CreateUserEto>, CreateUserEventHandler>()
         .AddScoped<IEventHandler<UpdateModelManagerCache>, ModelManagerEventHandler>()
-        .AddScoped<IEventHandler<RequestLog>, RequestLogCreatedEventHandler>()
         .AddTransient<JwtHelper>()
         .AddSingleton<OpenTelemetryMiddlewares>()
         .AddSingleton<UnitOfWorkMiddleware>()
         .AddScoped<AuthorizeService>()
         .AddScoped<ChannelService>()
+        .AddScoped<ChannelGroupFailoverService>()
         .AddScoped<EmailService>()
         .AddScoped<ImageService>()
+        .AddScoped<ImageTaskLoggerService>()
         .AddScoped<LoggerService>()
         .AddScoped<ModelManagerService>()
         .AddScoped<AnthropicChatService>()
@@ -191,7 +194,6 @@ try
         .AddDeepSeekService()
         .AddGeminiService();
 
-    builder.Services.AddScoped<RequestLogService>();
     builder.Services
         .AddCors(options =>
         {
@@ -610,37 +612,6 @@ try
 
     #endregion
 
-    #region RequestLog
-
-    var requestLog = app.MapGroup("/api/v1/request-log")
-        .WithTags("RequestLog")
-        .AddEndpointFilter<ResultFilter>()
-        .RequireAuthorization();
-
-    requestLog.MapGet(string.Empty,
-            async (RequestLogService service, int page, int pageSize, string? userName, DateTime? startTime,
-                    DateTime? endTime) =>
-                await service.GetAsync(page, pageSize, userName, startTime, endTime))
-        .WithDescription("获取请求日志")
-        .WithDisplayName("获取请求日志")
-        .WithOpenApi();
-
-    requestLog.MapDelete("{id}",
-            async (RequestLogService service, string id) =>
-                await service.DeleteAsync(id))
-        .WithDescription("删除请求日志")
-        .WithDisplayName("删除请求日志")
-        .WithOpenApi();
-
-    requestLog.MapDelete("batch",
-            async (RequestLogService service, string[] ids) =>
-                await service.DeleteBatchAsync(ids))
-        .WithDescription("批量删除请求日志")
-        .WithDisplayName("批量删除请求日志")
-        .WithOpenApi();
-
-    #endregion
-
     #region User
 
     var user = app.MapGroup("/api/v1/user")
@@ -994,11 +965,6 @@ try
         .WithDescription("获取邀请信息")
         .WithOpenApi();
 
-    system.MapGet("request-log-enabled", (SystemService service) =>
-            service.IsRequestLogEnabled())
-        .WithDescription("Is Request Log Enabled")
-        .WithOpenApi();
-
     #endregion
 
     #region Announcement
@@ -1051,6 +1017,177 @@ try
     announcementAdmin.MapPut("toggle/{id}", async (AnnouncementService service, string id, bool enabled) =>
             await service.ToggleEnabledAsync(id, enabled))
         .WithDescription("启用/禁用公告")
+        .WithOpenApi();
+
+    #endregion
+
+    #region Image Tasks
+
+    var imageTasks = app.MapGroup("/api/v1/image-tasks")
+        .WithTags("Image Task Logs")
+        .AddEndpointFilter<ResultFilter>()
+        .RequireAuthorization();
+
+    // 分页查询图片任务日志
+    imageTasks.MapGet(string.Empty, async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        int page = 1,
+        int pageSize = 20,
+        ThorImageTaskType? taskType = null,
+        ThorImageTaskStatus? taskStatus = null,
+        string? model = null,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? keyword = null,
+        string? userId = null) =>
+        await imageTaskLoggerService.GetAsync(page, pageSize, taskType, taskStatus, model, startTime, endTime, keyword, userId))
+        .WithDescription("分页查询图片任务日志")
+        .WithOpenApi();
+
+    // 根据TaskId获取任务详情
+    imageTasks.MapGet("{taskId}", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        IServiceProvider serviceProvider,
+        string taskId) =>
+    {
+        var userContext = serviceProvider.GetRequiredService<IUserContext>();
+        var task = await imageTaskLoggerService.GetByTaskIdAsync(taskId);
+
+        // 脱敏处理
+        if (task != null && !userContext.IsAdmin)
+        {
+            task.ChannelName = null;
+            if (!string.IsNullOrEmpty(task.TokenName))
+            {
+                task.TokenName = task.TokenName[..3] + "..." + task.TokenName[^3..];
+            }
+        }
+
+        return task;
+    })
+        .WithDescription("根据TaskId获取任务详情")
+        .WithOpenApi();
+
+    // 获取任务统计信息
+    imageTasks.MapGet("statistics", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        DateTime? startTime = null,
+        DateTime? endTime = null) =>
+        await imageTaskLoggerService.GetTaskStatisticsAsync(startTime, endTime))
+        .WithDescription("获取任务统计信息")
+        .WithOpenApi();
+
+    // 更新任务状态
+    imageTasks.MapPatch("{taskId}/status", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        string taskId,
+        UpdateTaskStatusRequest request) =>
+    {
+        await imageTaskLoggerService.UpdateTaskStatusAsync(
+            taskId: taskId,
+            status: request.Status,
+            progress: request.Progress,
+            imageUrls: request.ImageUrls,
+            errorMessage: request.ErrorMessage);
+        return Results.Ok();
+    })
+        .WithDescription("更新任务状态")
+        .WithOpenApi();
+
+    // 导出图片任务日志
+    imageTasks.MapGet("export", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        ILogger<Program> logger,
+        ThorImageTaskType? taskType = null,
+        ThorImageTaskStatus? taskStatus = null,
+        string? model = null,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? keyword = null,
+        string? userId = null) =>
+    {
+        try
+        {
+            // 获取所有符合条件的数据
+            var result = await imageTaskLoggerService.GetAsync(
+                1, int.MaxValue, taskType, taskStatus, model, startTime, endTime, keyword, userId);
+
+            if (result.Items.Any())
+            {
+                // 创建导出数据
+                var exportData = result.Items.Select(task => new
+                {
+                    任务ID = task.TaskId,
+                    任务类型 = task.TaskType.ToString(),
+                    任务状态 = task.TaskStatus.ToString(),
+                    提示词 = task.Prompt,
+                    模型名称 = task.ModelName,
+                    用户名 = task.UserName,
+                    用户ID = task.UserId,
+                    渠道名称 = task.ChannelName,
+                    IP地址 = task.IP,
+                    消费额度 = task.Quota,
+                    响应时间 = task.TotalTime,
+                    进度 = $"{task.Progress}%",
+                    是否成功 = task.IsSuccess ? "是" : "否",
+                    错误信息 = task.ErrorMessage,
+                    任务创建时间 = task.TaskCreatedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    任务完成时间 = task.TaskCompletedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    记录创建时间 = task.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }).ToList();
+
+                // 设置文件名称
+                string fileName = $"image_tasks_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+
+                // 使用MiniExcel导出
+                var exportStream = new MemoryStream();
+                await exportStream.SaveAsAsync(exportData);
+                exportStream.Seek(0, SeekOrigin.Begin);
+
+                return Results.File(exportStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            else
+            {
+                return Results.Content("没有找到符合条件的数据");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Export image tasks failed");
+            return Results.Problem("导出失败，请稍后重试", statusCode: 500);
+        }
+    })
+        .WithDescription("导出图片任务日志")
+        .WithOpenApi();
+
+    // 批量查询任务
+    imageTasks.MapPost("batch", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        BatchQueryRequest request) =>
+        await imageTaskLoggerService.GetTasksByChannelAndIdsAsync(request.ChannelId, request.TaskIds))
+        .WithDescription("批量查询任务")
+        .WithOpenApi();
+
+    // 获取任务类型列表
+    imageTasks.MapGet("task-types", () =>
+    {
+        var taskTypes = Enum.GetValues<ThorImageTaskType>()
+            .Select(type => new { Value = (int)type, Name = type.ToString() })
+            .ToList();
+        return Results.Ok(taskTypes);
+    })
+        .WithDescription("获取任务类型列表")
+        .WithOpenApi();
+
+    // 获取任务状态列表
+    imageTasks.MapGet("task-statuses", () =>
+    {
+        var taskStatuses = Enum.GetValues<ThorImageTaskStatus>()
+            .Select(status => new { Value = (int)status, Name = status.ToString() })
+            .ToList();
+        return Results.Ok(taskStatuses);
+    })
+        .WithDescription("获取任务状态列表")
         .WithOpenApi();
 
     #endregion
@@ -1175,4 +1312,24 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+/// <summary>
+/// 更新任务状态请求
+/// </summary>
+public record UpdateTaskStatusRequest
+{
+    public ThorImageTaskStatus Status { get; set; }
+    public int Progress { get; set; } = 0;
+    public string[]? ImageUrls { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// 批量查询请求
+/// </summary>
+public record BatchQueryRequest
+{
+    public string ChannelId { get; set; } = string.Empty;
+    public List<string> TaskIds { get; set; } = new();
 }

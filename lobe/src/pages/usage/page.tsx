@@ -1,12 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
-import { MessageSquare, Image, Headphones, Wrench, Download, Volume2, Languages, Calendar, Filter } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { MessageSquare, Image, Headphones, Wrench, Download, Volume2, Languages, Calendar, Filter, TrendingUp } from 'lucide-react';
 import { renderNumber, renderQuota } from '../../utils/render';
-import * as echarts from 'echarts';
 import { getTokens } from '../../services/TokenService';
 import { GetUsage } from '../../services/UsageService';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { Bar, BarChart, Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
 
 // shadcn/ui imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,35 +35,51 @@ export default function UsagePage() {
         serviceRequests: []
     });
 
-    // 图表容器引用
-    const chatCompletionChartRef = useRef<HTMLDivElement>(null);
-    const imagesChartRef = useRef<HTMLDivElement>(null);
-    const embeddingsChartRef = useRef<HTMLDivElement>(null);
-    const audioSpeechChartRef = useRef<HTMLDivElement>(null);
-    const audioTranscriptionChartRef = useRef<HTMLDivElement>(null);
-    const audioTranslationChartRef = useRef<HTMLDivElement>(null);
-    const dailyUsageChartRef = useRef<HTMLDivElement>(null);
-    const requestsChartRef = useRef<HTMLDivElement>(null);
-    const tokensChartRef = useRef<HTMLDivElement>(null);
+    // 处理后的图表数据
+    const [chartData, setChartData] = useState<{
+        dailyUsage: Array<{
+            date: string;
+            cost: number;
+            requests: number;
+            tokens: number;
+            [key: string]: any;
+        }>;
+        serviceCharts: {
+            [key: string]: Array<{
+                date: string;
+                requests: number;
+                tokens?: number;
+            }>;
+        };
+    }>({ dailyUsage: [], serviceCharts: {} });
 
-    // 图表实例引用
-    const chartInstancesRef = useRef<{ [key: string]: echarts.ECharts }>({});
+    // Chart configurations using shadcn theming system
+    const chartConfigs = {
+        dailyUsage: {
+            cost: {
+                label: t('usage.cost'),
+                color: 'hsl(var(--destructive))'
+            },
+            requests: {
+                label: t('usage.requests'),
+                color: 'hsl(var(--primary))'
+            },
+            tokens: {
+                label: t('usage.tokenCount'),
+                color: 'hsl(var(--chart-3))'
+            }
+        } satisfies ChartConfig,
 
-    // ECharts compatible color palette - matches the design system
-    const chartColors = {
-        primary: '#0f172a',
-        success: '#22c55e',
-        warning: '#f59e0b',
-        destructive: '#ef4444',
-        info: '#3b82f6',
-        muted: '#64748b',
-        background: '#ffffff',
-        foreground: '#0f172a',
-        border: '#e2e8f0',
-        // Chart specific gradients
-        primaryAlpha80: 'rgba(15, 23, 42, 0.8)',
-        successAlpha80: 'rgba(34, 197, 94, 0.8)',
-        warningAlpha80: 'rgba(245, 158, 11, 0.8)',
+        service: {
+            requests: {
+                label: t('usage.requests'),
+                color: 'hsl(var(--primary))'
+            },
+            tokens: {
+                label: t('usage.tokenCount'),
+                color: 'hsl(var(--chart-2))'
+            }
+        } satisfies ChartConfig
     };
 
     // 加载Token列表
@@ -111,12 +128,7 @@ export default function UsagePage() {
 
             if (response.success && response.data) {
                 setUsageData(response.data);
-                setTimeout(() => {
-                    updateCharts(response.data);
-                    Object.values(chartInstancesRef.current).forEach(chart => {
-                        chart?.resize();
-                    });
-                }, 100);
+                processChartData(response.data);
             }
         } catch (error) {
             console.error('获取使用数据失败', error);
@@ -125,12 +137,140 @@ export default function UsagePage() {
         }
     };
 
+    // 处理图表数据
+    const processChartData = (data: any) => {
+        if (!data || !data.dailyUsage || data.dailyUsage.length === 0) {
+            setChartData({ dailyUsage: [], serviceCharts: {} });
+            return;
+        }
+
+        // 处理日常使用数据
+        const processedDailyUsage = data.dailyUsage
+            .map((item: any) => {
+                const date = new Date(item.date);
+                return {
+                    date: `${date.getMonth() + 1}/${date.getDate()}`,
+                    cost: item.cost || 0,
+                    requests: item.requestCount || 0,
+                    tokens: item.tokenCount || 0,
+                    modelUsage: item.modelUsage || []
+                };
+            })
+            .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // 处理服务类型图表数据
+        const serviceEndpoints = [
+            '/v1/chat/completions',
+            '/v1/images/generations',
+            '/v1/embeddings',
+            '/v1/audio/speech',
+            '/v1/audio/transcriptions',
+            '/v1/audio/translations'
+        ];
+
+        const serviceCharts: any = {};
+
+        serviceEndpoints.forEach(endpoint => {
+            serviceCharts[endpoint] = data.dailyUsage.map((dailyItem: any) => {
+                const dailyDate = dailyItem.date;
+
+                const requests = data.serviceRequests
+                    .filter((req: any) => {
+                        const matchesEndpoint = endpoint === '/v1/chat/completions'
+                            ? (req.apiEndpoint.startsWith('/v1/chat/completions') || req.apiEndpoint.startsWith('/v1/completions'))
+                            : req.apiEndpoint.startsWith(endpoint);
+                        return matchesEndpoint && req.date === dailyDate;
+                    })
+                    .reduce((sum: number, req: any) => sum + (req.requestCount || 0), 0);
+
+                const tokens = data.serviceRequests
+                    .filter((req: any) => {
+                        const matchesEndpoint = endpoint === '/v1/chat/completions'
+                            ? (req.apiEndpoint.startsWith('/v1/chat/completions') || req.apiEndpoint.startsWith('/v1/completions'))
+                            : req.apiEndpoint.startsWith(endpoint);
+                        return matchesEndpoint && req.date === dailyDate;
+                    })
+                    .reduce((sum: number, req: any) => sum + (req.tokenCount || 0), 0);
+
+                const displayDate = new Date(dailyDate);
+                return {
+                    date: `${displayDate.getMonth() + 1}/${displayDate.getDate()}`,
+                    requests,
+                    tokens
+                };
+            });
+        });
+
+        setChartData({ dailyUsage: processedDailyUsage, serviceCharts });
+    };
+
     // 当选择的Token或日期范围变化时，重新获取数据
     useEffect(() => {
         if (dateRange) {
             fetchUsageData();
         }
     }, [selectedApiKey, dateRange]);
+
+    // 处理模型使用情况的图表数据
+    const getModelUsageChartData = () => {
+        if (!chartData.dailyUsage.length) return [];
+
+        const hasModelData = chartData.dailyUsage.some(item => item.modelUsage && item.modelUsage.length > 0);
+        if (!hasModelData) return chartData.dailyUsage;
+
+        const allModels = new Set<string>();
+        chartData.dailyUsage.forEach(item => {
+            if (item.modelUsage) {
+                item.modelUsage.forEach((model: any) => {
+                    allModels.add(model.modelName);
+                });
+            }
+        });
+
+        return chartData.dailyUsage.map(item => {
+            const result: any = { date: item.date };
+
+            Array.from(allModels).forEach(modelName => {
+                const modelUsage = item.modelUsage?.find((m: any) => m.modelName === modelName);
+                result[modelName] = modelUsage ? modelUsage.cost : 0;
+            });
+
+            return result;
+        });
+    };
+
+    // 为模型使用情况生成动态图表配置
+    const getModelChartConfig = (): ChartConfig => {
+        const modelData = getModelUsageChartData();
+        if (!modelData.length) return {};
+
+        const allModels = new Set<string>();
+        chartData.dailyUsage.forEach(item => {
+            if (item.modelUsage) {
+                item.modelUsage.forEach((model: any) => {
+                    allModels.add(model.modelName);
+                });
+            }
+        });
+
+        const colors = [
+            'hsl(var(--chart-1))',
+            'hsl(var(--chart-2))',
+            'hsl(var(--chart-3))',
+            'hsl(var(--chart-4))',
+            'hsl(var(--chart-5))'
+        ];
+
+        const config: ChartConfig = {};
+        Array.from(allModels).forEach((modelName, index) => {
+            config[modelName] = {
+                label: modelName,
+                color: colors[index % colors.length]
+            };
+        });
+
+        return config;
+    };
 
     // 处理每个API类别的数据
     const getCategoryData = (categoryEndpoint: string) => {
@@ -163,485 +303,11 @@ export default function UsagePage() {
         return summary;
     };
 
-    // 更新图表数据
-    const updateCharts = (data: any) => {
-        if (!data || !data.dailyUsage || data.dailyUsage.length === 0) {
-            return;
-        }
 
-        const dailyUsageData = data.dailyUsage.map((item: any) => ({
-            date: new Date(item.date),
-            cost: item.cost,
-            requestCount: item.requestCount,
-            tokenCount: item.tokenCount,
-            modelUsage: item.modelUsage || []
-        })).sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
 
-        const dailyDates = dailyUsageData.map((item: any) => `${item.date.getMonth() + 1}/${item.date.getDate()}`);
-        const dailyCosts = dailyUsageData.map((item: any) => item.cost);
-        const dailyRequests = dailyUsageData.map((item: any) => item.requestCount);
-        const dailyTokens = dailyUsageData.map((item: any) => item.tokenCount);
 
-        updateCostChart(dailyDates, dailyCosts, dailyUsageData);
-        updateRequestsChart(dailyDates, dailyRequests);
-        updateTokensChart(dailyDates, dailyTokens);
 
-        // Update service charts
-        const dates = dailyDates;
-        const services = [
-            { ref: chatCompletionChartRef, endpoint: '/v1/chat/completions', title: t('usage.chatCompletion'), hasTokens: true },
-            { ref: imagesChartRef, endpoint: '/v1/images/generations', title: t('usage.images'), hasTokens: false },
-            { ref: embeddingsChartRef, endpoint: '/v1/embeddings', title: t('usage.embeddings'), hasTokens: true },
-            { ref: audioSpeechChartRef, endpoint: '/v1/audio/speech', title: t('usage.audioSpeech'), hasTokens: false },
-            { ref: audioTranscriptionChartRef, endpoint: '/v1/audio/transcriptions', title: t('usage.audioTranscription'), hasTokens: false },
-            { ref: audioTranslationChartRef, endpoint: '/v1/audio/translations', title: t('usage.audioTranslation'), hasTokens: false }
-        ];
 
-        services.forEach(service => {
-            const serviceData = prepareChartDataForService(service.endpoint, data);
-            updateChart(service.ref, service.title, dates, serviceData, service.hasTokens);
-        });
-    };
-
-    // 更新消费图表
-    const updateCostChart = (dates: string[], costs: number[], dailyUsageData: any[]) => {
-        if (!dailyUsageChartRef.current) return;
-
-        if (chartInstancesRef.current['dailyUsage']) {
-            chartInstancesRef.current['dailyUsage'].dispose();
-        }
-
-        const chart = echarts.init(dailyUsageChartRef.current);
-        chartInstancesRef.current['dailyUsage'] = chart;
-
-        const totalCost = costs.reduce((sum, current) => sum + current, 0);
-        const hasModelUsage = dailyUsageData.some(item => item.modelUsage && item.modelUsage.length > 0);
-
-        let series: any[] = [];
-
-        if (hasModelUsage) {
-            const allModels = new Set<string>();
-            dailyUsageData.forEach(item => {
-                if (item.modelUsage) {
-                    item.modelUsage.forEach((model: any) => {
-                        allModels.add(model.modelName);
-                    });
-                }
-            });
-
-            const modelColors = [chartColors.primary, chartColors.success, chartColors.warning, chartColors.destructive, chartColors.info];
-
-            Array.from(allModels).forEach((modelName, index) => {
-                const modelData = dailyUsageData.map(item => {
-                    const modelUsage = item.modelUsage?.find((m: any) => m.modelName === modelName);
-                    return modelUsage ? modelUsage.cost : 0;
-                });
-
-                series.push({
-                    name: modelName,
-                    type: 'bar',
-                    stack: 'cost',
-                    barWidth: '60%',
-                    itemStyle: {
-                        color: modelColors[index % modelColors.length]
-                    },
-                    data: modelData
-                });
-            });
-        } else {
-            series = [{
-                name: t('usage.cost'),
-                type: 'bar',
-                barWidth: '60%',
-                itemStyle: {
-                    color: chartColors.primary
-                },
-                data: costs
-            }];
-        }
-
-        const option = {
-            backgroundColor: 'transparent',
-            title: {
-                text: `${t('usage.totalSpend')}: ${renderQuota(totalCost)}`,
-                left: 10,
-                top: 10,
-                textStyle: {
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    color: chartColors.primary
-                }
-            },
-            grid: {
-                top: hasModelUsage ? 80 : 60,
-                right: 20,
-                bottom: 50,
-                left: 0,
-                containLabel: false
-            },
-            legend: hasModelUsage ? {
-                top: 40,
-                left: 10,
-                orient: 'horizontal',
-                itemGap: 10,
-                textStyle: {
-                    fontSize: 12,
-                    color: chartColors.foreground
-                }
-            } : undefined,
-            tooltip: {
-                trigger: 'axis',
-                confine: true,
-                backgroundColor: chartColors.background,
-                borderColor: chartColors.border,
-                textStyle: {
-                    color: chartColors.foreground
-                },
-                formatter: (params: any) => {
-                    const dateStr = params[0].axisValue;
-                    let result = `<div style="font-weight:bold;margin-bottom:5px">${t('usage.date')}: ${dateStr}</div>`;
-
-                    params.forEach((param: any) => {
-                        if (param.value > 0) {
-                            result += `<div style="display:flex;justify-content:space-between;margin:3px 0">
-                  <span style="margin-right:15px">
-                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${param.color};margin-right:5px"></span>
-                    ${param.seriesName}:
-                  </span>
-                  <span style="font-weight:bold">${renderQuota(param.value)}</span>
-                </div>`;
-                        }
-                    });
-
-                    return result;
-                }
-            },
-            xAxis: {
-                type: 'category',
-                data: dates,
-                boundaryGap: true,
-                axisLine: {
-                    lineStyle: { color: chartColors.border }
-                },
-                axisTick: { alignWithLabel: true },
-                axisLabel: {
-                    interval: 0,
-                    rotate: dates.length > 5 ? 30 : 0,
-                    fontSize: 11,
-                    margin: 10,
-                    color: chartColors.muted
-                }
-            },
-            yAxis: {
-                type: 'value',
-                axisLine: { show: false },
-                axisTick: { show: false },
-                axisLabel: { show: false },
-                splitLine: { show: false }
-            },
-            series: series
-        };
-
-        chart.setOption(option);
-    };
-
-    // 更新请求数图表
-    const updateRequestsChart = (dates: string[], requests: number[]) => {
-        if (!requestsChartRef.current) return;
-
-        if (chartInstancesRef.current['requests']) {
-            chartInstancesRef.current['requests'].dispose();
-        }
-
-        const chart = echarts.init(requestsChartRef.current);
-        chartInstancesRef.current['requests'] = chart;
-
-        const totalRequests = requests.reduce((sum, current) => sum + current, 0);
-
-        const option = {
-            backgroundColor: 'transparent',
-            title: {
-                text: `${t('usage.totalRequests')}: ${renderNumber(totalRequests)}`,
-                left: 10,
-                top: 10,
-                textStyle: {
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    color: chartColors.success
-                }
-            },
-            grid: {
-                top: 60,
-                right: 20,
-                bottom: 50,
-                left: 0,
-                containLabel: false
-            },
-            tooltip: {
-                trigger: 'axis',
-                confine: true,
-                backgroundColor: chartColors.background,
-                borderColor: chartColors.border,
-                textStyle: {
-                    color: chartColors.foreground
-                }
-            },
-            xAxis: {
-                type: 'category',
-                data: dates,
-                boundaryGap: true,
-                axisLine: {
-                    lineStyle: { color: chartColors.border }
-                },
-                axisTick: { alignWithLabel: true },
-                axisLabel: {
-                    interval: 0,
-                    rotate: dates.length > 5 ? 30 : 0,
-                    fontSize: 11,
-                    margin: 10,
-                    color: chartColors.muted
-                }
-            },
-            yAxis: {
-                type: 'value',
-                axisLine: { show: false },
-                axisTick: { show: false },
-                axisLabel: { show: false },
-                splitLine: { show: false }
-            },
-            series: [{
-                name: t('usage.requests'),
-                type: 'bar',
-                barWidth: '60%',
-                itemStyle: {
-                    color: chartColors.success
-                },
-                data: requests
-            }]
-        };
-
-        chart.setOption(option);
-    };
-
-    // 更新令牌数图表
-    const updateTokensChart = (dates: string[], tokens: number[]) => {
-        if (!tokensChartRef.current) return;
-
-        if (chartInstancesRef.current['tokens']) {
-            chartInstancesRef.current['tokens'].dispose();
-        }
-
-        const chart = echarts.init(tokensChartRef.current);
-        chartInstancesRef.current['tokens'] = chart;
-
-        const totalTokens = tokens.reduce((sum, current) => sum + current, 0);
-
-        const option = {
-            backgroundColor: 'transparent',
-            title: {
-                text: `${t('usage.totalTokens')}: ${renderNumber(totalTokens)}`,
-                left: 10,
-                top: 10,
-                textStyle: {
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    color: chartColors.warning
-                }
-            },
-            grid: {
-                top: 60,
-                right: 20,
-                bottom: 50,
-                left: 0,
-                containLabel: false
-            },
-            tooltip: {
-                trigger: 'axis',
-                confine: true,
-                backgroundColor: chartColors.background,
-                borderColor: chartColors.border,
-                textStyle: {
-                    color: chartColors.foreground
-                }
-            },
-            xAxis: {
-                type: 'category',
-                data: dates,
-                boundaryGap: true,
-                axisLine: {
-                    lineStyle: { color: chartColors.border }
-                },
-                axisTick: { alignWithLabel: true },
-                axisLabel: {
-                    interval: 0,
-                    rotate: dates.length > 5 ? 30 : 0,
-                    fontSize: 11,
-                    margin: 10,
-                    color: chartColors.muted
-                }
-            },
-            yAxis: {
-                type: 'value',
-                axisLine: { show: false },
-                axisTick: { show: false },
-                axisLabel: { show: false },
-                splitLine: { show: false }
-            },
-            series: [{
-                name: t('usage.tokenCount'),
-                type: 'bar',
-                barWidth: '60%',
-                itemStyle: {
-                    color: chartColors.warning
-                },
-                data: tokens
-            }]
-        };
-
-        chart.setOption(option);
-    };
-
-    // 准备特定服务的图表数据
-    const prepareChartDataForService = (apiEndpoint: string, data: any) => {
-        const resultData = {
-            requestCount: new Array(data.dailyUsage.length).fill(0),
-            tokenCount: new Array(data.dailyUsage.length).fill(0)
-        };
-
-        const sortedDailyUsage = [...data.dailyUsage].sort((a: any, b: any) => {
-            return new Date(a.date).getTime() - new Date(b.date).getTime();
-        });
-
-        sortedDailyUsage.forEach((daily, index) => {
-            const requests = data.serviceRequests.filter(
-                (req: any) => {
-                    if (apiEndpoint === '/v1/chat/completions') {
-                        return (req.apiEndpoint.startsWith('/v1/chat/completions') ||
-                            req.apiEndpoint.startsWith('/v1/completions')) &&
-                            req.date === daily.date;
-                    }
-                    return req.apiEndpoint.startsWith(apiEndpoint) && req.date === daily.date;
-                }
-            );
-
-            const totalRequests = requests.reduce((sum: number, req: any) => sum + (req.requestCount || 0), 0);
-            const totalTokens = requests.reduce((sum: number, req: any) => sum + (req.tokenCount || 0), 0);
-
-            resultData.requestCount[index] = totalRequests;
-            resultData.tokenCount[index] = totalTokens;
-        });
-
-        return resultData;
-    };
-
-    // 更新单个图表
-    const updateChart = (chartRef: any, title: string, dates: any, seriesData: any, hasTokens: boolean) => {
-        if (!chartRef.current) return;
-
-        if (chartInstancesRef.current[title]) {
-            chartInstancesRef.current[title].dispose();
-        }
-
-        const chart = echarts.init(chartRef.current);
-        chartInstancesRef.current[title] = chart;
-
-        const option = {
-            backgroundColor: 'transparent',
-            grid: {
-                top: 30,
-                right: 20,
-                bottom: 50,
-                left: 50,
-                containLabel: true
-            },
-            tooltip: {
-                trigger: 'axis',
-                confine: true,
-                backgroundColor: chartColors.background,
-                borderColor: chartColors.border,
-                textStyle: {
-                    color: chartColors.foreground
-                }
-            },
-            legend: hasTokens ? {
-                data: [t('usage.requests'), t('usage.tokenCount')],
-                right: 0,
-                top: 0
-            } : {
-                data: [t('usage.requests')],
-                right: 0,
-                top: 0
-            },
-            xAxis: {
-                type: 'category',
-                data: dates,
-                boundaryGap: true,
-                axisLine: {
-                    lineStyle: { color: chartColors.border }
-                },
-                axisTick: { alignWithLabel: true },
-                axisLabel: {
-                    interval: 0,
-                    rotate: dates.length > 5 ? 30 : 0,
-                    fontSize: 11,
-                    margin: 10,
-                    color: chartColors.muted
-                }
-            },
-            yAxis: {
-                type: 'value',
-                name: hasTokens ? t('usage.quantity') : t('usage.requests'),
-                axisLine: {
-                    show: true,
-                    lineStyle: { color: chartColors.primary }
-                },
-                axisTick: { show: true },
-                axisLabel: {
-                    color: chartColors.muted
-                },
-                splitLine: {
-                    lineStyle: {
-                        color: chartColors.border,
-                        type: 'dashed'
-                    }
-                }
-            },
-            series: hasTokens ? [
-                {
-                    name: t('usage.requests'),
-                    type: 'bar',
-                    stack: '总量',
-                    barWidth: '40%',
-                    itemStyle: {
-                        color: chartColors.primary
-                    },
-                    data: seriesData.requestCount
-                },
-                {
-                    name: t('usage.tokenCount'),
-                    type: 'bar',
-                    stack: '总量',
-                    barWidth: '40%',
-                    itemStyle: {
-                        color: chartColors.success
-                    },
-                    data: seriesData.tokenCount
-                }
-            ] : [
-                {
-                    name: t('usage.requests'),
-                    type: 'bar',
-                    barWidth: '40%',
-                    itemStyle: {
-                        color: chartColors.primary
-                    },
-                    data: seriesData.requestCount
-                }
-            ]
-        };
-
-        chart.setOption(option);
-    };
 
     // 导出数据
     const handleExport = () => {
@@ -673,25 +339,6 @@ export default function UsagePage() {
         return csvContent;
     };
 
-    // 初始化并监听窗口大小变化
-    useEffect(() => {
-        const handleResize = () => {
-            Object.values(chartInstancesRef.current).forEach(chart => {
-                chart?.resize();
-            });
-        };
-
-        window.addEventListener('resize', handleResize);
-        setTimeout(handleResize, 300);
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            Object.values(chartInstancesRef.current).forEach(chart => {
-                chart?.dispose();
-            });
-            chartInstancesRef.current = {};
-        };
-    }, []);
 
     // 获取各类别的统计数据
     const chatCompletionsData = getCategoryData('/v1/chat/completions');
@@ -766,7 +413,7 @@ export default function UsagePage() {
             </div>
 
             {/* Overview Statistics */}
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="col-span-full md:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -781,7 +428,53 @@ export default function UsagePage() {
                         {loading ? (
                             <Skeleton className="h-[380px] w-full" />
                         ) : (
-                            <div ref={dailyUsageChartRef} className="h-[380px] w-full" />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                    <div className="text-sm font-medium">
+                                        {t('usage.totalSpend')}: {renderQuota(usageData.totalCost || 0)}
+                                    </div>
+                                </div>
+                                <ChartContainer config={getModelChartConfig()} className="h-[350px] w-full">
+                                    <BarChart data={getModelUsageChartData()}>
+                                        <XAxis
+                                            dataKey="date"
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={8}
+                                            tickFormatter={(value) => value.slice(0, 3)}
+                                        />
+                                        <ChartTooltip
+                                            content={<ChartTooltipContent
+                                                formatter={(value, name) => [
+                                                    renderQuota(Number(value)),
+                                                    name
+                                                ]}
+                                            />}
+                                        />
+                                        {Object.keys(getModelChartConfig()).length > 1 ? (
+                                            Object.keys(getModelChartConfig()).map((key) => (
+                                                <Bar
+                                                    key={key}
+                                                    dataKey={key}
+                                                    stackId="cost"
+                                                    fill={`var(--color-${key})`}
+                                                    radius={[0, 0, 0, 0]}
+                                                />
+                                            ))
+                                        ) : (
+                                            <Bar
+                                                dataKey="cost"
+                                                fill="hsl(var(--primary))"
+                                                radius={[4, 4, 0, 0]}
+                                            />
+                                        )}
+                                        {Object.keys(getModelChartConfig()).length > 1 && (
+                                            <ChartLegend content={<ChartLegendContent />} />
+                                        )}
+                                    </BarChart>
+                                </ChartContainer>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -798,7 +491,38 @@ export default function UsagePage() {
                             {loading ? (
                                 <Skeleton className="h-[140px] w-full" />
                             ) : (
-                                <div ref={requestsChartRef} className="h-[140px] w-full" />
+                                <div className="space-y-4">
+                                    <div className="text-sm font-medium">
+                                        {t('usage.totalRequests')}: {renderNumber(usageData.totalRequestCount || 0)}
+                                    </div>
+                                    <ChartContainer config={chartConfigs.dailyUsage} className="h-[110px] w-full">
+                                        <AreaChart data={chartData.dailyUsage}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.requests')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Area
+                                                dataKey="requests"
+                                                type="monotone"
+                                                fill="hsl(var(--primary))"
+                                                fillOpacity={0.2}
+                                                stroke="hsl(var(--primary))"
+                                                strokeWidth={2}
+                                            />
+                                        </AreaChart>
+                                    </ChartContainer>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -814,7 +538,38 @@ export default function UsagePage() {
                             {loading ? (
                                 <Skeleton className="h-[140px] w-full" />
                             ) : (
-                                <div ref={tokensChartRef} className="h-[140px] w-full" />
+                                <div className="space-y-4">
+                                    <div className="text-sm font-medium">
+                                        {t('usage.totalTokens')}: {renderNumber(usageData.totalTokenCount || 0)}
+                                    </div>
+                                    <ChartContainer config={chartConfigs.dailyUsage} className="h-[110px] w-full">
+                                        <AreaChart data={chartData.dailyUsage}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.tokenCount')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Area
+                                                dataKey="tokens"
+                                                type="monotone"
+                                                fill="hsl(var(--chart-3))"
+                                                fillOpacity={0.2}
+                                                stroke="hsl(var(--chart-3))"
+                                                strokeWidth={2}
+                                            />
+                                        </AreaChart>
+                                    </ChartContainer>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -866,7 +621,41 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={chatCompletionChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={chartConfigs.service} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/chat/completions'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => {
+                                                        if (name === 'requests') {
+                                                            return [renderNumber(Number(value)), t('usage.requests')];
+                                                        } else if (name === 'tokens') {
+                                                            return [renderNumber(Number(value)), t('usage.tokenCount')];
+                                                        }
+                                                        return [renderNumber(Number(value)), name];
+                                                    }}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[2, 2, 0, 0]}
+                                            />
+                                            <Bar
+                                                dataKey="tokens"
+                                                fill="hsl(var(--chart-2))"
+                                                radius={[2, 2, 0, 0]}
+                                            />
+                                            <ChartLegend content={<ChartLegendContent />} />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>
@@ -906,7 +695,31 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={imagesChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={{requests: {label: t('usage.requests'), color: 'hsl(var(--primary))'}}} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/images/generations'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.requests')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[4, 4, 0, 0]}
+                                            />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>
@@ -946,7 +759,41 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={embeddingsChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={chartConfigs.service} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/embeddings'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => {
+                                                        if (name === 'requests') {
+                                                            return [renderNumber(Number(value)), t('usage.requests')];
+                                                        } else if (name === 'tokens') {
+                                                            return [renderNumber(Number(value)), t('usage.inputTokens')];
+                                                        }
+                                                        return [renderNumber(Number(value)), name];
+                                                    }}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[2, 2, 0, 0]}
+                                            />
+                                            <Bar
+                                                dataKey="tokens"
+                                                fill="hsl(var(--chart-2))"
+                                                radius={[2, 2, 0, 0]}
+                                            />
+                                            <ChartLegend content={<ChartLegendContent />} />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>
@@ -982,7 +829,31 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={audioSpeechChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={{requests: {label: t('usage.requests'), color: 'hsl(var(--primary))'}}} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/audio/speech'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.requests')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[4, 4, 0, 0]}
+                                            />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>
@@ -1018,7 +889,31 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={audioTranscriptionChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={{requests: {label: t('usage.requests'), color: 'hsl(var(--primary))'}}} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/audio/transcriptions'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.requests')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[4, 4, 0, 0]}
+                                            />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>
@@ -1054,7 +949,31 @@ export default function UsagePage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div ref={audioTranslationChartRef} className="h-[320px] w-full" />
+                                    <ChartContainer config={{requests: {label: t('usage.requests'), color: 'hsl(var(--primary))'}}} className="h-[280px] w-full">
+                                        <BarChart data={chartData.serviceCharts['/v1/audio/translations'] || []}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={(value) => value.slice(0, 3)}
+                                            />
+                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                            <ChartTooltip
+                                                content={<ChartTooltipContent
+                                                    formatter={(value, name) => [
+                                                        renderNumber(Number(value)),
+                                                        t('usage.requests')
+                                                    ]}
+                                                />}
+                                            />
+                                            <Bar
+                                                dataKey="requests"
+                                                fill="hsl(var(--primary))"
+                                                radius={[4, 4, 0, 0]}
+                                            />
+                                        </BarChart>
+                                    </ChartContainer>
                                 </>
                             )}
                         </CardContent>

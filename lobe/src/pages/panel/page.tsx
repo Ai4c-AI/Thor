@@ -48,7 +48,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
 } from 'recharts';
 import * as React from 'react';
 

@@ -26,6 +26,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -102,6 +109,17 @@ export default function ChannelPage() {
   const [importing, setImporting] = useState(false);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [bulkOperating, setBulkOperating] = useState(false);
+
+  // 计算每个分组下的渠道数量
+  const getGroupChannelCount = useCallback((groupCode: string) => {
+    if (!groupCode) return data.length; // 所有分组的总数
+    return data.filter(channel => String(channel.group ?? '') === groupCode).length;
+  }, [data]);
+
+  // 获取当前显示的渠道数量（考虑过滤条件）
+  const getCurrentChannelCount = useCallback(() => {
+    return data.length;
+  }, [data]);
 
   useEffect(() => {
     getList().then((res) => {
@@ -348,13 +366,219 @@ export default function ChannelPage() {
     return XCircle;
   };
 
+  const handleGroupFilterChange = (groupCode: string) => {
+    setInput((prev) => ({
+      ...prev,
+      page: 1,
+      group: prev.group === groupCode ? '' : groupCode,
+    }));
+  };
+
+  const selectedGroupInfo = groups.find(
+    (group) => String(group.code ?? '') === input.group
+  );
+
   return (
     <div className="space-y-6">
       {/* Header Card */}
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <CardTitle className="text-2xl font-bold">{t('channel.title')}</CardTitle>
+
+            {/* Group Filter - Segmented Control */}
+            <div className="flex flex-col gap-3 min-w-[250px]">
+              {/* Segmented Control */}
+              <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+                <button
+                  onClick={() => handleGroupFilterChange('')}
+                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${input.group === ''
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'hover:bg-background/50'
+                    }`}
+                >
+                  所有分组 ({getGroupChannelCount('')})
+                </button>
+                {groups.slice(0, 4).map((group) => {
+                  const value = String(group.code ?? '');
+                  const label = group.name ?? value;
+                  const channelCount = getGroupChannelCount(value);
+                  const isSelected = input.group === value;
+
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => handleGroupFilterChange(value)}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${isSelected
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'hover:bg-background/50'
+                        }`}
+                    >
+                      {label} ({channelCount})
+                    </button>
+                  );
+                })}
+                {groups.length > 4 && (
+                  <Select value={input.group} onValueChange={handleGroupFilterChange}>
+                    <SelectTrigger className="w-auto h-7 px-2 border-0 bg-transparent hover:bg-background/50 data-[state=open]:bg-background/50">
+                      <SelectValue placeholder="更多..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groups.slice(4).map((group) => {
+                        const value = String(group.code ?? '');
+                        const label = group.name ?? value;
+                        const channelCount = getGroupChannelCount(value);
+
+                        return (
+                          <SelectItem key={value} value={value}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{label}</span>
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                {channelCount}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              {/* 选中分组的详细信息卡片 */}
+              {selectedGroupInfo && (
+                <Card className="p-3 bg-muted/50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium text-sm">{selectedGroupInfo.name}</h4>
+                        <Badge variant="secondary" className="text-xs">
+                          {getCurrentChannelCount()} 个渠道
+                        </Badge>
+                      </div>
+                      {selectedGroupInfo.description && (
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {selectedGroupInfo.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {selectedGroupInfo.rate != null && (
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">费率:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedGroupInfo.rate}x
+                            </Badge>
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <span className="font-medium">分组代码:</span>
+                          <code className="px-1 py-0.5 bg-background rounded text-xs">
+                            {selectedGroupInfo.code}
+                          </code>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
+
+            {/* Bulk Action Buttons */}
+            {selectedChannels.length > 0 && (
+              <>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={bulkOperating}
+                      className="text-green-600 border-green-600 hover:bg-green-50"
+                    >
+                      {bulkOperating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Power className="h-4 w-4" />
+                      )}
+                      {t('channel.bulkEnable')} ({selectedChannels.length})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('channel.confirmBulkEnable')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('channel.confirmBulkEnableDescription', { count: selectedChannels.length })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkEnable}>
+                        {t('common.confirm')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={bulkOperating}
+                      className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                    >
+                      {bulkOperating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <PowerOff className="h-4 w-4" />
+                      )}
+                      {t('channel.bulkDisable')} ({selectedChannels.length})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('channel.confirmBulkDisable')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('channel.confirmBulkDisableDescription', { count: selectedChannels.length })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDisable}>
+                        {t('common.confirm')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={bulkOperating}
+                      className="text-red-600 border-red-600 hover:bg-red-50"
+                    >
+                      {bulkOperating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      {t('channel.bulkDelete')} ({selectedChannels.length})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('channel.confirmBulkDelete')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('channel.confirmBulkDeleteDescription', { count: selectedChannels.length })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
+                        {t('common.confirm')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Search */}
@@ -368,129 +592,6 @@ export default function ChannelPage() {
                 />
               </div>
 
-              {/* Group Filter */}
-              <Select
-                value={input.group || "all"}
-                onValueChange={(value) => setInput({ ...input, group: value === "all" ? "" : value })}
-              >
-                <SelectTrigger className="min-w-[200px]">
-                  <SelectValue placeholder={t('channel.selectGroups')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {groups.map((group) => (
-                    <SelectItem key={group.code} value={group.code}>
-                      <div className="flex items-center gap-2">
-                        <span>{group.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {group.description}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {t('channel.rate')}: {group.rate}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Bulk Action Buttons */}
-              {selectedChannels.length > 0 && (
-                <>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        disabled={bulkOperating}
-                        className="text-green-600 border-green-600 hover:bg-green-50"
-                      >
-                        {bulkOperating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Power className="h-4 w-4" />
-                        )}
-                        {t('channel.bulkEnable')} ({selectedChannels.length})
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('channel.confirmBulkEnable')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('channel.confirmBulkEnableDescription', { count: selectedChannels.length })}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBulkEnable}>
-                          {t('common.confirm')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        disabled={bulkOperating}
-                        className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                      >
-                        {bulkOperating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <PowerOff className="h-4 w-4" />
-                        )}
-                        {t('channel.bulkDisable')} ({selectedChannels.length})
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('channel.confirmBulkDisable')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('channel.confirmBulkDisableDescription', { count: selectedChannels.length })}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBulkDisable}>
-                          {t('common.confirm')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        disabled={bulkOperating}
-                        className="text-red-600 border-red-600 hover:bg-red-50"
-                      >
-                        {bulkOperating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        {t('channel.bulkDelete')} ({selectedChannels.length})
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('channel.confirmBulkDelete')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('channel.confirmBulkDeleteDescription', { count: selectedChannels.length })}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
-                          {t('common.confirm')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              )}
 
               {/* Action Buttons */}
               <Button variant="outline" onClick={handleDownloadTemplate}>

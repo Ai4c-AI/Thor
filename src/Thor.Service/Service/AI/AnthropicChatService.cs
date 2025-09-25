@@ -9,7 +9,6 @@ using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
 using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Middlewares;
-using Thor.Service.Service.OpenAI;
 
 namespace Thor.Service.Service.AI;
 
@@ -22,7 +21,6 @@ public class AnthropicChatService(
     ChannelService channelService,
     UserGroupService userGroupService,
     LoggerService loggerService,
-    RequestLogService requestLogService,
     UserService userService,
     ILogger<AnthropicChatService> logger,
     ContextPricingService contextPricingService)
@@ -35,8 +33,6 @@ public class AnthropicChatService(
 
         var model = request.Model;
         Exception? lastException = null;
-        var log = requestLogService.BeginRequestLog(context.Request.Path, request);
-        RequestLogContext.SetCurrent(log);
 
         var rateLimit = 0;
 
@@ -54,9 +50,6 @@ public class AnthropicChatService(
             {
                 context.Response.StatusCode = 400;
                 await context.WriteErrorAsync($"当前{model}模型未设置倍率,请联系管理员设置倍率", "400");
-
-                await requestLogService.EndRequestLog(log, 400,
-                    $"当前{model}模型未设置倍率,请联系管理员设置倍率", lastException);
             }
             else
             {
@@ -79,10 +72,6 @@ public class AnthropicChatService(
                         {
                             logger.LogError("对话模型请求异常：{lastException}，请求参数：{request}",
                                 lastException, JsonSerializer.Serialize(request, ThorJsonSerializer.DefaultOptions));
-
-                            await requestLogService.EndRequestLog(log, 400,
-                                $"对话模型请求异常：{lastException.Message}",
-                                lastException);
 
                             await context.WriteErrorAsync(
                                 lastException.Message, "400");
@@ -122,7 +111,6 @@ public class AnthropicChatService(
                 var responseToken = 0;
                 int cachedTokens = 0;
                 int cacheWriteTokens = 0;
-                string? responseBody = null;
 
                 var sw = Stopwatch.StartNew();
 
@@ -131,13 +119,9 @@ public class AnthropicChatService(
                     using var activity =
                         Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens, cacheWriteTokens, responseBody) =
+                    (requestToken, responseToken, cachedTokens, cacheWriteTokens) =
                         await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate).ConfigureAwait(false);
-                    if (!string.IsNullOrEmpty(responseBody))
-                    {
-                        StreamResponseInterceptor.AddContent(ref responseBody);
-                    }
                 }
                 else
                 {
@@ -148,9 +132,6 @@ public class AnthropicChatService(
                         await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate).ConfigureAwait(false);
                 }
-
-                // 结束请求日志
-                await requestLogService.EndRequestLog(log, 200);
 
                 sw.Stop();
 
@@ -246,7 +227,6 @@ public class AnthropicChatService(
 
             if (rateLimit > 50)
             {
-                await requestLogService.EndRequestLog(log, 403, forbiddenException.Message, lastException);
                 context.Response.StatusCode = 403;
             }
             else
@@ -263,7 +243,6 @@ public class AnthropicChatService(
             // TODO：限流重试次数
             if (rateLimit > 50)
             {
-                await requestLogService.EndRequestLog(log, 429, thorRateLimitException.Message, lastException);
                 context.Response.StatusCode = 429;
             }
             else
@@ -276,8 +255,6 @@ public class AnthropicChatService(
         {
             if (context.Response.StatusCode != 402)
             {
-                await requestLogService.EndRequestLog(log, 402, insufficientQuotaException.Message,
-                    lastException);
                 context.Response.StatusCode = 402;
             }
 
@@ -286,23 +263,19 @@ public class AnthropicChatService(
         catch (RateLimitException)
         {
             context.Response.StatusCode = 429;
-            await requestLogService.EndRequestLog(log, 429, "请求过于频繁，请稍后再试", lastException);
         }
         catch (UnauthorizedAccessException e)
         {
             context.Response.StatusCode = 401;
-            await requestLogService.EndRequestLog(log, 401, e.Message, lastException);
         }
         catch (OpenAIErrorException error)
         {
             context.Response.StatusCode = 400;
-            await requestLogService.EndRequestLog(log, 400, error.Message, lastException);
             await context.WriteErrorAsync(error.Message, error.Code);
         }
         catch (NotModelException modelException)
         {
             context.Response.StatusCode = 400;
-            await requestLogService.EndRequestLog(log, 400, modelException.Message, lastException);
             await context.WriteErrorAsync(modelException.Message, "400");
         }
         catch (Exception e)
@@ -318,7 +291,6 @@ public class AnthropicChatService(
             if (rateLimit > 50)
             {
                 context.Response.StatusCode = 400;
-                await requestLogService.EndRequestLog(log, 400, e.Message, lastException);
                 await context.WriteErrorAsync(e.Message, "500");
             }
             else
@@ -413,7 +385,6 @@ public class AnthropicChatService(
             if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
-            StreamResponseInterceptor.AddContent(result);
 
             await context.Response.WriteAsJsonAsync(result);
 
@@ -445,14 +416,11 @@ public class AnthropicChatService(
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
 
-            StreamResponseInterceptor.AddContent(result);
-
             await context.Response.WriteAsJsonAsync(result);
         }
         else
         {
             result = await openService.ChatCompletionsAsync(input, platformOptions);
-            StreamResponseInterceptor.AddContent(result);
 
             await context.Response.WriteAsJsonAsync(result);
         }
@@ -489,7 +457,7 @@ public class AnthropicChatService(
         return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, string?)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens)>
         StreamChatCompletionsHandlerAsync(
             HttpContext context,
             AnthropicInput input, ChatChannel channel, IAnthropicChatCompletionsService openService, User? user,
@@ -637,7 +605,6 @@ public class AnthropicChatService(
             _ => responseToken
         };
 
-        return (requestToken, responseToken, cachedTokens, cacheWriteTokens,
-            StreamResponseInterceptor.GetCollectedContent());
+        return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
     }
 }

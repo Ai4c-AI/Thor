@@ -20,12 +20,6 @@ public static class HttpContextExtensions
         context.Response.ContentType = "text/event-stream;charset=utf-8;";
         context.Response.Headers.TryAdd("Cache-Control", "no-cache");
         context.Response.Headers.TryAdd("Connection", "keep-alive");
-
-        // 初始化流式响应日志收集
-        if (RequestLogContext.Current != null)
-        {
-            StreamResponseInterceptor.StartCollecting();
-        }
     }
 
     public static string GetContentType(string extension)
@@ -149,12 +143,6 @@ public static class HttpContextExtensions
     public static async ValueTask WriteAsEventStreamEndAsync(this HttpContext context)
     {
         var endData = "data: [DONE]\n\n";
-
-        // 拦截内容用于日志记录
-        if (RequestLogContext.Current != null)
-        {
-            StreamResponseInterceptor.AddContent(ref endData);
-        }
 
         await context.Response.WriteAsync(endData);
         await context.Response.Body.FlushAsync();

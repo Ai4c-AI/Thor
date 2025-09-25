@@ -18,9 +18,13 @@ public sealed class TokenService(
 
         if (input is { UnlimitedExpired: false, ExpiredTime: null }) throw new Exception("请选择过期时间");
 
-        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
+        input.Groups = input.Groups?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? Array.Empty<string>();
 
-        if (input.Groups.Length > 1) throw new Exception("token只能属于一个分组");
+        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
 
         var token = Mapper.Map<Token>(input);
 
@@ -64,9 +68,13 @@ public sealed class TokenService(
 
     public async ValueTask<bool> UpdateAsync(Token input)
     {
-        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
+        input.Groups = input.Groups?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? Array.Empty<string>();
 
-        if (input.Groups.Length > 1) throw new Exception("token只能属于一个分组");
+        if (input.Groups.Length <= 0) throw new Exception("请选择分组");
 
 
         var result = await DbContext.Tokens.Where(x => x.Id == input.Id)
@@ -183,9 +191,11 @@ public sealed class TokenService(
         {
             token = await DbContext.Tokens.AsNoTracking().FirstOrDefaultAsync(x => x.Key == key && x.Disabled == false);
 
+            var ip = context.GetIpAddress();
+
             if (token == null)
             {
-                logger.LogWarning("Token 不存在");
+                logger.LogWarning($"IP:{ip} Token 不存在");
                 context.Response.StatusCode = 401;
                 throw new UnauthorizedAccessException();
             }
@@ -193,7 +203,7 @@ public sealed class TokenService(
             // token过期
             if (token.ExpiredTime < DateTimeOffset.Now)
             {
-                logger.LogWarning("Token 过期");
+                logger.LogWarning($"IP:{ip} Token 过期");
                 context.Response.StatusCode = 401;
                 throw new UnauthorizedAccessException();
             }
@@ -201,7 +211,7 @@ public sealed class TokenService(
             // 余额不足
             if (token is { UnlimitedQuota: false } && token.RemainQuota < requestQuota)
             {
-                logger.LogWarning("Token 额度不足");
+                logger.LogWarning($"IP:{ip} Token 额度不足");
                 context.Response.StatusCode = 402;
                 throw new InsufficientQuotaException("当前 Token 额度不足，请充值 Token 额度");
             }
