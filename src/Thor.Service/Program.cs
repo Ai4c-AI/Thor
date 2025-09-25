@@ -24,6 +24,8 @@ using Thor.Core.Extensions;
 using Thor.CustomOpenAI.Extensions;
 using Thor.DeepSeek.Extensions;
 using Thor.Domain.Chats;
+using Thor.Domain.Images;
+using Thor.Domain.Shared;
 using Thor.Domain.Users;
 using Thor.ErnieBot.Extensions;
 using Thor.GCPClaude.Extensions;
@@ -49,10 +51,12 @@ using Thor.Service.Infrastructure;
 using Thor.Service.Infrastructure.Middlewares;
 using Thor.Service.Options;
 using Thor.Service.Service;
-using Thor.Service.Service.OpenAI;
+using Thor.Service.Service.AI;
 using Thor.SiliconFlow.Extensions;
 using Thor.SparkDesk.Extensions;
 using Thor.VolCenGine.Extensions;
+using MiniExcelLibs;
+using ChatService = Thor.Service.Service.AI.ChatService;
 using Product = Thor.Service.Domain.Product;
 using TracingService = Thor.Service.Service.TracingService;
 
@@ -68,8 +72,6 @@ try
         Args = args,
         ContentRootPath = AppContext.BaseDirectory,
     });
-
-    ThorOptions.Initialize(builder.Configuration);
 
     // 添加Windows服务支持
     if (OperatingSystem.IsWindows())
@@ -96,6 +98,8 @@ try
     builder.Services.AddEndpointsApiExplorer();
 
     builder.Services.AddMapster();
+
+    builder.Services.AddMiniApis();
 
     if (string.IsNullOrEmpty(CacheOptions.Type) ||
         CacheOptions.Type.Equals("Memory", StringComparison.OrdinalIgnoreCase))
@@ -135,20 +139,21 @@ try
         .AddCustomAuthentication()
         .AddHttpContextAccessor()
         .AddScoped<IEventHandler<ChatLogger>, ChatLoggerEventHandler>()
+        .AddScoped<IEventHandler<ImageTaskLogger>, ImageTaskLoggerEventHandler>()
         .AddScoped<IEventHandler<CreateUserEto>, CreateUserEventHandler>()
         .AddScoped<IEventHandler<UpdateModelManagerCache>, ModelManagerEventHandler>()
-        .AddScoped<IEventHandler<RequestLog>, RequestLogCreatedEventHandler>()
         .AddTransient<JwtHelper>()
         .AddSingleton<OpenTelemetryMiddlewares>()
         .AddSingleton<UnitOfWorkMiddleware>()
         .AddScoped<AuthorizeService>()
         .AddScoped<ChannelService>()
+        .AddScoped<ChannelGroupFailoverService>()
         .AddScoped<EmailService>()
         .AddScoped<ImageService>()
+        .AddScoped<ImageTaskLoggerService>()
         .AddScoped<LoggerService>()
         .AddScoped<ModelManagerService>()
         .AddScoped<AnthropicChatService>()
-        .AddScoped<ResponsesService>()
         .AddScoped<ProductService>()
         .AddScoped<RateLimitModelService>()
         .AddScoped<SystemService>()
@@ -189,7 +194,6 @@ try
         .AddDeepSeekService()
         .AddGeminiService();
 
-    builder.Services.AddScoped<RequestLogService>();
     builder.Services
         .AddCors(options =>
         {
@@ -274,64 +278,65 @@ try
     {
         if (context.Request.Path == "/")
         {
-            if (string.IsNullOrEmpty(ChatCoreOptions.Master))
-            {
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
-                if (File.Exists(path))
-                {
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
-            }
-            else
-            {
-                context.Response.Redirect(ChatCoreOptions.Master);
-                return;
-            }
-        }
-
-        context.Response.Headers["AI-Gateway-Versions"] = "1.0.0.4";
-        context.Response.Headers["AI-Gateway-Name"] = "Thor";
-
-        if (context.Request.Path.Value?.EndsWith(".js") == true)
-        {
-            var path = context.Request.Path.Value;
-
-            // 判断是否存在.br文件
-            var brPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".br");
-            if (File.Exists(brPath))
-            {
-                context.Response.Headers.Append("Content-Encoding", "br");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                context.Response.Headers.Append("Content-Type", "application/javascript");
-
-                await context.Response.SendFileAsync(brPath);
-
-                return;
-            }
-
-            // 判断是否存在.gz文件
-            var gzPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", path.TrimStart('/') + ".gz");
-            if (File.Exists(gzPath))
-            {
-                context.Response.Headers.Append("Content-Encoding", "gzip");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                context.Response.Headers.Append("Content-Type", "application/javascript");
-                await context.Response.SendFileAsync(gzPath);
-                return;
-            }
-        }
-        else if (context.Request.Path.Value?.EndsWith(".css") == true)
-        {
-            // 判断是否存在.br文件
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
-                context.Request.Path.Value.TrimStart('/'));
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
             if (File.Exists(path))
             {
-                context.Response.Headers.Append("Content-Type", "text/css");
-                context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
                 await context.Response.SendFileAsync(path);
                 return;
+            }
+        }
+
+        context.Response.Headers["AI-Gateway-Versions"] = "1.0.5";
+        context.Response.Headers["AI-Gateway-Name"] = "ThorAPI";
+
+        // 处理静态文件的压缩和缓存
+        var requestPath = context.Request.Path.Value;
+        if (!string.IsNullOrEmpty(requestPath))
+        {
+            var fileExtension = Path.GetExtension(requestPath).ToLowerInvariant();
+            var isStaticFile = fileExtension is ".js" or ".css" or ".html" or ".png" or ".jpg" or ".jpeg" or ".gif" or ".svg" or ".ico" or ".woff" or ".woff2" or ".ttf" or ".eot";
+
+            if (isStaticFile)
+            {
+                var baseFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", requestPath.TrimStart('/'));
+                var servedFile = false;
+
+                // 优先尝试 Brotli 压缩文件
+                var brPath = baseFilePath + ".br";
+                if (File.Exists(brPath))
+                {
+                    context.Response.Headers.Append("Content-Encoding", "br");
+                    context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                    context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                    await context.Response.SendFileAsync(brPath);
+                    servedFile = true;
+                }
+                // 其次尝试 Gzip 压缩文件
+                else
+                {
+                    var gzPath = baseFilePath + ".gz";
+                    if (File.Exists(gzPath))
+                    {
+                        context.Response.Headers.Append("Content-Encoding", "gzip");
+                        context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                        context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                        await context.Response.SendFileAsync(gzPath);
+                        servedFile = true;
+                    }
+                    // 最后使用原始文件
+                    else if (File.Exists(baseFilePath))
+                    {
+                        context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                        context.Response.Headers.Append("Content-Type", HttpContextExtensions.GetContentType(fileExtension));
+                        await context.Response.SendFileAsync(baseFilePath);
+                        servedFile = true;
+                    }
+                }
+
+                if (servedFile)
+                {
+                    return;
+                }
             }
         }
 
@@ -339,36 +344,28 @@ try
 
         if (context.Response.StatusCode == 404)
         {
-            if (string.IsNullOrEmpty(ChatCoreOptions.Master))
+            // 尝试直接查找文件
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
+                context.Request.Path.Value.TrimStart('/'));
+
+            if (File.Exists(path))
             {
-                // 判断是否存在文件
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
-                    context.Request.Path.Value.TrimStart('/'));
-
-                if (File.Exists(path))
-                {
-                    context.Response.StatusCode = 200;
-                    context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                    context.Response.Headers.Append("Content-Type",
-                        HttpContextExtensions.GetContentType(Path.GetExtension(path)));
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
-
-                // 返回index.html
-                path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
-
-                if (File.Exists(path))
-                {
-                    context.Response.StatusCode = 200;
-                    context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
-                    await context.Response.SendFileAsync(path);
-                    return;
-                }
+                context.Response.StatusCode = 200;
+                context.Response.Headers.Append("Cache-Control", "public, max-age=604800"); // 7天缓存
+                context.Response.Headers.Append("Content-Type",
+                    HttpContextExtensions.GetContentType(Path.GetExtension(path)));
+                await context.Response.SendFileAsync(path);
+                return;
             }
-            else
+
+            // 返回index.html作为SPA fallback
+            path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "index.html");
+
+            if (File.Exists(path))
             {
-                context.Response.Redirect(ChatCoreOptions.Master);
+                context.Response.StatusCode = 200;
+                context.Response.Headers.Append("Cache-Control", "no-cache"); // index.html不缓存
+                await context.Response.SendFileAsync(path);
                 return;
             }
         }
@@ -611,37 +608,6 @@ try
                 await service.GetModelHotAsync())
         .WithDescription("获取模型热度")
         .WithDisplayName("获取模型热度")
-        .WithOpenApi();
-
-    #endregion
-
-    #region RequestLog
-
-    var requestLog = app.MapGroup("/api/v1/request-log")
-        .WithTags("RequestLog")
-        .AddEndpointFilter<ResultFilter>()
-        .RequireAuthorization();
-
-    requestLog.MapGet(string.Empty,
-            async (RequestLogService service, int page, int pageSize, string? userName, DateTime? startTime,
-                    DateTime? endTime) =>
-                await service.GetAsync(page, pageSize, userName, startTime, endTime))
-        .WithDescription("获取请求日志")
-        .WithDisplayName("获取请求日志")
-        .WithOpenApi();
-
-    requestLog.MapDelete("{id}",
-            async (RequestLogService service, string id) =>
-                await service.DeleteAsync(id))
-        .WithDescription("删除请求日志")
-        .WithDisplayName("删除请求日志")
-        .WithOpenApi();
-
-    requestLog.MapDelete("batch",
-            async (RequestLogService service, string[] ids) =>
-                await service.DeleteBatchAsync(ids))
-        .WithDescription("批量删除请求日志")
-        .WithDisplayName("批量删除请求日志")
         .WithOpenApi();
 
     #endregion
@@ -999,11 +965,6 @@ try
         .WithDescription("获取邀请信息")
         .WithOpenApi();
 
-    system.MapGet("request-log-enabled", (SystemService service) =>
-            service.IsRequestLogEnabled())
-        .WithDescription("Is Request Log Enabled")
-        .WithOpenApi();
-
     #endregion
 
     #region Announcement
@@ -1060,6 +1021,177 @@ try
 
     #endregion
 
+    #region Image Tasks
+
+    var imageTasks = app.MapGroup("/api/v1/image-tasks")
+        .WithTags("Image Task Logs")
+        .AddEndpointFilter<ResultFilter>()
+        .RequireAuthorization();
+
+    // 分页查询图片任务日志
+    imageTasks.MapGet(string.Empty, async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        int page = 1,
+        int pageSize = 20,
+        ThorImageTaskType? taskType = null,
+        ThorImageTaskStatus? taskStatus = null,
+        string? model = null,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? keyword = null,
+        string? userId = null) =>
+        await imageTaskLoggerService.GetAsync(page, pageSize, taskType, taskStatus, model, startTime, endTime, keyword, userId))
+        .WithDescription("分页查询图片任务日志")
+        .WithOpenApi();
+
+    // 根据TaskId获取任务详情
+    imageTasks.MapGet("{taskId}", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        IServiceProvider serviceProvider,
+        string taskId) =>
+    {
+        var userContext = serviceProvider.GetRequiredService<IUserContext>();
+        var task = await imageTaskLoggerService.GetByTaskIdAsync(taskId);
+
+        // 脱敏处理
+        if (task != null && !userContext.IsAdmin)
+        {
+            task.ChannelName = null;
+            if (!string.IsNullOrEmpty(task.TokenName))
+            {
+                task.TokenName = task.TokenName[..3] + "..." + task.TokenName[^3..];
+            }
+        }
+
+        return task;
+    })
+        .WithDescription("根据TaskId获取任务详情")
+        .WithOpenApi();
+
+    // 获取任务统计信息
+    imageTasks.MapGet("statistics", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        DateTime? startTime = null,
+        DateTime? endTime = null) =>
+        await imageTaskLoggerService.GetTaskStatisticsAsync(startTime, endTime))
+        .WithDescription("获取任务统计信息")
+        .WithOpenApi();
+
+    // 更新任务状态
+    imageTasks.MapPatch("{taskId}/status", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        string taskId,
+        UpdateTaskStatusRequest request) =>
+    {
+        await imageTaskLoggerService.UpdateTaskStatusAsync(
+            taskId: taskId,
+            status: request.Status,
+            progress: request.Progress,
+            imageUrls: request.ImageUrls,
+            errorMessage: request.ErrorMessage);
+        return Results.Ok();
+    })
+        .WithDescription("更新任务状态")
+        .WithOpenApi();
+
+    // 导出图片任务日志
+    imageTasks.MapGet("export", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        ILogger<Program> logger,
+        ThorImageTaskType? taskType = null,
+        ThorImageTaskStatus? taskStatus = null,
+        string? model = null,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? keyword = null,
+        string? userId = null) =>
+    {
+        try
+        {
+            // 获取所有符合条件的数据
+            var result = await imageTaskLoggerService.GetAsync(
+                1, int.MaxValue, taskType, taskStatus, model, startTime, endTime, keyword, userId);
+
+            if (result.Items.Any())
+            {
+                // 创建导出数据
+                var exportData = result.Items.Select(task => new
+                {
+                    任务ID = task.TaskId,
+                    任务类型 = task.TaskType.ToString(),
+                    任务状态 = task.TaskStatus.ToString(),
+                    提示词 = task.Prompt,
+                    模型名称 = task.ModelName,
+                    用户名 = task.UserName,
+                    用户ID = task.UserId,
+                    渠道名称 = task.ChannelName,
+                    IP地址 = task.IP,
+                    消费额度 = task.Quota,
+                    响应时间 = task.TotalTime,
+                    进度 = $"{task.Progress}%",
+                    是否成功 = task.IsSuccess ? "是" : "否",
+                    错误信息 = task.ErrorMessage,
+                    任务创建时间 = task.TaskCreatedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    任务完成时间 = task.TaskCompletedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    记录创建时间 = task.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }).ToList();
+
+                // 设置文件名称
+                string fileName = $"image_tasks_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+
+                // 使用MiniExcel导出
+                var exportStream = new MemoryStream();
+                await exportStream.SaveAsAsync(exportData);
+                exportStream.Seek(0, SeekOrigin.Begin);
+
+                return Results.File(exportStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            else
+            {
+                return Results.Content("没有找到符合条件的数据");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Export image tasks failed");
+            return Results.Problem("导出失败，请稍后重试", statusCode: 500);
+        }
+    })
+        .WithDescription("导出图片任务日志")
+        .WithOpenApi();
+
+    // 批量查询任务
+    imageTasks.MapPost("batch", async (
+        ImageTaskLoggerService imageTaskLoggerService,
+        BatchQueryRequest request) =>
+        await imageTaskLoggerService.GetTasksByChannelAndIdsAsync(request.ChannelId, request.TaskIds))
+        .WithDescription("批量查询任务")
+        .WithOpenApi();
+
+    // 获取任务类型列表
+    imageTasks.MapGet("task-types", () =>
+    {
+        var taskTypes = Enum.GetValues<ThorImageTaskType>()
+            .Select(type => new { Value = (int)type, Name = type.ToString() })
+            .ToList();
+        return Results.Ok(taskTypes);
+    })
+        .WithDescription("获取任务类型列表")
+        .WithOpenApi();
+
+    // 获取任务状态列表
+    imageTasks.MapGet("task-statuses", () =>
+    {
+        var taskStatuses = Enum.GetValues<ThorImageTaskStatus>()
+            .Select(status => new { Value = (int)status, Name = status.ToString() })
+            .ToList();
+        return Results.Ok(taskStatuses);
+    })
+        .WithDescription("获取任务状态列表")
+        .WithOpenApi();
+
+    #endregion
+
     var usage = app.MapGroup("/api/v1/usage")
         .WithTags("Usage")
         .AddEndpointFilter<ResultFilter>()
@@ -1083,14 +1215,6 @@ try
 
     tracker.MapGet("request-user", (TrackerService service) => service.GetUserRequest())
         .WithDescription("获取用户请求")
-        .WithOpenApi();
-
-    app.MapPost("/v1/responses",
-            async (ResponsesService responsesService, HttpContext context, ResponsesInput input) =>
-            {
-                await responsesService.ExecuteAsync(context, input);
-            })
-        .WithDescription("OpenAI Responses")
         .WithOpenApi();
 
     // 对话补全请求
@@ -1171,6 +1295,8 @@ try
             await chatService.SpeechAsync(context, request);
         });
     
+    app.MapMiniApis();
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -1186,4 +1312,24 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+/// <summary>
+/// 更新任务状态请求
+/// </summary>
+public record UpdateTaskStatusRequest
+{
+    public ThorImageTaskStatus Status { get; set; }
+    public int Progress { get; set; } = 0;
+    public string[]? ImageUrls { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// 批量查询请求
+/// </summary>
+public record BatchQueryRequest
+{
+    public string ChannelId { get; set; } = string.Empty;
+    public List<string> TaskIds { get; set; } = new();
 }

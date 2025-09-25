@@ -1,4 +1,5 @@
-﻿using Thor.Service.Domain.Core;
+﻿using System;
+using Thor.Service.Domain.Core;
 
 namespace Thor.Domain.Chats;
 
@@ -62,7 +63,7 @@ public sealed class Token : Entity<string>, ISoftDeletion
     /// <summary>
     /// token所属分组
     /// </summary>
-    public string[] Groups { get; set; } = null!;
+    public string[] Groups { get; set; } = Array.Empty<string>();
     
     public bool IsDelete { get; set; }
     

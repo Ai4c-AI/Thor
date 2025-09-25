@@ -114,10 +114,8 @@ export const createCompletion = async (params: {
   const { model } = params;
   
   if (isResponsesModel(model)) {
-    console.log(`使用responses接口处理模型: ${model}`);
     return await createResponsesCompletion(params);
   } else {
-    console.log(`使用chat completions接口处理模型: ${model}`);
     return await createChatCompletion(params);
   }
 };

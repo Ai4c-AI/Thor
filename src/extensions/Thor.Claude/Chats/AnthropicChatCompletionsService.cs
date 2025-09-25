@@ -12,7 +12,7 @@ namespace Thor.Claude.Chats;
 public class AnthropicChatCompletionsService(ILogger<AnthropicChatCompletionsService> logger)
     : IAnthropicChatCompletionsService
 {
-    public async Task<ClaudeChatCompletionDto> ChatCompletionsAsync(AnthropicInput input,
+    public async Task<AnthropicChatCompletionDto> ChatCompletionsAsync(AnthropicInput input,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -37,15 +37,30 @@ public class AnthropicChatCompletionsService(ILogger<AnthropicChatCompletionsSer
         bool isThink = input.Model.EndsWith("-thinking");
         input.Model = input.Model.Replace("-thinking", string.Empty);
 
-        var budgetTokens = 1024;
         if (input.MaxTokens is < 2048)
         {
             input.MaxTokens = 2048;
         }
 
-        if (input.MaxTokens != null && input.MaxTokens / 2 < 1024)
+        if (isThink && input.Thinking is null)
         {
-            budgetTokens = input.MaxTokens.Value / (4 * 3);
+            input.Thinking = new AnthropicThinkingInput()
+            {
+                Type = "enabled",
+                BudgetTokens = 4000
+            };
+        }
+
+        if (input.Thinking is not null && input.Thinking.BudgetTokens > 0 && input.MaxTokens != null)
+        {
+            if (input.Thinking.BudgetTokens > input.MaxTokens)
+            {
+                input.Thinking.BudgetTokens = input.MaxTokens.Value - 1;
+                if (input.Thinking.BudgetTokens > 63999)
+                {
+                    input.Thinking.BudgetTokens = 63999;
+                }
+            }
         }
 
         var response =
@@ -65,13 +80,13 @@ public class AnthropicChatCompletionsService(ILogger<AnthropicChatCompletionsSer
         }
 
         var value =
-            await response.Content.ReadFromJsonAsync<ClaudeChatCompletionDto>(ThorJsonSerializer.DefaultOptions,
+            await response.Content.ReadFromJsonAsync<AnthropicChatCompletionDto>(ThorJsonSerializer.DefaultOptions,
                 cancellationToken: cancellationToken);
 
         return value;
     }
 
-    public async IAsyncEnumerable<(string, string, ClaudeStreamDto?)> StreamChatCompletionsAsync(AnthropicInput input,
+    public async IAsyncEnumerable<(string, AnthropicStreamDto?)> StreamChatCompletionsAsync(AnthropicInput input,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -146,10 +161,10 @@ public class AnthropicChatCompletionsService(ILogger<AnthropicChatCompletionsSer
 
             data = line[OpenAIConstant.Data.Length..].Trim();
 
-            var result = JsonSerializer.Deserialize<ClaudeStreamDto>(data,
+            var result = JsonSerializer.Deserialize<AnthropicStreamDto>(data,
                 ThorJsonSerializer.DefaultOptions);
 
-            yield return (eventType, line, result);
+            yield return (eventType, result);
         }
     }
 }

@@ -12,30 +12,22 @@ namespace Thor.AzureOpenAI.Chats;
 /// OpenAI到Claude适配器服务
 /// 将Claude格式的请求转换为OpenAI格式，然后将OpenAI的响应转换为Claude格式
 /// </summary>
-public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompletionsService
+public class AzureOpenAIAnthropicChatCompletionsService(
+    IThorChatCompletionsService openAiChatService,
+    ILogger<AzureOpenAIAnthropicChatCompletionsService> logger)
+    : IAnthropicChatCompletionsService
 {
-    private readonly IThorChatCompletionsService _openAIChatService;
-    private readonly ILogger<AzureOpenAIAnthropicChatCompletionsService> _logger;
-
-    public AzureOpenAIAnthropicChatCompletionsService(
-        IThorChatCompletionsService openAIChatService,
-        ILogger<AzureOpenAIAnthropicChatCompletionsService> logger)
-    {
-        _openAIChatService = openAIChatService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// 非流式对话补全
     /// </summary>
-    public async Task<ClaudeChatCompletionDto> ChatCompletionsAsync(AnthropicInput request,
+    public async Task<AnthropicChatCompletionDto> ChatCompletionsAsync(AnthropicInput request,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             // 转换请求格式：Claude -> OpenAI
-            var openAIRequest = AnthropicToOpenAI.ConvertAnthropicToOpenAI(request);
+            var openAIRequest = AnthropicToOpenAi.ConvertAnthropicToOpenAi(request);
 
             if (openAIRequest.Model.StartsWith("gpt-5"))
             {
@@ -51,16 +43,16 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
 
             // 调用OpenAI服务
             var openAIResponse =
-                await _openAIChatService.ChatCompletionsAsync(openAIRequest, options, cancellationToken);
+                await openAiChatService.ChatCompletionsAsync(openAIRequest, options, cancellationToken);
 
             // 转换响应格式：OpenAI -> Claude
-            var claudeResponse = AnthropicToOpenAI.ConvertOpenAIToClaude(openAIResponse, request);
+            var claudeResponse = AnthropicToOpenAi.ConvertOpenAIToClaude(openAIResponse, request);
 
             return claudeResponse;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "OpenAI到Claude适配器异常");
+            logger.LogError(ex, "OpenAI到Claude适配器异常");
             throw;
         }
     }
@@ -68,11 +60,12 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
     /// <summary>
     /// 流式对话补全
     /// </summary>
-    public async IAsyncEnumerable<(string, string, ClaudeStreamDto?)> StreamChatCompletionsAsync(AnthropicInput request,
+    public async IAsyncEnumerable<(string, AnthropicStreamDto?)> StreamChatCompletionsAsync(
+        AnthropicInput request,
         ThorPlatformOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var openAIRequest = AnthropicToOpenAI.ConvertAnthropicToOpenAI(request);
+        var openAIRequest = AnthropicToOpenAi.ConvertAnthropicToOpenAi(request);
         openAIRequest.Stream = true;
 
         if (openAIRequest.Model.StartsWith("gpt-5"))
@@ -94,13 +87,13 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
         var toolBlocksStarted = new Dictionary<int, bool>(); // 使用索引而不是ID
         var toolCallIds = new Dictionary<int, string>(); // 存储每个索引对应的ID
         var toolCallIndexToBlockIndex = new Dictionary<int, int>(); // 工具调用索引到块索引的映射
-        var accumulatedUsage = new ClaudeChatCompletionDtoUsage();
+        var accumulatedUsage = new AnthropicCompletionDtoUsage();
         var isFinished = false;
         var currentContentBlockType = ""; // 跟踪当前内容块类型
         var currentBlockIndex = 0; // 跟踪当前块索引
         var lastContentBlockType = ""; // 跟踪最后一个内容块类型，用于确定停止原因
 
-        await foreach (var openAIResponse in _openAIChatService.StreamChatCompletionsAsync(openAIRequest, options,
+        await foreach (var openAIResponse in openAiChatService.StreamChatCompletionsAsync(openAIRequest, options,
                            cancellationToken))
         {
             // 发送message_start事件
@@ -108,9 +101,8 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                 openAIResponse.Choices.Any(x => x.Delta.ToolCalls?.Count > 0) == false)
             {
                 hasStarted = true;
-                var messageStartEvent = AnthropicToOpenAI.CreateMessageStartEvent(messageId, request.Model);
-                yield return ("message_start",
-                    JsonSerializer.Serialize(messageStartEvent, ThorJsonSerializer.DefaultOptions), messageStartEvent);
+                var messageStartEvent = AnthropicToOpenAi.CreateMessageStartEvent(messageId, request.Model);
+                yield return ("message_start", messageStartEvent);
             }
 
             // 更新使用情况统计
@@ -119,24 +111,24 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                 // 使用最新的token计数（OpenAI通常在最后的响应中提供完整的统计）
                 if (openAIResponse.Usage.PromptTokens.HasValue)
                 {
-                    accumulatedUsage.input_tokens = openAIResponse.Usage.PromptTokens.Value;
+                    accumulatedUsage.InputTokens = openAIResponse.Usage.PromptTokens.Value;
                 }
 
                 if (openAIResponse.Usage.CompletionTokens.HasValue)
                 {
-                    accumulatedUsage.output_tokens = (int)openAIResponse.Usage.CompletionTokens.Value;
+                    accumulatedUsage.OutputTokens = (int)openAIResponse.Usage.CompletionTokens.Value;
                 }
 
                 if (openAIResponse.Usage.PromptTokensDetails?.CachedTokens.HasValue == true)
                 {
-                    accumulatedUsage.cache_read_input_tokens =
+                    accumulatedUsage.CacheReadInputTokens =
                         openAIResponse.Usage.PromptTokensDetails.CachedTokens.Value;
                 }
 
                 // 记录调试信息
-                _logger.LogDebug("OpenAI Usage更新: Input={InputTokens}, Output={OutputTokens}, CacheRead={CacheRead}",
-                    accumulatedUsage.input_tokens, accumulatedUsage.output_tokens,
-                    accumulatedUsage.cache_read_input_tokens);
+                logger.LogDebug("OpenAI Usage更新: Input={InputTokens}, Output={OutputTokens}, CacheRead={CacheRead}",
+                    accumulatedUsage.InputTokens, accumulatedUsage.OutputTokens,
+                    accumulatedUsage.CacheReadInputTokens);
             }
 
             if (openAIResponse.Choices is { Count: > 0 })
@@ -149,10 +141,9 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                     // 如果当前有其他类型的内容块在运行，先结束它们
                     if (currentContentBlockType != "text" && !string.IsNullOrEmpty(currentContentBlockType))
                     {
-                        var stopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                        stopEvent.index = currentBlockIndex;
-                        yield return ("content_block_stop",
-                            JsonSerializer.Serialize(stopEvent, ThorJsonSerializer.DefaultOptions), stopEvent);
+                        var stopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                        stopEvent.Index = currentBlockIndex;
+                        yield return ("content_block_stop", stopEvent);
                         currentBlockIndex++; // 切换内容块时增加索引
                         currentContentBlockType = "";
                     }
@@ -163,18 +154,16 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                         hasTextContentBlockStarted = true;
                         currentContentBlockType = "text";
                         lastContentBlockType = "text";
-                        var contentBlockStartEvent = AnthropicToOpenAI.CreateContentBlockStartEvent();
-                        contentBlockStartEvent.index = currentBlockIndex;
+                        var contentBlockStartEvent = AnthropicToOpenAi.CreateContentBlockStartEvent();
+                        contentBlockStartEvent.Index = currentBlockIndex;
                         yield return ("content_block_start",
-                            JsonSerializer.Serialize(contentBlockStartEvent, ThorJsonSerializer.DefaultOptions),
                             contentBlockStartEvent);
                     }
 
                     // 发送content_block_delta事件
-                    var contentDeltaEvent = AnthropicToOpenAI.CreateContentBlockDeltaEvent(choice.Delta.Content);
-                    contentDeltaEvent.index = currentBlockIndex;
+                    var contentDeltaEvent = AnthropicToOpenAi.CreateContentBlockDeltaEvent(choice.Delta.Content);
+                    contentDeltaEvent.Index = currentBlockIndex;
                     yield return ("content_block_delta",
-                        JsonSerializer.Serialize(contentDeltaEvent, ThorJsonSerializer.DefaultOptions),
                         contentDeltaEvent);
                 }
 
@@ -191,19 +180,17 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                             // 如果当前有文本或thinking内容块在运行，先结束它们
                             if (currentContentBlockType == "text" || currentContentBlockType == "thinking")
                             {
-                                var stopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                                stopEvent.index = currentBlockIndex;
-                                yield return ("content_block_stop",
-                                    JsonSerializer.Serialize(stopEvent, ThorJsonSerializer.DefaultOptions), stopEvent);
+                                var stopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                                stopEvent.Index = currentBlockIndex;
+                                yield return ("content_block_stop", stopEvent);
                                 currentBlockIndex++; // 增加块索引
                             }
                             // 如果当前有其他工具调用在运行，也需要结束它们
                             else if (currentContentBlockType == "tool_use")
                             {
-                                var stopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                                stopEvent.index = currentBlockIndex;
-                                yield return ("content_block_stop",
-                                    JsonSerializer.Serialize(stopEvent, ThorJsonSerializer.DefaultOptions), stopEvent);
+                                var stopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                                stopEvent.Index = currentBlockIndex;
+                                yield return ("content_block_stop", stopEvent);
                                 currentBlockIndex++; // 增加块索引
                             }
 
@@ -224,12 +211,11 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                                 toolCallIds[toolCallIndex] = Guid.NewGuid().ToString();
                             }
 
-                            var toolBlockStartEvent = AnthropicToOpenAI.CreateToolBlockStartEvent(
+                            var toolBlockStartEvent = AnthropicToOpenAi.CreateToolBlockStartEvent(
                                 toolCallIds[toolCallIndex],
                                 toolCall.Function?.Name);
-                            toolBlockStartEvent.index = currentBlockIndex;
+                            toolBlockStartEvent.Index = currentBlockIndex;
                             yield return ("content_block_start",
-                                JsonSerializer.Serialize(toolBlockStartEvent, ThorJsonSerializer.DefaultOptions),
                                 toolBlockStartEvent);
                         }
 
@@ -237,11 +223,10 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                         if (!string.IsNullOrEmpty(toolCall.Function?.Arguments))
                         {
                             var toolDeltaEvent =
-                                AnthropicToOpenAI.CreateToolBlockDeltaEvent(toolCall.Function.Arguments);
+                                AnthropicToOpenAi.CreateToolBlockDeltaEvent(toolCall.Function.Arguments);
                             // 使用该工具调用对应的块索引
-                            toolDeltaEvent.index = toolCallIndexToBlockIndex[toolCallIndex];
+                            toolDeltaEvent.Index = toolCallIndexToBlockIndex[toolCallIndex];
                             yield return ("content_block_delta",
-                                JsonSerializer.Serialize(toolDeltaEvent, ThorJsonSerializer.DefaultOptions),
                                 toolDeltaEvent);
                         }
                     }
@@ -253,10 +238,9 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                     // 如果当前有其他类型的内容块在运行，先结束它们
                     if (currentContentBlockType != "thinking" && !string.IsNullOrEmpty(currentContentBlockType))
                     {
-                        var stopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                        stopEvent.index = currentBlockIndex;
-                        yield return ("content_block_stop",
-                            JsonSerializer.Serialize(stopEvent, ThorJsonSerializer.DefaultOptions), stopEvent);
+                        var stopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                        stopEvent.Index = currentBlockIndex;
+                        yield return ("content_block_stop", stopEvent);
                         currentBlockIndex++; // 增加块索引
                         currentContentBlockType = "";
                     }
@@ -267,18 +251,16 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                         hasThinkingContentBlockStarted = true;
                         currentContentBlockType = "thinking";
                         lastContentBlockType = "thinking";
-                        var thinkingBlockStartEvent = AnthropicToOpenAI.CreateThinkingBlockStartEvent();
-                        thinkingBlockStartEvent.index = currentBlockIndex;
+                        var thinkingBlockStartEvent = AnthropicToOpenAi.CreateThinkingBlockStartEvent();
+                        thinkingBlockStartEvent.Index = currentBlockIndex;
                         yield return ("content_block_start",
-                            JsonSerializer.Serialize(thinkingBlockStartEvent, ThorJsonSerializer.DefaultOptions),
                             thinkingBlockStartEvent);
                     }
 
                     var thinkingDeltaEvent =
-                        AnthropicToOpenAI.CreateThinkingBlockDeltaEvent(choice.Delta.ReasoningContent);
-                    thinkingDeltaEvent.index = currentBlockIndex;
+                        AnthropicToOpenAi.CreateThinkingBlockDeltaEvent(choice.Delta.ReasoningContent);
+                    thinkingDeltaEvent.Index = currentBlockIndex;
                     yield return ("content_block_delta",
-                        JsonSerializer.Serialize(thinkingDeltaEvent, ThorJsonSerializer.DefaultOptions),
                         thinkingDeltaEvent);
                 }
 
@@ -290,32 +272,29 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
                     // 发送content_block_stop事件（如果有活跃的内容块）
                     if (!string.IsNullOrEmpty(currentContentBlockType))
                     {
-                        var contentBlockStopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                        contentBlockStopEvent.index = currentBlockIndex;
+                        var contentBlockStopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                        contentBlockStopEvent.Index = currentBlockIndex;
                         yield return ("content_block_stop",
-                            JsonSerializer.Serialize(contentBlockStopEvent, ThorJsonSerializer.DefaultOptions),
                             contentBlockStopEvent);
                     }
 
                     // 发送message_delta事件
-                    var messageDeltaEvent = AnthropicToOpenAI.CreateMessageDeltaEvent(
-                        AnthropicToOpenAI.GetStopReasonByLastContentType(choice.FinishReason, lastContentBlockType),
+                    var messageDeltaEvent = AnthropicToOpenAi.CreateMessageDeltaEvent(
+                        AnthropicToOpenAi.GetStopReasonByLastContentType(choice.FinishReason, lastContentBlockType),
                         accumulatedUsage);
 
                     // 记录最终Usage统计
-                    _logger.LogDebug(
+                    logger.LogDebug(
                         "流式响应结束，最终Usage: Input={InputTokens}, Output={OutputTokens}, CacheRead={CacheRead}",
-                        accumulatedUsage.input_tokens, accumulatedUsage.output_tokens,
-                        accumulatedUsage.cache_read_input_tokens);
+                        accumulatedUsage.InputTokens, accumulatedUsage.OutputTokens,
+                        accumulatedUsage.CacheReadInputTokens);
 
                     yield return ("message_delta",
-                        JsonSerializer.Serialize(messageDeltaEvent, ThorJsonSerializer.DefaultOptions),
                         messageDeltaEvent);
 
                     // 发送message_stop事件
-                    var messageStopEvent = AnthropicToOpenAI.CreateMessageStopEvent();
+                    var messageStopEvent = AnthropicToOpenAi.CreateMessageStopEvent();
                     yield return ("message_stop",
-                        JsonSerializer.Serialize(messageStopEvent, ThorJsonSerializer.DefaultOptions),
                         messageStopEvent);
                 }
             }
@@ -326,22 +305,20 @@ public class AzureOpenAIAnthropicChatCompletionsService : IAnthropicChatCompleti
         {
             if (!string.IsNullOrEmpty(currentContentBlockType))
             {
-                var contentBlockStopEvent = AnthropicToOpenAI.CreateContentBlockStopEvent();
-                contentBlockStopEvent.index = currentBlockIndex;
+                var contentBlockStopEvent = AnthropicToOpenAi.CreateContentBlockStopEvent();
+                contentBlockStopEvent.Index = currentBlockIndex;
                 yield return ("content_block_stop",
-                    JsonSerializer.Serialize(contentBlockStopEvent, ThorJsonSerializer.DefaultOptions),
                     contentBlockStopEvent);
             }
 
             var messageDeltaEvent =
-                AnthropicToOpenAI.CreateMessageDeltaEvent(
-                    AnthropicToOpenAI.GetStopReasonByLastContentType("end_turn", lastContentBlockType),
+                AnthropicToOpenAi.CreateMessageDeltaEvent(
+                    AnthropicToOpenAi.GetStopReasonByLastContentType("end_turn", lastContentBlockType),
                     accumulatedUsage);
-            yield return ("message_delta",
-                JsonSerializer.Serialize(messageDeltaEvent, ThorJsonSerializer.DefaultOptions), messageDeltaEvent);
+            yield return ("message_delta", messageDeltaEvent);
 
-            var messageStopEvent = AnthropicToOpenAI.CreateMessageStopEvent();
-            yield return ("message_stop", JsonSerializer.Serialize(messageStopEvent, ThorJsonSerializer.DefaultOptions),
+            var messageStopEvent = AnthropicToOpenAi.CreateMessageStopEvent();
+            yield return ("message_stop",
                 messageStopEvent);
         }
     }

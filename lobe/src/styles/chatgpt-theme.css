@@ -1,20 +1,20 @@
 /* ChatGPT-inspired Design System */
 
 :root {
-  /* ChatGPT Color Palette */
+  /* ChatGPT Color Palette - 统一使用灰色主题 */
   --chatgpt-bg-primary: #ffffff;
-  --chatgpt-bg-secondary: #f7f7f8;
-  --chatgpt-bg-tertiary: #ececf1;
-  --chatgpt-bg-hover: #f0f0f0;
-  --chatgpt-border: #d9d9e3;
-  --chatgpt-border-light: #e5e5e5;
-  --chatgpt-text-primary: #202123;
-  --chatgpt-text-secondary: #6e6e80;
-  --chatgpt-text-muted: #8e8ea0;
-  --chatgpt-primary: #10a37f;
-  --chatgpt-primary-hover: #0d8f6f;
-  --chatgpt-success: #00a86b;
-  --chatgpt-warning: #ff8c00;
+  --chatgpt-bg-secondary: #f9fafb;
+  --chatgpt-bg-tertiary: #f3f4f6;
+  --chatgpt-bg-hover: #f3f4f6;
+  --chatgpt-border: #e5e7eb;
+  --chatgpt-border-light: #f3f4f6;
+  --chatgpt-text-primary: #111827;
+  --chatgpt-text-secondary: #6b7280;
+  --chatgpt-text-muted: #9ca3af;
+  --chatgpt-primary: #6b7280;
+  --chatgpt-primary-hover: #4b5563;
+  --chatgpt-success: #10b981;
+  --chatgpt-warning: #f59e0b;
   --chatgpt-error: #ef4444;
   --chatgpt-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --chatgpt-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -48,17 +48,17 @@
 }
 
 [data-theme="dark"] {
-  --chatgpt-bg-primary: #202123;
-  --chatgpt-bg-secondary: #343541;
-  --chatgpt-bg-tertiary: #40414f;
-  --chatgpt-bg-hover: #2a2b32;
-  --chatgpt-border: #4d4d4f;
-  --chatgpt-border-light: #565869;
-  --chatgpt-text-primary: #ececf1;
-  --chatgpt-text-secondary: #c5c5d2;
-  --chatgpt-text-muted: #8e8ea0;
-  --chatgpt-primary: #19c37d;
-  --chatgpt-primary-hover: #1a9d6a;
+  --chatgpt-bg-primary: #1f2937;
+  --chatgpt-bg-secondary: #111827;
+  --chatgpt-bg-tertiary: #374151;
+  --chatgpt-bg-hover: #374151;
+  --chatgpt-border: #374151;
+  --chatgpt-border-light: #4b5563;
+  --chatgpt-text-primary: #f9fafb;
+  --chatgpt-text-secondary: #d1d5db;
+  --chatgpt-text-muted: #9ca3af;
+  --chatgpt-primary: #9ca3af;
+  --chatgpt-primary-hover: #d1d5db;
 }
 
 /* Global Styles */
@@ -143,7 +143,7 @@
 
 .chatgpt-input-wrapper:focus-within {
   border-color: var(--chatgpt-primary);
-  box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+  box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.2);
 }
 
 .chatgpt-textarea {
@@ -271,7 +271,7 @@
 
 .chatgpt-select:focus {
   border-color: var(--chatgpt-primary);
-  box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+  box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.2);
 }
 
 /* ChatGPT-style Cards */

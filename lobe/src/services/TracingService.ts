@@ -1,5 +1,5 @@
 import { get, del } from "../utils/fetch";
-import { message } from "antd";
+import { toast } from "sonner";
 
 export interface TracingStatistics {
   totalCount: number;
@@ -27,7 +27,7 @@ export async function getTracingStatistics(): Promise<ApiResponse<TracingStatist
       data: data,
     };
   } catch (error: any) {
-    message.error(error.message || "获取统计信息失败");
+    toast.error(error.message || "获取统计信息失败");
     return {
       success: false,
       data: {
@@ -52,7 +52,7 @@ export async function cleanupTracings(retainDays: number = 30): Promise<ApiRespo
       data: data,
     };
   } catch (error: any) {
-    message.error(error.message || "清理记录失败");
+    toast.error(error.message || "清理记录失败");
     return {
       success: false,
       data: { deletedCount: 0, message: "清理失败" },
@@ -72,7 +72,7 @@ export async function deleteTracingsByDate(beforeDate: string): Promise<ApiRespo
       data: data,
     };
   } catch (error: any) {
-    message.error(error.message || "删除记录失败");
+    toast.error(error.message || "删除记录失败");
     return {
       success: false,
       data: { deletedCount: 0, message: "删除失败" },
@@ -92,7 +92,7 @@ export async function deleteTracingsByChatLoggerId(chatLoggerId: string): Promis
       data: data,
     };
   } catch (error: any) {
-    message.error(error.message || "删除记录失败");
+    toast.error(error.message || "删除记录失败");
     return {
       success: false,
       data: { deletedCount: 0, message: "删除失败" },
@@ -112,7 +112,7 @@ export async function deleteTracingsByTraceId(traceId: string): Promise<ApiRespo
       data: data,
     };
   } catch (error: any) {
-    message.error(error.message || "删除记录失败");
+    toast.error(error.message || "删除记录失败");
     return {
       success: false,
       data: { deletedCount: 0, message: "删除失败" },

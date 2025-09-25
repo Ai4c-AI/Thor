@@ -3,14 +3,14 @@ using Thor.Abstractions.Chats.Dtos;
 
 namespace Thor.Abstractions.Anthropic;
 
-public class AnthropicToOpenAI
+public static class AnthropicToOpenAi
 {
     /// <summary>
     /// 将AnthropicInput转换为ThorChatCompletionsRequest
     /// </summary>
-    public static ThorChatCompletionsRequest ConvertAnthropicToOpenAI(AnthropicInput anthropicInput)
+    public static ThorChatCompletionsRequest ConvertAnthropicToOpenAi(AnthropicInput anthropicInput)
     {
-        var openAIRequest = new ThorChatCompletionsRequest
+        var openAiRequest = new ThorChatCompletionsRequest
         {
             Model = anthropicInput.Model,
             MaxTokens = anthropicInput.MaxTokens,
@@ -19,12 +19,12 @@ public class AnthropicToOpenAI
         };
 
         // high medium minimal low
-        if (openAIRequest.Model.EndsWith("-high") ||
-            openAIRequest.Model.EndsWith("-medium") ||
-            openAIRequest.Model.EndsWith("-minimal") ||
-            openAIRequest.Model.EndsWith("-low"))
+        if (openAiRequest.Model.EndsWith("-high") ||
+            openAiRequest.Model.EndsWith("-medium") ||
+            openAiRequest.Model.EndsWith("-minimal") ||
+            openAiRequest.Model.EndsWith("-low"))
         {
-            openAIRequest.ReasoningEffort = openAIRequest.Model switch
+            openAiRequest.ReasoningEffort = openAiRequest.Model switch
             {
                 var model when model.EndsWith("-high") => "high",
                 var model when model.EndsWith("-medium") => "medium",
@@ -33,21 +33,32 @@ public class AnthropicToOpenAI
                 _ => "medium"
             };
 
-            openAIRequest.Model = openAIRequest.Model.Replace("-high", "")
+            openAiRequest.Model = openAiRequest.Model.Replace("-high", "")
                 .Replace("-medium", "")
                 .Replace("-minimal", "")
                 .Replace("-low", "");
         }
 
-        if (openAIRequest.Model.EndsWith("-thinking"))
+        if (anthropicInput.Thinking != null &&
+            anthropicInput.Thinking.Type.Equals("enabled", StringComparison.OrdinalIgnoreCase))
         {
-            openAIRequest.EnableThinking = true;
-            openAIRequest.Model = openAIRequest.Model.Replace("-thinking", "");
+            openAiRequest.Thinking = new ThorChatClaudeThinking()
+            {
+                BudgetToken = anthropicInput.Thinking.BudgetTokens,
+                Type = "enabled",
+            };
+            openAiRequest.EnableThinking = true;
         }
 
-        if (openAIRequest.Stream == true)
+        if (openAiRequest.Model.EndsWith("-thinking"))
         {
-            openAIRequest.StreamOptions = new ThorStreamOptions()
+            openAiRequest.EnableThinking = true;
+            openAiRequest.Model = openAiRequest.Model.Replace("-thinking", "");
+        }
+
+        if (openAiRequest.Stream == true)
+        {
+            openAiRequest.StreamOptions = new ThorStreamOptions()
             {
                 IncludeUsage = true,
             };
@@ -55,17 +66,16 @@ public class AnthropicToOpenAI
 
         if (!string.IsNullOrEmpty(anthropicInput.System))
         {
-            openAIRequest.Messages.Add(ThorChatMessage.CreateSystemMessage(anthropicInput.System));
+            openAiRequest.Messages.Add(ThorChatMessage.CreateSystemMessage(anthropicInput.System));
         }
 
         if (anthropicInput.Systems?.Count > 0)
         {
             foreach (var systemContent in anthropicInput.Systems)
             {
-                openAIRequest.Messages.Add(ThorChatMessage.CreateSystemMessage(systemContent.Text ?? string.Empty));
+                openAiRequest.Messages.Add(ThorChatMessage.CreateSystemMessage(systemContent.Text ?? string.Empty));
             }
         }
-
 
         // 处理messages
         if (anthropicInput.Messages != null)
@@ -79,10 +89,10 @@ public class AnthropicToOpenAI
                     continue;
                 }
 
-                openAIRequest.Messages.AddRange(thorMessages);
+                openAiRequest.Messages.AddRange(thorMessages);
             }
 
-            openAIRequest.Messages = openAIRequest.Messages
+            openAiRequest.Messages = openAiRequest.Messages
                 .Where(m => !string.IsNullOrEmpty(m.Content) || m.Contents?.Count > 0 || m.ToolCalls?.Count > 0 ||
                             !string.IsNullOrEmpty(m.ToolCallId))
                 .ToList();
@@ -91,14 +101,14 @@ public class AnthropicToOpenAI
         // 处理tools
         if (anthropicInput.Tools is { Count: > 0 })
         {
-            openAIRequest.Tools = anthropicInput.Tools.Where(x => x.name != "web_search")
+            openAiRequest.Tools = anthropicInput.Tools.Where(x => x.name != "web_search")
                 .Select(ConvertAnthropicToolToThor).ToList();
         }
 
         // 判断是否存在web_search
         if (anthropicInput.Tools?.Any(x => x.name == "web_search") == true)
         {
-            openAIRequest.WebSearchOptions = new ThorChatWebSearchOptions()
+            openAiRequest.WebSearchOptions = new ThorChatWebSearchOptions()
             {
             };
         }
@@ -106,10 +116,10 @@ public class AnthropicToOpenAI
         // 处理tool_choice
         if (anthropicInput.ToolChoice != null)
         {
-            openAIRequest.ToolChoice = ConvertAnthropicToolChoiceToThor(anthropicInput.ToolChoice);
+            openAiRequest.ToolChoice = ConvertAnthropicToolChoiceToThor(anthropicInput.ToolChoice);
         }
 
-        return openAIRequest;
+        return openAiRequest;
     }
 
     /// <summary>
@@ -130,24 +140,24 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建message_start事件
     /// </summary>
-    public static ClaudeStreamDto CreateMessageStartEvent(string messageId, string model)
+    public static AnthropicStreamDto CreateMessageStartEvent(string messageId, string model)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "message_start",
-            message = new ClaudeChatCompletionDto
+            Type = "message_start",
+            Message = new AnthropicChatCompletionDto
             {
                 id = messageId,
                 type = "message",
                 role = "assistant",
                 model = model,
-                content = new ClaudeChatCompletionDtoContent[0],
-                Usage = new ClaudeChatCompletionDtoUsage
+                content = new AnthropicChatCompletionDtoContent[0],
+                Usage = new AnthropicCompletionDtoUsage
                 {
-                    input_tokens = 0,
-                    output_tokens = 0,
-                    cache_creation_input_tokens = 0,
-                    cache_read_input_tokens = 0
+                    InputTokens = 0,
+                    OutputTokens = 0,
+                    CacheCreationInputTokens = 0,
+                    CacheReadInputTokens = 0
                 }
             }
         };
@@ -156,17 +166,17 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建content_block_start事件
     /// </summary>
-    public static ClaudeStreamDto CreateContentBlockStartEvent()
+    public static AnthropicStreamDto CreateContentBlockStartEvent()
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_start",
-            index = 0,
-            content_block = new ClaudeChatCompletionDtoContent_block
+            Type = "content_block_start",
+            Index = 0,
+            ContentBlock = new AnthropicChatCompletionDtoContentBlock
             {
-                type = "text",
-                id = null,
-                name = null
+                Type = "text",
+                Id = null,
+                Name = null
             }
         };
     }
@@ -174,17 +184,17 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建thinking block start事件
     /// </summary>
-    public static ClaudeStreamDto CreateThinkingBlockStartEvent()
+    public static AnthropicStreamDto CreateThinkingBlockStartEvent()
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_start",
-            index = 0,
-            content_block = new ClaudeChatCompletionDtoContent_block
+            Type = "content_block_start",
+            Index = 0,
+            ContentBlock = new AnthropicChatCompletionDtoContentBlock
             {
-                type = "thinking",
-                id = null,
-                name = null
+                Type = "thinking",
+                Id = null,
+                Name = null
             }
         };
     }
@@ -192,16 +202,16 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建content_block_delta事件
     /// </summary>
-    public static ClaudeStreamDto CreateContentBlockDeltaEvent(string text)
+    public static AnthropicStreamDto CreateContentBlockDeltaEvent(string text)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_delta",
-            index = 0,
-            delta = new ClaudeChatCompletionDtoDelta
+            Type = "content_block_delta",
+            Index = 0,
+            Delta = new AnthropicChatCompletionDtoDelta
             {
-                type = "text_delta",
-                text = text
+                Type = "text_delta",
+                Text = text
             }
         };
     }
@@ -209,16 +219,16 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建thinking delta事件
     /// </summary>
-    public static ClaudeStreamDto CreateThinkingBlockDeltaEvent(string thinking)
+    public static AnthropicStreamDto CreateThinkingBlockDeltaEvent(string thinking)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_delta",
-            index = 0,
-            delta = new ClaudeChatCompletionDtoDelta
+            Type = "content_block_delta",
+            Index = 0,
+            Delta = new AnthropicChatCompletionDtoDelta
             {
-                type = "thinking",
-                thinking = thinking
+                Type = "thinking",
+                Thinking = thinking
             }
         };
     }
@@ -226,27 +236,27 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建content_block_stop事件
     /// </summary>
-    public static ClaudeStreamDto CreateContentBlockStopEvent()
+    public static AnthropicStreamDto CreateContentBlockStopEvent()
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_stop",
-            index = 0
+            Type = "content_block_stop",
+            Index = 0
         };
     }
 
     /// <summary>
     /// 创建message_delta事件
     /// </summary>
-    public static ClaudeStreamDto CreateMessageDeltaEvent(string finishReason, ClaudeChatCompletionDtoUsage usage)
+    public static AnthropicStreamDto CreateMessageDeltaEvent(string finishReason, AnthropicCompletionDtoUsage usage)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "message_delta",
+            Type = "message_delta",
             Usage = usage,
-            delta = new ClaudeChatCompletionDtoDelta
+            Delta = new AnthropicChatCompletionDtoDelta
             {
-                stop_reason = finishReason
+                StopReason = finishReason
             }
         };
     }
@@ -254,28 +264,28 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建message_stop事件
     /// </summary>
-    public static ClaudeStreamDto CreateMessageStopEvent()
+    public static AnthropicStreamDto CreateMessageStopEvent()
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "message_stop"
+            Type = "message_stop"
         };
     }
 
     /// <summary>
     /// 创建tool block start事件
     /// </summary>
-    public static ClaudeStreamDto CreateToolBlockStartEvent(string? toolId, string? toolName)
+    public static AnthropicStreamDto CreateToolBlockStartEvent(string? toolId, string? toolName)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_start",
-            index = 0,
-            content_block = new ClaudeChatCompletionDtoContent_block
+            Type = "content_block_start",
+            Index = 0,
+            ContentBlock = new AnthropicChatCompletionDtoContentBlock
             {
-                type = "tool_use",
-                id = toolId,
-                name = toolName
+                Type = "tool_use",
+                Id = toolId,
+                Name = toolName
             }
         };
     }
@@ -283,16 +293,16 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 创建tool delta事件
     /// </summary>
-    public static ClaudeStreamDto CreateToolBlockDeltaEvent(string partialJson)
+    public static AnthropicStreamDto CreateToolBlockDeltaEvent(string partialJson)
     {
-        return new ClaudeStreamDto
+        return new AnthropicStreamDto
         {
-            type = "content_block_delta",
-            index = 0,
-            delta = new ClaudeChatCompletionDtoDelta
+            Type = "content_block_delta",
+            Index = 0,
+            Delta = new AnthropicChatCompletionDtoDelta
             {
-                type = "input_json_delta",
-                partial_json = partialJson
+                Type = "input_json_delta",
+                PartialJson = partialJson
             }
         };
     }
@@ -324,35 +334,74 @@ public class AnthropicToOpenAI
 
             foreach (var content in anthropicMessage.Contents)
             {
-                if (content.Type == "text")
+                switch (content.Type)
                 {
-                    currentContents.Add(ThorChatMessageContent.CreateTextContent(content.Text ?? string.Empty));
-                }
-                else if (content.Type == "image")
-                {
-                    if (content.Source != null)
-                    {
-                        var imageUrl = content.Source.Type == "base64"
-                            ? $"data:{content.Source.MediaType};base64,{content.Source.Data}"
-                            : content.Source.Data;
-                        currentContents.Add(ThorChatMessageContent.CreateImageUrlContent(imageUrl ?? string.Empty));
-                    }
-                }
-                else if (content.Type == "tool_use")
-                {
-                    // 如果有普通内容，先创建内容消息
-                    if (currentContents.Count > 0)
-                    {
-                        if (currentContents.Count == 1 && currentContents.Any(x => x.Type == "text"))
+                    case "text":
+                        currentContents.Add(ThorChatMessageContent.CreateTextContent(content.Text ?? string.Empty));
+                        break;
+                    case "thinking" when !string.IsNullOrEmpty(content.Thinking):
+                        results.Add(new ThorChatMessage()
                         {
-                            var contentMessage = new ThorChatMessage
-                            {
-                                Role = anthropicMessage.Role,
-                                ContentCalculated = currentContents.FirstOrDefault()?.Text ?? string.Empty
-                            };
-                            results.Add(contentMessage);
+                            ReasoningContent = content.Thinking
+                        });
+                        break;
+                    case "image":
+                    {
+                        if (content.Source != null)
+                        {
+                            var imageUrl = content.Source.Type == "base64"
+                                ? $"data:{content.Source.MediaType};base64,{content.Source.Data}"
+                                : content.Source.Data;
+                            currentContents.Add(ThorChatMessageContent.CreateImageUrlContent(imageUrl ?? string.Empty));
                         }
-                        else
+
+                        break;
+                    }
+                    case "tool_use":
+                    {
+                        // 如果有普通内容，先创建内容消息
+                        if (currentContents.Count > 0)
+                        {
+                            if (currentContents.Count == 1 && currentContents.Any(x => x.Type == "text"))
+                            {
+                                var contentMessage = new ThorChatMessage
+                                {
+                                    Role = anthropicMessage.Role,
+                                    ContentCalculated = currentContents.FirstOrDefault()?.Text ?? string.Empty
+                                };
+                                results.Add(contentMessage);
+                            }
+                            else
+                            {
+                                var contentMessage = new ThorChatMessage
+                                {
+                                    Role = anthropicMessage.Role,
+                                    Contents = currentContents
+                                };
+                                results.Add(contentMessage);
+                            }
+
+                            currentContents = new List<ThorChatMessageContent>();
+                        }
+
+                        // 收集工具调用
+                        var toolCall = new ThorToolCall
+                        {
+                            Id = content.Id,
+                            Type = "function",
+                            Function = new ThorChatMessageFunction
+                            {
+                                Name = content.Name,
+                                Arguments = JsonSerializer.Serialize(content.Input)
+                            }
+                        };
+                        currentToolCalls.Add(toolCall);
+                        break;
+                    }
+                    case "tool_result":
+                    {
+                        // 如果有普通内容，先创建内容消息
+                        if (currentContents.Count > 0)
                         {
                             var contentMessage = new ThorChatMessage
                             {
@@ -360,58 +409,31 @@ public class AnthropicToOpenAI
                                 Contents = currentContents
                             };
                             results.Add(contentMessage);
+                            currentContents = [];
                         }
 
-                        currentContents = new List<ThorChatMessageContent>();
-                    }
-
-                    // 收集工具调用
-                    var toolCall = new ThorToolCall
-                    {
-                        Id = content.Id,
-                        Type = "function",
-                        Function = new ThorChatMessageFunction
+                        // 如果有工具调用，先创建工具调用消息
+                        if (currentToolCalls.Count > 0)
                         {
-                            Name = content.Name,
-                            Arguments = JsonSerializer.Serialize(content.Input)
+                            var toolCallMessage = new ThorChatMessage
+                            {
+                                Role = anthropicMessage.Role,
+                                ToolCalls = currentToolCalls
+                            };
+                            results.Add(toolCallMessage);
+                            currentToolCalls = new List<ThorToolCall>();
                         }
-                    };
-                    currentToolCalls.Add(toolCall);
-                }
-                else if (content.Type == "tool_result")
-                {
-                    // 如果有普通内容，先创建内容消息
-                    if (currentContents.Count > 0)
-                    {
-                        var contentMessage = new ThorChatMessage
-                        {
-                            Role = anthropicMessage.Role,
-                            Contents = currentContents
-                        };
-                        results.Add(contentMessage);
-                        currentContents = new List<ThorChatMessageContent>();
-                    }
 
-                    // 如果有工具调用，先创建工具调用消息
-                    if (currentToolCalls.Count > 0)
-                    {
-                        var toolCallMessage = new ThorChatMessage
+                        // 创建工具结果消息
+                        var toolMessage = new ThorChatMessage
                         {
-                            Role = anthropicMessage.Role,
-                            ToolCalls = currentToolCalls
+                            Role = "tool",
+                            ToolCallId = content.ToolUseId,
+                            Content = content.Content?.ToString() ?? string.Empty
                         };
-                        results.Add(toolCallMessage);
-                        currentToolCalls = new List<ThorToolCall>();
+                        results.Add(toolMessage);
+                        break;
                     }
-
-                    // 创建工具结果消息
-                    var toolMessage = new ThorChatMessage
-                    {
-                        Role = "tool",
-                        ToolCallId = content.ToolUseId,
-                        Content = content.Content?.ToString() ?? string.Empty
-                    };
-                    results.Add(toolMessage);
                 }
             }
 
@@ -478,15 +500,22 @@ public class AnthropicToOpenAI
         {
             foreach (var property in anthropicTool.InputSchema.Properties)
             {
-                var propertyValueStr = property.Value?.ToString();
-                if (propertyValueStr != null)
+                if (property.Value?.description != null)
                 {
-                    var propertyDefinition =
-                        JsonSerializer.Deserialize<ThorToolFunctionPropertyDefinition>(propertyValueStr);
-                    if (propertyDefinition != null)
+                    var definitionType = new ThorToolFunctionPropertyDefinition()
                     {
-                        values.Add(property.Key, propertyDefinition);
+                        Description = property.Value.description,
+                        Type = property.Value.type
+                    };
+                    if (property.Value?.items?.type != null)
+                    {
+                        definitionType.Items = new ThorToolFunctionPropertyDefinition()
+                        {
+                            Type = property.Value.items.type
+                        };
                     }
+
+                    values.Add(property.Key, definitionType);
                 }
             }
         }
@@ -503,7 +532,7 @@ public class AnthropicToOpenAI
                 {
                     Type = anthropicTool.InputSchema?.Type ?? "object",
                     Properties = values,
-                    Required = anthropicTool.InputSchema?.Required?.ToList() ?? new List<string>()
+                    Required = anthropicTool.InputSchema?.Required
                 }
             }
         };
@@ -527,10 +556,10 @@ public class AnthropicToOpenAI
     /// <summary>
     /// 将OpenAI响应转换为Claude响应格式
     /// </summary>
-    public static ClaudeChatCompletionDto ConvertOpenAIToClaude(ThorChatCompletionsResponse openAIResponse,
+    public static AnthropicChatCompletionDto ConvertOpenAIToClaude(ThorChatCompletionsResponse openAIResponse,
         AnthropicInput originalRequest)
     {
-        var claudeResponse = new ClaudeChatCompletionDto
+        var claudeResponse = new AnthropicChatCompletionDto
         {
             id = openAIResponse.Id,
             type = "message",
@@ -538,62 +567,66 @@ public class AnthropicToOpenAI
             model = openAIResponse.Model ?? originalRequest.Model,
             stop_reason = GetClaudeStopReason(openAIResponse.Choices?.FirstOrDefault()?.FinishReason),
             stop_sequence = "",
-            content = new ClaudeChatCompletionDtoContent[0]
+            content = []
         };
 
-        if (openAIResponse.Choices != null && openAIResponse.Choices.Count > 0)
+        if (openAIResponse.Choices is { Count: > 0 })
         {
             var choice = openAIResponse.Choices.First();
-            var contents = new List<ClaudeChatCompletionDtoContent>();
+            var contents = new List<AnthropicChatCompletionDtoContent>();
 
-            // 处理思维内容
-            if (!string.IsNullOrEmpty(choice.Message.ReasoningContent))
+            if (!string.IsNullOrEmpty(choice.Message.Content) && !string.IsNullOrEmpty(choice.Message.ReasoningContent))
             {
-                contents.Add(new ClaudeChatCompletionDtoContent
+                contents.Add(new AnthropicChatCompletionDtoContent
                 {
                     type = "thinking",
                     Thinking = choice.Message.ReasoningContent
                 });
-            }
 
-            // 处理文本内容
-            if (!string.IsNullOrEmpty(choice.Message.Content))
-            {
-                contents.Add(new ClaudeChatCompletionDtoContent
+                contents.Add(new AnthropicChatCompletionDtoContent
                 {
                     type = "text",
                     text = choice.Message.Content
                 });
             }
+            else
+            {
+                // 处理思维内容
+                if (!string.IsNullOrEmpty(choice.Message.ReasoningContent))
+                    contents.Add(new AnthropicChatCompletionDtoContent
+                    {
+                        type = "thinking",
+                        Thinking = choice.Message.ReasoningContent
+                    });
+
+                // 处理文本内容
+                if (!string.IsNullOrEmpty(choice.Message.Content))
+                    contents.Add(new AnthropicChatCompletionDtoContent
+                    {
+                        type = "text",
+                        text = choice.Message.Content
+                    });
+            }
 
             // 处理工具调用
-            if (choice.Message.ToolCalls != null && choice.Message.ToolCalls.Count > 0)
-            {
-                foreach (var toolCall in choice.Message.ToolCalls)
+            if (choice.Message.ToolCalls is { Count: > 0 })
+                contents.AddRange(choice.Message.ToolCalls.Select(toolCall => new AnthropicChatCompletionDtoContent
                 {
-                    contents.Add(new ClaudeChatCompletionDtoContent
-                    {
-                        type = "tool_use",
-                        id = toolCall.Id,
-                        name = toolCall.Function?.Name,
-                        input = JsonSerializer.Deserialize<object>(toolCall.Function?.Arguments ?? "{}")
-                    });
-                }
-            }
+                    type = "tool_use", id = toolCall.Id, name = toolCall.Function?.Name,
+                    input = JsonSerializer.Deserialize<object>(toolCall.Function?.Arguments ?? "{}")
+                }));
 
             claudeResponse.content = contents.ToArray();
         }
 
-        // 处理使用情况统计
-        if (openAIResponse.Usage != null)
+        // 处理使用情况统计 - 确保始终提供Usage信息
+        claudeResponse.Usage = new AnthropicCompletionDtoUsage
         {
-            claudeResponse.Usage = new ClaudeChatCompletionDtoUsage
-            {
-                input_tokens = openAIResponse.Usage.PromptTokens,
-                output_tokens = (int?)openAIResponse.Usage.CompletionTokens,
-                cache_read_input_tokens = openAIResponse.Usage.PromptTokensDetails?.CachedTokens
-            };
-        }
+            InputTokens = openAIResponse.Usage?.PromptTokens ?? 0,
+            OutputTokens = (int?)(openAIResponse.Usage?.CompletionTokens ?? 0),
+            CacheCreationInputTokens = openAIResponse.Usage?.PromptTokensDetails?.CachedTokens ?? 0,
+            CacheReadInputTokens = openAIResponse.Usage?.PromptTokensDetails?.CachedTokens ?? 0
+        };
 
         return claudeResponse;
     }

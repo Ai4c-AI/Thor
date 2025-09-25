@@ -1,231 +1,38 @@
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
-import { message, Input, Button, Form, Spin, Typography, Steps, Divider, theme } from 'antd';
-import { EyeInvisibleOutlined, EyeTwoTone, UserOutlined, MailOutlined, LockOutlined, SafetyOutlined, GiftOutlined } from '@ant-design/icons';
-import { Avatar } from '@lobehub/ui';
-import styled from 'styled-components';
-import { create, GetEmailCode } from '../../services/UserService';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Eye, EyeOff, User, Mail, Lock, Shield, Gift, Rocket } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../../components/ui/form';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Avatar } from '../../components/ui/avatar';
+import { Separator } from '../../components/ui/separator';
+import { cn } from '../../lib/utils';
+
+import { create, GetEmailCode } from '../../services/UserService';
 import { login } from '../../services/AuthorizeService';
 import { IsEnableEmailRegister } from '../../services/SettingService';
-import { useTranslation } from 'react-i18next';
 
-const { Title, Text, Paragraph } = Typography;
+const registerSchema = z.object({
+  userName: z.string().min(1, 'Username is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+  code: z.string().optional(),
+  inviteCode: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
 
-// 自定义主题接口
-interface CustomTheme {
-  backgroundColor: string;
-  formBg: string;
-  gradientBg: string;
-  linkColor: string;
-  linkHoverColor: string;
-}
-
-const PageContainer = styled.div<{ theme: CustomTheme }>`
-  display: flex;
-  min-height: 100vh;
-  background: ${props => props.theme.backgroundColor};
-`;
-
-const BrandSide = styled.div<{ theme: CustomTheme }>`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 40px;
-  color: white;
-  position: relative;
-  overflow: hidden;
-  
-  @media (max-width: 992px) {
-    display: none;
-  }
-`;
-
-const BrandContent = styled.div`
-  max-width: 480px;
-  z-index: 2;
-  text-align: center;
-`;
-
-const FormSide = styled.div<{ theme: CustomTheme }>`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 40px 20px;
-  background: ${props => props.theme.formBg};
-  overflow-y: auto;
-  
-  @media (max-width: 992px) {
-    width: 100%;
-  }
-`;
-
-const FormContainer = styled.div`
-  width: 100%;
-  max-width: 480px;
-  padding: 0 20px;
-`;
-
-const LogoContainer = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 40px;
-  
-  @media (max-width: 992px) {
-    justify-content: center;
-  }
-`;
-
-const LogoText = styled.div`
-  margin-left: 16px;
-`;
-
-const StepsContainer = styled.div`
-  margin-bottom: 30px;
-`;
-
-const ActionsContainer = styled.div`
-  margin-top: 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const LoginLink = styled(Text) <{ theme: CustomTheme }>`
-  text-align: center;
-  cursor: pointer;
-  color: ${props => props.theme.linkColor};
-  transition: color 0.3s;
-  
-  &:hover {
-    color: ${props => props.theme.linkHoverColor};
-    text-decoration: underline;
-  }
-`;
-
-const AnimatedShape = styled.div`
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  animation: float 15s infinite ease-in-out;
-  
-  &:nth-child(1) {
-    width: 300px;
-    height: 300px;
-    top: -50px;
-    left: -100px;
-    animation-delay: 0s;
-  }
-  
-  &:nth-child(2) {
-    width: 200px;
-    height: 200px;
-    bottom: 50px;
-    right: 30px;
-    animation-delay: 2s;
-  }
-  
-  &:nth-child(3) {
-    width: 150px;
-    height: 150px;
-    bottom: -50px;
-    left: 30%;
-    animation-delay: 4s;
-  }
-  
-  @keyframes float {
-    0% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-20px) rotate(5deg); }
-    100% { transform: translateY(0) rotate(0deg); }
-  }
-`;
-
-const FeatureItem = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-`;
-
-const FeatureIcon = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16px;
-  font-size: 20px;
-`;
-
-// 彩蛋动画容器
-const ConfettiContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1000;
-`;
-
-// 彩蛋粒子样式
-const Confetti = styled.div<{ color: string; size: number; left: string; top: string; animationDuration: string; delay: string }>`
-  position: fixed;
-  width: ${props => props.size}px;
-  height: ${props => props.size}px;
-  background-color: ${props => props.color};
-  left: ${props => props.left};
-  top: ${props => props.top};
-  opacity: 0;
-  border-radius: ${props => Math.random() > 0.5 ? '50%' : props.size / 5 + 'px'};
-  transform: scale(0);
-  animation: confettiAnim ${props => props.animationDuration} ease-out forwards;
-  animation-delay: ${props => props.delay};
-  
-  @keyframes confettiAnim {
-    0% {
-      transform: scale(0);
-      opacity: 1;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      transform: scale(1) translate(${() => (Math.random() - 0.5) * 200}px, ${() => (Math.random() - 0.5) * 200}px) rotate(${() => Math.random() * 720}deg);
-      opacity: 0;
-    }
-  }
-`;
-
-// 彩蛋爆炸效果
-const Explosion = styled.div<{ top: string; left: string }>`
-  position: fixed;
-  top: ${props => props.top};
-  left: ${props => props.left};
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: #ff4d4f;
-  animation: explode 0.5s ease-out forwards;
-  z-index: 1001;
-  
-  @keyframes explode {
-    0% {
-      transform: scale(0);
-      opacity: 1;
-      box-shadow: 0 0 20px 10px rgba(255, 77, 79, 0.8);
-    }
-    100% {
-      transform: scale(20);
-      opacity: 0;
-      box-shadow: 0 0 0 0 rgba(255, 77, 79, 0);
-    }
-  }
-`;
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterPage = memo(() => {
   const { t } = useTranslation();
@@ -233,34 +40,24 @@ const RegisterPage = memo(() => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [countDown, setCountDown] = useState(0);
-  const [form] = Form.useForm();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'account' | 'security'>('account');
   const enableEmailRegister = IsEnableEmailRegister();
-  const easterEggTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [explosionPosition, setExplosionPosition] = useState({ top: '0px', left: '0px' });
-  const [confettiItems, setConfettiItems] = useState<Array<{
-    id: number;
-    color: string;
-    size: number;
-    left: string;
-    top: string;
-    animationDuration: string;
-    delay: string;
-  }>>([]);
   const registerButtonRef = useRef<HTMLButtonElement>(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
 
-  // 使用antd的主题系统
-  const { token } = theme.useToken();
-
-  // 设置主题色
-  const themeColors = {
-    backgroundColor: token.colorBgLayout,
-    formBg: token.colorBgContainer,
-    gradientBg: `linear-gradient(135deg, ${token.colorPrimary} 0%, ${token.colorPrimaryActive} 100%)`,
-    linkColor: token.colorPrimary,
-    linkHoverColor: token.colorPrimaryHover
-  };
+  const form = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      userName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      code: '',
+      inviteCode: '',
+    },
+  });
 
   useEffect(() => {
     if (countDown > 0) {
@@ -275,63 +72,19 @@ const RegisterPage = memo(() => {
     const searchParams = new URLSearchParams(location.search);
     const inviteCode = searchParams.get('inviteCode');
     if (inviteCode) {
-      form.setFieldsValue({ inviteCode });
+      form.setValue('inviteCode', inviteCode);
     }
   }, [location, form]);
 
-  // 生成彩蛋粒子
-  const generateConfetti = useCallback((buttonElement: HTMLElement) => {
-    const rect = buttonElement.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    // 设置爆炸中心点
-    setExplosionPosition({
-      top: `${centerY}px`,
-      left: `${centerX}px`
-    });
-
-    // 生成彩蛋粒子 - 从按钮中心向四周炸开
-    const colors = [token.colorError, token.colorWarning, token.colorInfo, token.colorSuccess, token.colorPrimary, token.colorPrimaryActive];
-    const newConfetti = Array.from({ length: 150 }, (_, i) => {
-      // 随机角度和距离，确保粒子向四周散开
-      const angle = Math.random() * Math.PI * 2; // 0-360度的随机角度
-      const distance = Math.random() * 100 + 20; // 随机距离
-
-      // 计算粒子的起始位置（相对于爆炸中心）
-      const x = centerX + Math.cos(angle) * distance;
-      const y = centerY + Math.sin(angle) * distance;
-
-      return {
-        id: i,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        size: Math.random() * 10 + 5,
-        left: `${x}px`,
-        top: `${y}px`,
-        animationDuration: `${0.5 + Math.random() * 1}s`,
-        delay: `${Math.random() * 0.2}s`,
-      };
-    });
-
-    setConfettiItems(newConfetti);
-    setShowConfetti(true);
-
-    // 5秒后清除粒子
-    setTimeout(() => {
-      setShowConfetti(false);
-      setConfettiItems([]);
-    }, 5000);
-  }, [token]);
-
   const playEasterEgg = useCallback(() => {
     if (registerButtonRef.current) {
-      generateConfetti(registerButtonRef.current);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
     }
-  }, [generateConfetti]);
+  }, []);
 
-  const onFinish = useCallback(async (values: any) => {
+  const onSubmit = useCallback(async (values: RegisterFormData) => {
     try {
-      console.log('Form values:', values);
       setLoading(true);
       const resp = await create({
         userName: values.userName,
@@ -339,22 +92,19 @@ const RegisterPage = memo(() => {
         password: values.password,
         confirmPassword: values.confirmPassword,
         code: values.code || '',
-        inviteCode: values.inviteCode
+        inviteCode: values.inviteCode || ''
       });
 
       if (resp.success) {
-        message.success(t('register.registerSuccess'));
-        
-        // 触发彩蛋动画
+        toast.success(t('register.registerSuccess'));
         playEasterEgg();
-        
-        // 自动登录
-        easterEggTimer.current = setTimeout(async () => {
+
+        setTimeout(async () => {
           const loginResp = await login({
             account: values.userName,
             pass: values.password
           });
-          
+
           if (loginResp.success) {
             localStorage.setItem('token', loginResp.data.token);
             localStorage.setItem('role', loginResp.data.role);
@@ -364,10 +114,10 @@ const RegisterPage = memo(() => {
           }
         }, 2000);
       } else {
-        message.error(t('register.userCreationFailed') + ': ' + resp.message);
+        toast.error(t('register.userCreationFailed') + ': ' + resp.message);
       }
     } catch (error) {
-      message.error(t('register.registerError'));
+      toast.error(t('register.registerError'));
       console.error('Registration error:', error);
     } finally {
       setLoading(false);
@@ -376,303 +126,433 @@ const RegisterPage = memo(() => {
 
   const handleGetCode = useCallback(async () => {
     try {
-      const email = form.getFieldValue('email');
+      const email = form.getValues('email');
       if (!email) {
-        message.error(t('register.emailRequired'));
+        toast.error(t('register.emailRequired'));
         return;
       }
-      
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        message.error(t('register.emailInvalid'));
+        toast.error(t('register.emailInvalid'));
         return;
       }
-      
+
       setCountDown(60);
       const resp = await GetEmailCode(email);
-      
+
       if (resp.success) {
-        message.success(t('register.verificationCodeSent'));
+        toast.success(t('register.verificationCodeSent'));
       } else {
-        // 验证码获取失败时，给用户友好提示
-        message.warning(resp.message || t('register.verificationCodeOptional'));
+        toast.warning(resp.message || t('register.verificationCodeOptional'));
         setCountDown(0);
       }
     } catch (error) {
       console.error('Error sending verification code:', error);
-      message.warning(t('register.verificationCodeOptional'));
+      toast.warning(t('register.verificationCodeOptional'));
       setCountDown(0);
     }
   }, [form, t]);
 
-  const nextStep = () => {
-    form.validateFields(['userName', 'email']).then((values) => {
-      // 单独保存验证通过的值
-      console.log('Step 1 validated values:', values);
-      
-      // 存储第一步表单的值以便于最终提交使用
-      const formValues = form.getFieldsValue();
-      console.log('Current form values:', formValues);
-      
-      setCurrentStep(1);
-    }).catch(err => {
-      console.log('Validation errors:', err);
-    });
-  };
-
-  const prevStep = () => {
-    setCurrentStep(0);
-  };
-
   return (
-    <PageContainer theme={themeColors}>
-      {/* 左侧品牌展示区 */}
-      <BrandSide theme={themeColors}>
-        <AnimatedShape />
-        <AnimatedShape />
-        <AnimatedShape />
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
+      <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
 
-        <BrandContent>
-          <Title level={1} style={{ color: token.colorTextLightSolid || 'white', marginTop: 24 }}>
-            TokenAI 
-          </Title>
-          <Paragraph style={{ color: token.colorTextSecondary || 'rgba(255,255,255,0.8)', fontSize: 16, marginBottom: 40 }}>
-            {t('register.brandSlogan')}
-          </Paragraph>
+        {/* Brand Section */}
+        <div className="relative hidden h-full flex-col bg-muted p-6 lg:p-10 text-white md:flex dark:border-r">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/80" />
 
-          <Divider style={{ backgroundColor: token.colorBorderSecondary || 'rgba(255,255,255,0.2)', margin: '30px 0' }} />
+          {/* Floating Elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-20 -left-20 lg:-top-40 lg:-left-40 h-40 w-40 lg:h-80 lg:w-80 rounded-full bg-white/10 animate-pulse" />
+            <div className="absolute -bottom-20 -right-20 lg:-bottom-40 lg:-right-40 h-48 w-48 lg:h-96 lg:w-96 rounded-full bg-white/5 animate-pulse delay-1000" />
+            <div className="absolute top-1/2 left-1/4 h-16 w-16 lg:h-32 lg:w-32 rounded-full bg-white/10 animate-pulse delay-2000" />
+          </div>
 
-          <FeatureItem>
-            <FeatureIcon>🚀</FeatureIcon>
-            <div>
-              <Text style={{ color: token.colorTextLightSolid || 'white', fontWeight: 'bold', fontSize: 16 }}>
-                {t('register.feature1Title')}
-              </Text>
-              <Paragraph style={{ color: token.colorTextSecondary || 'rgba(255,255,255,0.8)', margin: 0 }}>
-                {t('register.feature1Desc')}
-              </Paragraph>
+          <div className="relative z-20 flex items-center text-base lg:text-lg font-medium">
+            <Avatar className="mr-2 h-6 w-6 lg:h-8 lg:w-8">
+              <img src="/logo.png" alt="Thor" className="rounded-md" />
+            </Avatar>
+            Thor
+          </div>
+
+          <div className="relative z-20 mt-auto">
+            <blockquote className="space-y-2">
+              <div className="flex items-start space-x-3 lg:space-x-4 mb-4 lg:mb-6">
+                <div className="flex h-8 w-8 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-white/20 flex-shrink-0 mt-1">
+                  <Rocket className="h-4 w-4 lg:h-6 lg:w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm lg:text-lg font-semibold leading-tight">
+                    {t('register.feature1Title') || 'Next Generation AI Platform'}
+                  </p>
+                  <p className="text-xs lg:text-sm text-white/80 mt-1">
+                    {t('register.feature1Desc') || 'Powerful AI tools for modern workflows'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 lg:space-y-3">
+                <div className="flex items-center space-x-2 lg:space-x-3">
+                  <div className="h-1.5 w-1.5 lg:h-2 lg:w-2 rounded-full bg-white/60 flex-shrink-0" />
+                  <p className="text-xs lg:text-sm text-white/90">Enterprise-grade security</p>
+                </div>
+                <div className="flex items-center space-x-2 lg:space-x-3">
+                  <div className="h-1.5 w-1.5 lg:h-2 lg:w-2 rounded-full bg-white/60 flex-shrink-0" />
+                  <p className="text-xs lg:text-sm text-white/90">Multi-model support</p>
+                </div>
+                <div className="flex items-center space-x-2 lg:space-x-3">
+                  <div className="h-1.5 w-1.5 lg:h-2 lg:w-2 rounded-full bg-white/60 flex-shrink-0" />
+                  <p className="text-xs lg:text-sm text-white/90">Real-time analytics</p>
+                </div>
+              </div>
+
+              <footer className="pt-3 lg:pt-4 text-xs lg:text-sm text-white/60">
+                {t('register.brandSlogan') || 'Join thousands of users already using Thor AI'}
+              </footer>
+            </blockquote>
+          </div>
+        </div>
+
+        {/* Form Section */}
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto flex w-full flex-col justify-center space-y-4 sm:space-y-6 sm:w-[400px]">
+
+            {/* Mobile Logo */}
+            <div className="flex flex-col space-y-2 text-center md:hidden">
+              <div className="flex items-center justify-center space-x-2">
+                <Avatar className="h-8 w-8">
+                  <img src="/logo.png" alt="Thor" className="rounded-md" />
+                </Avatar>
+                <h1 className="text-2xl font-semibold tracking-tight">Thor</h1>
+              </div>
             </div>
-          </FeatureItem>
 
-        </BrandContent>
-      </BrandSide>
+            {/* Header */}
+            <div className="flex flex-col space-y-2 text-center">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {t('register.title') || 'Create an account'}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t('register.description') || 'Enter your details below to create your account'}
+              </p>
+            </div>
 
-      {/* 右侧表单区 */}
-      <FormSide theme={themeColors}>
-        <FormContainer>
-          <LogoContainer>
-            <Avatar size={48} shape="square" src="/logo.png" />
-            <LogoText>
-              <Title level={4} style={{ margin: 0 }}>
-                Thor
-              </Title>
-              <Text type="secondary">{t('register.subtitle')}</Text>
-            </LogoText>
-          </LogoContainer>
+            {/* Progress Indicator */}
+            <div className="flex items-center space-x-2">
+              <div className={cn(
+                "h-2 flex-1 rounded-full transition-colors",
+                currentStep === 'account' ? "bg-primary" : "bg-primary/20"
+              )} />
+              <div className={cn(
+                "h-2 flex-1 rounded-full transition-colors",
+                currentStep === 'security' ? "bg-primary" : "bg-primary/20"
+              )} />
+            </div>
 
-          <Title level={3} style={{ marginBottom: 24 }}>{t('register.title')}</Title>
+            {/* Form */}
+            <Card className="border-0 shadow-lg">
+              <CardContent className="pt-6">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
-          <StepsContainer>
-            <Steps
-              current={currentStep}
-              items={[
-                {
-                  title: t('register.step1'),
-                },
-                {
-                  title: t('register.step2'),
-                }
-              ]}
-            />
-          </StepsContainer>
+                    {/* Step 1: Account Info */}
+                    {currentStep === 'account' && (
+                      <div className="space-y-4 animate-in slide-in-from-right-5 duration-300">
+                        <div className="text-center pb-2">
+                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                            <User className="w-6 h-6 text-primary" />
+                          </div>
+                          <h3 className="font-semibold">{t('register.step1') || 'Account Information'}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {t('register.step1Desc') || 'Basic information for your account'}
+                          </p>
+                        </div>
 
-          <Spin spinning={loading}>
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={onFinish}
-              autoComplete="off"
-              requiredMark={false}
-            >
-              {/* 第一步表单内容 - 始终存在但根据步骤控制显示 */}
-              <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
-                <Form.Item
-                  name="userName"
-                  label={t('register.usernameLabel')}
-                  rules={[
-                    { required: true, message: t('register.usernameRequired') }
-                  ]}
-                >
-                  <Input 
-                    prefix={<UserOutlined />} 
-                    placeholder={t('register.usernamePlaceholder')} 
-                    size="large" 
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="email"
-                  label={t('register.emailLabel')}
-                  rules={[
-                    { required: true, message: t('register.emailRequired') },
-                    { type: 'email', message: t('register.emailInvalid') }
-                  ]}
-                >
-                  <Input 
-                    prefix={<MailOutlined />} 
-                    placeholder={t('register.emailPlaceholder')} 
-                    size="large" 
-                  />
-                </Form.Item>
-                
-                {/* 获取验证码按钮 - 在邮箱输入框下方显示 */}
-                {enableEmailRegister && (
-                  <div style={{ marginBottom: 16, marginTop: -8 }}>
-                    <Button 
-                      type="primary"
-                      ghost
-                      disabled={countDown > 0}
-                      onClick={handleGetCode}
-                      size="large"
-                      style={{ width: '100%' }}
-                    >
-                      {countDown > 0 
-                        ? t('register.resendCode', { count: countDown }) 
-                        : t('register.getVerificationCode')}
-                    </Button>
-                  </div>
-                )}
-                
-                {/* 验证码输入字段 - 移除右侧按钮 */}
-                {enableEmailRegister && (
-                  <Form.Item
-                    name="code"
-                    label={`${t('register.verificationCodeLabel')} ${!enableEmailRegister ? `(${t('common.optional')})` : ''}`}
-                    rules={[
-                      { required: false, message: t('register.verificationCodePlaceholder') }
-                    ]}
-                  >
-                    <Input
-                      prefix={<SafetyOutlined />}
-                      placeholder={t('register.verificationCodePlaceholder')}
-                      size="large"
-                    />
-                  </Form.Item>
-                )}
-                
-                <ActionsContainer>
-                  <Button 
-                    type="primary" 
-                    size="large" 
-                    onClick={nextStep} 
-                    block
-                  >
-                    {t('register.nextStep')}
-                  </Button>
-                  
-                  <LoginLink onClick={() => navigate('/login')} theme={themeColors}>
-                    {t('register.loginLink')}
-                  </LoginLink>
-                </ActionsContainer>
-              </div>
-              
-              {/* 第二步表单内容 - 始终存在但根据步骤控制显示 */}
-              <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-                <Form.Item
-                  name="password"
-                  label={t('register.passwordLabel')}
-                  rules={[
-                    { required: true, message: t('register.passwordRequired') },
-                    { min: 6, message: t('register.passwordLength') }
-                  ]}
-                >
-                  <Input.Password
-                    prefix={<LockOutlined />}
-                    placeholder={t('register.passwordPlaceholder')}
-                    size="large"
-                    iconRender={visible => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="confirmPassword"
-                  label={t('register.confirmPasswordLabel')}
-                  dependencies={['password']}
-                  rules={[
-                    { required: true, message: t('register.confirmPasswordRequired') },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        if (!value || getFieldValue('password') === value) {
-                          return Promise.resolve();
-                        }
-                        return Promise.reject(new Error(t('register.passwordMismatch')));
-                      },
-                    }),
-                  ]}
-                >
-                  <Input.Password
-                    prefix={<LockOutlined />}
-                    placeholder={t('register.confirmPasswordPlaceholder')}
-                    size="large"
-                    iconRender={visible => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="inviteCode"
-                  label={t('register.inviteCodeLabel')}
-                >
-                  <Input
-                    prefix={<GiftOutlined />}
-                    placeholder={t('register.inviteCodePlaceholder')}
-                    size="large"
-                  />
-                </Form.Item>
-                
-                <ActionsContainer>
-                  <Button 
-                    type="primary" 
-                    size="large" 
-                    htmlType="submit" 
-                    block
-                    loading={loading}
-                    ref={registerButtonRef}
-                  >
-                    {t('register.registerButton')}
-                  </Button>
-                  
-                  <Button 
-                    size="large" 
-                    onClick={prevStep} 
-                    block
-                  >
-                    {t('register.prevStep')}
-                  </Button>
-                </ActionsContainer>
-              </div>
-            </Form>
-          </Spin>
-        </FormContainer>
-      </FormSide>
+                        <FormField
+                          control={form.control}
+                          name="userName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">{t('register.usernameLabel')}</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    placeholder={t('register.usernamePlaceholder')}
+                                    className="pl-10 h-11"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-      {/* 彩蛋效果 */}
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">{t('register.emailLabel')}</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    type="email"
+                                    placeholder={t('register.emailPlaceholder')}
+                                    className="pl-10 h-11"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {enableEmailRegister && (
+                          <>
+                            <div className="pt-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={countDown > 0}
+                                onClick={handleGetCode}
+                                className="w-full h-11"
+                              >
+                                <Shield className="w-4 h-4 mr-2" />
+                                {countDown > 0
+                                  ? t('register.resendCode', { count: countDown })
+                                  : t('register.getVerificationCode')}
+                              </Button>
+                            </div>
+
+                            <FormField
+                              control={form.control}
+                              name="code"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    {t('register.verificationCodeLabel')}
+                                    <span className="text-muted-foreground ml-1">(optional)</span>
+                                  </FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                      <Input
+                                        {...field}
+                                        placeholder={t('register.verificationCodePlaceholder')}
+                                        className="pl-10 h-11"
+                                      />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+
+                        <div className="pt-4 space-y-3">
+                          <Button
+                            type="button"
+                            onClick={() => setCurrentStep('security')}
+                            className="w-full h-11"
+                            size="lg"
+                          >
+                            {t('register.nextStep') || 'Continue'}
+                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Button>
+
+                          <div className="text-center">
+                            <Button
+                              type="button"
+                              variant="link"
+                              onClick={() => navigate('/login')}
+                              className="text-sm text-muted-foreground hover:text-foreground"
+                            >
+                              {t('register.loginLink') || 'Already have an account? Sign in'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 2: Security */}
+                    {currentStep === 'security' && (
+                      <div className="space-y-4 animate-in slide-in-from-right-5 duration-300">
+                        <div className="text-center pb-2">
+                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                            <Lock className="w-6 h-6 text-primary" />
+                          </div>
+                          <h3 className="font-semibold">{t('register.step2') || 'Security Setup'}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {t('register.step2Desc') || 'Set up your password and optional invite code'}
+                          </p>
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">{t('register.passwordLabel')}</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder={t('register.passwordPlaceholder')}
+                                    className="pl-10 pr-10 h-11"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                  >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">{t('register.confirmPasswordLabel')}</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder={t('register.confirmPasswordPlaceholder')}
+                                    className="pl-10 pr-10 h-11"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  >
+                                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="inviteCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">
+                                {t('register.inviteCodeLabel')}
+                                <span className="text-muted-foreground ml-1">(optional)</span>
+                              </FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Gift className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    placeholder={t('register.inviteCodePlaceholder')}
+                                    className="pl-10 h-11"
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="pt-4 space-y-3">
+                          <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full h-11"
+                            size="lg"
+                            ref={registerButtonRef}
+                          >
+                            {loading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                {t('register.registering') || 'Creating account...'}
+                              </>
+                            ) : (
+                              <>
+                                {t('register.registerButton') || 'Create account'}
+                                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </>
+                            )}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setCurrentStep('account')}
+                            className="w-full h-11"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {t('register.prevStep') || 'Back'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Terms */}
+            <p className="px-8 text-center text-sm text-muted-foreground">
+              By clicking continue, you agree to our{" "}
+              <Button variant="link" className="h-auto p-0 text-sm underline">
+                Terms of Service
+              </Button>{" "}
+              and{" "}
+              <Button variant="link" className="h-auto p-0 text-sm underline">
+                Privacy Policy
+              </Button>
+              .
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Success Animation */}
       {showConfetti && (
-        <ConfettiContainer>
-          <Explosion top={explosionPosition.top} left={explosionPosition.left} />
-          {confettiItems.map(item => (
-            <Confetti
-              key={item.id}
-              color={item.color}
-              size={item.size}
-              left={item.left}
-              top={item.top}
-              animationDuration={item.animationDuration}
-              delay={item.delay}
-            />
-          ))}
-        </ConfettiContainer>
+        <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+          <div className="animate-in zoom-in-50 duration-500">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-green-500 shadow-lg">
+              <svg className="h-12 w-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 via-blue-500/20 to-purple-600/20 animate-pulse" />
+        </div>
       )}
-    </PageContainer>
+    </div>
   );
 });
 

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Thor.Domain.Chats;
+using Thor.Domain.Images;
 using Thor.Service.DataAccess;
 using Thor.Service.Domain;
 
@@ -10,11 +11,11 @@ public class LoggerDbContext<TContext>(DbContextOptions<TContext> options, IServ
 {
     public DbSet<ChatLogger> Loggers { get; set; }
 
-    public DbSet<RequestLog> RequestLogs { get; set; }
-
     public DbSet<StatisticsConsumesNumber> StatisticsConsumesNumbers { get; set; }
 
     public DbSet<ModelStatisticsNumber> ModelStatisticsNumbers { get; set; }
+
+    public DbSet<ImageTaskLogger> ImageTaskLoggers { get; set; }
 
     public DbSet<Tracing> Tracings { get; set; }
 

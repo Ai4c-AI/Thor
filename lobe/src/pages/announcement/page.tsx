@@ -1,142 +1,78 @@
-import { useEffect, useState } from "react";
-import styled from "styled-components";
+import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Loader2,
+  Pin,
+  Calendar,
+  Edit,
+  Trash2
+} from "lucide-react";
+
+// shadcn/ui components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+
+// Services
 import { getAnnouncements, deleteAnnouncement, toggleAnnouncement } from "../../services/AnnouncementService";
-import { Switch, Tag, Button, Dropdown, Input, Table, message, Space } from 'antd';
 import CreateAnnouncement from "./features/CreateAnnouncement";
 import EditAnnouncement from "./features/EditAnnouncement";
 
-const Header = styled.header`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-`;
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  enabled: boolean;
+  pinned: boolean;
+  order: number;
+  expireTime?: string;
+  createdAt: string;
+}
 
-const { Search } = Input;
+interface PaginationInput {
+  page: number;
+  pageSize: number;
+  keyword: string;
+}
 
-export default function Announcement() {
-  const [data, setData] = useState<any[]>([]);
+export default function AnnouncementPage() {
+  const { t } = useTranslation();
+
+  const [data, setData] = useState<Announcement[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [createVisible, setCreateVisible] = useState<boolean>(false);
   const [editVisible, setEditVisible] = useState<boolean>(false);
-  const [currentAnnouncement, setCurrentAnnouncement] = useState<any>(null);
-  const [input, setInput] = useState({
+  const [currentAnnouncement, setCurrentAnnouncement] = useState<Announcement | null>(null);
+  const [input, setInput] = useState<PaginationInput>({
     page: 1,
     pageSize: 10,
     keyword: ''
   });
 
-  const columns = [
-    {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
-      ellipsis: true,
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: string) => {
-        const colorMap: { [key: string]: string } = {
-          'info': 'blue',
-          'success': 'green',
-          'warning': 'orange',
-          'error': 'red'
-        };
-        return <Tag color={colorMap[type] || 'blue'}>{type}</Tag>;
-      }
-    },
-    {
-      title: '状态',
-      dataIndex: 'enabled',
-      key: 'enabled',
-      render: (enabled: boolean, item: any) => {
-        return (
-          <Switch
-            checked={enabled}
-            checkedChildren="启用"
-            unCheckedChildren="禁用"
-            onChange={(checked) => handleToggle(item.id, checked)}
-          />
-        );
-      }
-    },
-    {
-      title: '置顶',
-      dataIndex: 'pinned',
-      key: 'pinned',
-      render: (pinned: boolean) => {
-        return pinned ? <Tag color="red">置顶</Tag> : <Tag>普通</Tag>;
-      }
-    },
-    {
-      title: '排序权重',
-      dataIndex: 'order',
-      key: 'order',
-    },
-    {
-      title: '过期时间',
-      dataIndex: 'expireTime',
-      key: 'expireTime',
-      render: (expireTime: string) => {
-        if (!expireTime) return '永不过期';
-        return new Date(expireTime).toLocaleString();
-      }
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (createdAt: string) => {
-        return new Date(createdAt).toLocaleString();
-      }
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_text: any, item: any) => (
-        <Space>
-          <Button size="small" onClick={() => openEditAnnouncement(item)}>
-            编辑
-          </Button>
-          <Button size="small" danger onClick={() => handleDelete(item.id)}>
-            删除
-          </Button>
-        </Space>
-      ),
-    }
-  ];
-
-  function openEditAnnouncement(announcement: any) {
-    setCurrentAnnouncement(announcement);
-    setEditVisible(true);
-  }
-
-  function handleDelete(id: string) {
-    deleteAnnouncement(id).then((res) => {
-      if (res.success) {
-        message.success('删除成功');
-        loadData();
-      } else {
-        message.error(res.message || '删除失败');
-      }
-    });
-  }
-
-  function handleToggle(id: string, enabled: boolean) {
-    toggleAnnouncement(id, enabled).then((res) => {
-      if (res.success) {
-        message.success('操作成功');
-        loadData();
-      } else {
-        message.error(res.message || '操作失败');
-      }
-    });
-  }
-
-  function loadData() {
+  const loadData = useCallback(() => {
     setLoading(true);
     getAnnouncements(input.page, input.pageSize, input.keyword)
       .then((res) => {
@@ -144,74 +80,274 @@ export default function Announcement() {
           setData(res.data.items);
           setTotal(res.data.total);
         } else {
-          message.error(res.message || '加载失败');
+          toast.error(res.message || t('announcement.loadFailed'));
         }
       })
       .finally(() => setLoading(false));
-  }
+  }, [input]);
 
-  function handleSearch(value: string) {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleSearch = (value: string) => {
     setInput({
       ...input,
       keyword: value,
       page: 1
     });
-  }
+  };
 
-  useEffect(() => {
-    loadData();
-  }, [input]);
+  const handleToggle = async (id: string, enabled: boolean) => {
+    try {
+      const res = await toggleAnnouncement(id, enabled);
+      if (res.success) {
+        toast.success(t('announcement.statusUpdateSuccess'));
+        loadData();
+      } else {
+        toast.error(res.message || t('announcement.statusUpdateFailed'));
+      }
+    } catch (error) {
+      toast.error(t('announcement.statusUpdateFailed'));
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await deleteAnnouncement(id);
+      if (res.success) {
+        toast.success(t('announcement.deleteSuccess'));
+        loadData();
+      } else {
+        toast.error(res.message || t('announcement.deleteFailed'));
+      }
+    } catch (error) {
+      toast.error(t('announcement.deleteFailed'));
+    }
+  };
+
+  const openEditAnnouncement = (announcement: Announcement) => {
+    setCurrentAnnouncement(announcement);
+    setEditVisible(true);
+  };
+
+  const getTypeVariant = (type: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (type) {
+      case 'success': return 'default';
+      case 'warning': return 'secondary';
+      case 'error': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  const getTypeColor = (type: string): string => {
+    switch (type) {
+      case 'success': return 'text-green-600';
+      case 'warning': return 'text-orange-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-blue-600';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
 
   return (
-    <div style={{
-      margin: '10px',
-      height: '80vh',
-      overflow: 'auto',
-      width: '100%',
-    }}>
-      <Header>
-        <span style={{
-          fontSize: '1.5rem',
-          fontWeight: 'bold',
-        }}>
-          公告管理
-        </span>
-        <Space>
-          <Search
-            placeholder="搜索公告标题或内容"
-            allowClear
-            enterButton="搜索"
-            size="middle"
-            onSearch={handleSearch}
-          />
-          <Button type="primary" onClick={() => setCreateVisible(true)}>
-            创建公告
-          </Button>
-        </Space>
-      </Header>
+    <div className="space-y-6">
+      {/* Header Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="text-2xl font-bold">{t('announcement.title')}</CardTitle>
 
-      <Table
-        columns={columns}
-        dataSource={data}
-        loading={loading}
-        rowKey="id"
-        pagination={{
-          current: input.page,
-          pageSize: input.pageSize,
-          total: total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setInput({
-              ...input,
-              page,
-              pageSize: pageSize || input.pageSize
-            });
-          }
-        }}
-      />
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder={t('announcement.searchPlaceholder')}
+                  value={input.keyword}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10 min-w-[250px]"
+                />
+              </div>
 
+              <Button onClick={() => setCreateVisible(true)}>
+                <Plus className="h-4 w-4" />
+                {t('announcement.create')}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Table Card */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">{t('announcement.titleColumn')}</TableHead>
+                  <TableHead className="w-[100px]">{t('announcement.typeColumn')}</TableHead>
+                  <TableHead className="w-[120px]">{t('announcement.statusColumn')}</TableHead>
+                  <TableHead className="w-[100px]">{t('announcement.priorityColumn')}</TableHead>
+                  <TableHead className="w-[100px]">{t('announcement.orderColumn')}</TableHead>
+                  <TableHead className="w-[150px]">{t('announcement.expireTimeColumn')}</TableHead>
+                  <TableHead className="w-[150px]">{t('announcement.createdAtColumn')}</TableHead>
+                  <TableHead className="w-[100px]">{t('announcement.actionsColumn')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                      <p className="mt-2 text-muted-foreground">{t('announcement.loading')}</p>
+                    </TableCell>
+                  </TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <p className="text-muted-foreground">{t('announcement.noAnnouncements')}</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.map((item) => (
+                    <TableRow key={item.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="font-medium truncate max-w-[200px]" title={item.title}>
+                          {item.title}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge variant={getTypeVariant(item.type)} className={getTypeColor(item.type)}>
+                          {item.type}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={item.enabled}
+                            onCheckedChange={(checked) => handleToggle(item.id, checked)}
+                          />
+                          <span className={`text-xs ${item.enabled ? 'text-green-600' : 'text-gray-500'}`}>
+                            {item.enabled ? t('announcement.enabled') : t('announcement.disabled')}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {item.pinned ? (
+                          <Badge variant="destructive" className="flex items-center gap-1">
+                            <Pin className="h-3 w-3" />
+                            {t('announcement.pinned')}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">{t('announcement.normal')}</Badge>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-center font-mono">
+                        {item.order}
+                      </TableCell>
+
+                      <TableCell className="text-muted-foreground text-sm">
+                        {item.expireTime ? (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(item.expireTime)}
+                          </div>
+                        ) : (
+                          <span className="text-green-600">{t('announcement.neverExpires')}</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-muted-foreground text-sm">
+                        {formatDate(item.createdAt)}
+                      </TableCell>
+
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => openEditAnnouncement(item)}
+                              className="flex items-center gap-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                              {t('announcement.edit')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleToggle(item.id, !item.enabled)}
+                              className="flex items-center gap-2"
+                            >
+                              <Switch className="h-4 w-4" />
+                              {item.enabled ? t('announcement.disable') : t('announcement.enable')}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => handleDelete(item.id)}
+                              className="flex items-center gap-2"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {t('announcement.delete')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && data.length > 0 && (
+            <div className="flex items-center justify-between p-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                {t('announcement.totalAnnouncements', { total })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInput({ ...input, page: Math.max(1, input.page - 1) })}
+                  disabled={input.page <= 1}
+                >
+                  {t('announcement.previous')}
+                </Button>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">{input.page}</span>
+                  <span className="text-sm text-muted-foreground">/</span>
+                  <span className="text-sm text-muted-foreground">
+                    {Math.ceil(total / input.pageSize)}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInput({ ...input, page: input.page + 1 })}
+                  disabled={input.page >= Math.ceil(total / input.pageSize)}
+                >
+                  {t('announcement.next')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialogs */}
       <CreateAnnouncement
         visible={createVisible}
         onCancel={() => setCreateVisible(false)}
@@ -236,4 +372,4 @@ export default function Announcement() {
       />
     </div>
   );
-} 
+}

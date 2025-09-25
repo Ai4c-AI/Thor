@@ -98,7 +98,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("Name");
 
-                    b.ToTable("Channels");
+                    b.ToTable("Channels", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Domain.Chats.Token", b =>
@@ -173,7 +173,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("Key");
 
-                    b.ToTable("Tokens");
+                    b.ToTable("Tokens", (string)null);
 
                     b.HasData(
                         new
@@ -318,7 +318,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasKey("Id");
 
-                    b.ToTable("Announcements");
+                    b.ToTable("Announcements", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.ModelManager", b =>
@@ -412,7 +412,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("Model");
 
-                    b.ToTable("ModelManagers");
+                    b.ToTable("ModelManagers", (string)null);
 
                     b.HasData(
                         new
@@ -1924,7 +1924,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("ModelId");
 
-                    b.ToTable("ModelMaps");
+                    b.ToTable("ModelMaps", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.Product", b =>
@@ -1963,7 +1963,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasKey("Id");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.ProductPurchaseRecord", b =>
@@ -2013,7 +2013,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ProductPurchaseRecords");
+                    b.ToTable("ProductPurchaseRecords", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.RateLimitModel", b =>
@@ -2071,7 +2071,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("Model");
 
-                    b.ToTable("RateLimitModels");
+                    b.ToTable("RateLimitModels", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.RedeemCode", b =>
@@ -2122,7 +2122,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasIndex("Code");
 
-                    b.ToTable("RedeemCodes");
+                    b.ToTable("RedeemCodes", (string)null);
                 });
 
             modelBuilder.Entity("Thor.Service.Domain.Setting", b =>
@@ -2143,7 +2143,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasKey("Key");
 
-                    b.ToTable("Settings");
+                    b.ToTable("Settings", (string)null);
 
                     b.HasData(
                         new
@@ -2478,7 +2478,7 @@ namespace Thor.Provider.PostgreSQL.Thor
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
 
                     b.HasData(
                         new

@@ -1,5 +1,28 @@
-import { Form, Input, InputNumber, Modal, Switch, message } from "antd";
 import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { update } from "../../../services/UserGroupService";
 
 interface UpdateUserGroupPageProps {
@@ -9,93 +32,207 @@ interface UpdateUserGroupPageProps {
     value: any;
 }
 
+interface FormData {
+    name: string;
+    code: string;
+    description: string;
+    rate: number;
+    order: number;
+    enable: boolean;
+}
+
 export default function UpdateUserGroupPage(props: UpdateUserGroupPageProps) {
-    const [form] = Form.useForm();
+    const { t } = useTranslation();
+    const form = useForm<FormData>({
+        defaultValues: {
+            name: "",
+            code: "",
+            description: "",
+            rate: 1.0,
+            order: 0,
+            enable: true,
+        },
+    });
 
     useEffect(() => {
         if (props.open && props.value) {
-            form.setFieldsValue(props.value);
+            form.reset({
+                name: props.value.name || "",
+                code: props.value.code || "",
+                description: props.value.description || "",
+                rate: props.value.rate || 1.0,
+                order: props.value.order || 0,
+                enable: props.value.enable !== undefined ? props.value.enable : true,
+            });
         }
-    }, [props.open, props.value]);
+    }, [props.open, props.value, form]);
 
-    const handleOk = async () => {
+    const handleSubmit = async (data: FormData) => {
         try {
-            const values = await form.validateFields();
             const res = await update({
-                ...values,
+                ...data,
                 id: props.value.id
             });
             if (res.success) {
-                message.success('更新成功');
+                toast.success(t('common.updateSuccess'));
                 props.onOk();
             } else {
-                message.error(res.message || '更新失败');
+                toast.error(res.message || t('common.updateFailed'));
             }
         } catch (error) {
-            console.error('表单验证失败:', error);
+            console.error('Update failed:', error);
+            toast.error(t('common.updateFailed'));
         }
     };
 
     return (
-        <Modal
-            title="更新用户分组"
-            open={props.open}
-            onCancel={props.onClose}
-            onOk={handleOk}
-            destroyOnClose
-        >
-            <Form
-                form={form}
-                layout="vertical"
-            >
-                <Form.Item
-                    name="name"
-                    label="分组名称"
-                    rules={[{ required: true, message: '请输入分组名称' }]}
-                >
-                    <Input placeholder="请输入分组名称" />
-                </Form.Item>
+        <Dialog open={props.open} onOpenChange={(open) => !open && props.onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t('userGroup.updateTitle')}</DialogTitle>
+                    <DialogDescription>
+                        {t('userGroup.updateDescription')}
+                    </DialogDescription>
+                </DialogHeader>
 
-                <Form.Item
-                    name="code"
-                    label="唯一编码"
-                    rules={[{ required: true, message: '请输入唯一编码' }]}
-                >
-                    <Input placeholder="请输入唯一编码" />
-                </Form.Item>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            rules={{ required: t('userGroup.nameRequired') }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('userGroup.name')}</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder={t('userGroup.namePlaceholder')} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    name="description"
-                    label="描述"
-                    rules={[{ required: true, message: '请输入描述' }]}
-                >
-                    <Input.TextArea rows={3} placeholder="请输入描述" />
-                </Form.Item>
+                        <FormField
+                            control={form.control}
+                            name="code"
+                            rules={{ required: t('userGroup.codeRequired') }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('userGroup.code')}</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder={t('userGroup.codePlaceholder')} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    name="rate"
-                    label="分组倍率"
-                    rules={[{ required: true, message: '请输入分组倍率' }]}
-                >
-                    <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
-                </Form.Item>
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            rules={{ required: t('userGroup.descriptionRequired') }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('common.description')}</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder={t('userGroup.descriptionPlaceholder')}
+                                            className="min-h-20"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    name="order"
-                    label="排序"
-                    rules={[{ required: true, message: '请输入排序' }]}
-                >
-                    <InputNumber min={0} style={{ width: '100%' }} />
-                </Form.Item>
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="rate"
+                                rules={{
+                                    required: t('userGroup.rateRequired'),
+                                    min: { value: 0, message: t('userGroup.rateMinError') }
+                                }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>{t('userGroup.rate')}</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                placeholder="1.0"
+                                                {...field}
+                                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                <Form.Item
-                    name="enable"
-                    label="是否启用"
-                    valuePropName="checked"
-                >
-                    <Switch />
-                </Form.Item>
-            </Form>
-        </Modal>
+                            <FormField
+                                control={form.control}
+                                name="order"
+                                rules={{
+                                    required: t('userGroup.orderRequired'),
+                                    min: { value: 0, message: t('userGroup.orderMinError') }
+                                }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>{t('userGroup.order')}</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                {...field}
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <FormField
+                            control={form.control}
+                            name="enable"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <div className="space-y-0.5">
+                                        <FormLabel className="text-base">{t('userGroup.enableLabel')}</FormLabel>
+                                        <div className="text-sm text-muted-foreground">
+                                            {t('userGroup.enableDescription')}
+                                        </div>
+                                    </div>
+                                    <FormControl>
+                                        <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={props.onClose}
+                            >
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="submit">
+                                {t('common.update')}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
     );
 } 

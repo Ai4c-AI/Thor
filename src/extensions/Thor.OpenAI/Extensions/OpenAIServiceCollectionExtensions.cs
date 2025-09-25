@@ -56,7 +56,7 @@ public static class OpenAIServiceCollectionExtensions
             "text-search-ada-doc-001"
         ]);
 
-        services.AddKeyedSingleton<IThorChatCompletionsService, OpenAIChatCompletionsService>(OpenAIPlatformOptions
+        services.AddKeyedSingleton<IThorChatCompletionsService, OpenAiChatCompletionsService>(OpenAIPlatformOptions
             .PlatformCode);
 
         // 注册OpenAI到Claude适配器服务

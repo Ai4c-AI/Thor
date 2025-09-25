@@ -1,66 +1,52 @@
-import { Avatar, type AvatarProps } from '@lobehub/ui';
-import { createStyles } from 'antd-style';
-import { memo, } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { memo, forwardRef } from 'react';
+import { cn } from '@/lib/utils';
 
-const useStyles = createStyles(({ css, token }) => ({
-  clickable: css`
-    position: relative;
-    transition: all 200ms ease-out 0s;
 
-    &::before {
-      content: '';
-
-      position: absolute;
-      transform: skewX(-45deg) translateX(-400%);
-
-      overflow: hidden;
-
-      box-sizing: border-box;
-      width: 25%;
-      height: 100%;
-
-      background: rgba(255, 255, 255, 50%);
-
-      transition: all 200ms ease-out 0s;
-    }
-
-    &:hover {
-      box-shadow: 0 0 0 2px ${token.colorPrimary};
-
-      &::before {
-        transform: skewX(-45deg) translateX(400%);
-      }
-    }
-  `,
-}));
-
-export interface UserAvatarProps extends AvatarProps {
+export interface UserAvatarProps {
+  size?: number;
   clickable?: boolean;
   user?: any;
+  className?: string;
+  style?: React.CSSProperties;
+  onClick?: () => void;
 }
 
-const UserAvatar = memo<UserAvatarProps>(
-  ({ size = 40, avatar, background, clickable, user, className, style, ...rest }) => {
-    const { styles, cx } = useStyles();
-
+const UserAvatar = forwardRef<HTMLDivElement, UserAvatarProps>(
+  ({ size = 40, clickable, user, className, style, onClick, ...rest }, ref) => {
     function getAvatar() {
       return user?.avatar || '/logo.png'
     }
 
     return (
       <Avatar
-        avatar={getAvatar()}
-        background={background}
-        className={cx(clickable && styles.clickable, className)}
-        size={size}
-        style={{ flex: 'none', ...style }}
-        unoptimized
+        ref={ref}
+        className={cn(
+          'flex-none transition-all duration-200 ease-out',
+          clickable && [
+            'relative cursor-pointer',
+            'before:absolute before:content-[""] before:w-1/4 before:h-full',
+            'before:bg-white/50 before:transform before:skew-x-[-45deg]',
+            'before:translate-x-[-400%] before:transition-all before:duration-200',
+            'before:ease-out before:overflow-hidden before:box-border',
+            'hover:ring-2 hover:ring-primary',
+            'hover:before:transform hover:before:skew-x-[-45deg] hover:before:translate-x-[400%]'
+          ],
+          className
+        )}
+        style={{ width: size, height: size, ...style }}
+        onClick={onClick}
         {...rest}
-      />
+      >
+        <AvatarImage src={getAvatar()} alt="User avatar" />
+        <AvatarFallback className="bg-muted">
+          {user?.userName?.[0]?.toUpperCase() || 'U'}
+        </AvatarFallback>
+      </Avatar>
     );
-  },
+  }
 );
 
 UserAvatar.displayName = 'UserAvatar';
 
-export default UserAvatar;
+export default memo(UserAvatar);

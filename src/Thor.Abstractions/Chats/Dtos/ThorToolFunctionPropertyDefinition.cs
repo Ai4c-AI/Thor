@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Thor.Abstractions.Chats.Dtos;
 
@@ -25,37 +26,77 @@ public class ThorToolFunctionPropertyDefinition
         /// 表示字符串类型的函数对象
         /// </summary>
         String,
+
         /// <summary>
         /// 表示整数类型的函数对象
         /// </summary>
         Integer,
+
         /// <summary>
         /// 表示数字（包括浮点数等）类型的函数对象
         /// </summary>
         Number,
+
         /// <summary>
         /// 表示对象类型的函数对象
         /// </summary>
         Object,
+
         /// <summary>
         /// 表示数组类型的函数对象
         /// </summary>
         Array,
+
         /// <summary>
         /// 表示布尔类型的函数对象
         /// </summary>
         Boolean,
+
         /// <summary>
         /// 表示空值类型的函数对象
         /// </summary>
         Null
     }
 
+    public string typeStr = "object";
+
+    public string[] Types;
+
     /// <summary>
     /// 必填的。函数参数对象类型。默认值为“object”。
     /// </summary>
     [JsonPropertyName("type")]
-    public string Type { get; set; } = "object";
+    public object Type
+    {
+        get
+        {
+            if (Types is { Length: > 0 })
+            {
+                return Types;
+            }
+
+            return typeStr;
+        }
+        set
+        {
+            if (value is JsonElement str)
+            {
+                switch (str.ValueKind)
+                {
+                    case JsonValueKind.String:
+                        typeStr = value?.ToString();
+                        break;
+                    case JsonValueKind.Array:
+                        Types = JsonSerializer.Deserialize<string[]>(value?.ToString());
+                        break;
+                }
+            }
+            else
+            {
+                typeStr = value?.ToString();
+            }
+        }
+    }
 
     /// <summary>
     /// 可选。“函数参数”列表，作为从参数名称映射的字典
@@ -68,7 +109,7 @@ public class ThorToolFunctionPropertyDefinition
     /// 可选。列出必需的“function arguments”列表。
     /// </summary>
     [JsonPropertyName("required")]
-    public List<string>? Required { get; set; }
+    public string[]? Required { get; set; }
 
     /// <summary>
     /// 可选。是否允许附加属性。默认值为true。
@@ -219,11 +260,12 @@ public class ThorToolFunctionPropertyDefinition
     /// <param name="description"></param>
     /// <param name="enum"></param>
     /// <returns></returns>
-    public static ThorToolFunctionPropertyDefinition DefineObject(IDictionary<string, ThorToolFunctionPropertyDefinition>? properties,
-                                                                  List<string>? required,
-                                                                  object? additionalProperties,
-                                                                  string? description,
-                                                                  List<string>? @enum)
+    public static ThorToolFunctionPropertyDefinition DefineObject(
+        IDictionary<string, ThorToolFunctionPropertyDefinition>? properties,
+        string[]? required,
+        object? additionalProperties,
+        string? description,
+        List<string>? @enum)
     {
         return new ThorToolFunctionPropertyDefinition
         {
@@ -242,7 +284,6 @@ public class ThorToolFunctionPropertyDefinition
     /// </summary>
     /// <param name="type">要转换的类型</param>
     /// <returns>给定类型的字符串表示形式</returns>
-
     public static string ConvertTypeToString(FunctionObjectTypes type)
     {
         return type switch

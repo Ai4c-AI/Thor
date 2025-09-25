@@ -1,77 +1,18 @@
 import { memo, useState } from 'react';
 import { LayoutProps } from './type';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Layout, ConfigProvider, theme, Button, Drawer, Typography, Avatar, Space, Tooltip } from 'antd';
-import styled from 'styled-components';
-import { Flexbox } from 'react-layout-kit';
-import { MenuOutlined, HomeOutlined } from '@ant-design/icons';
-import { ThemeSwitch } from '@lobehub/ui';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Menu, Home, Sun, Moon, MonitorSpeaker } from 'lucide-react';
 import useThemeStore from '../store/theme';
-import { motion } from 'framer-motion';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
-import PwaInstall from '../components/PwaInstall';
-
-const { Header, Content, Footer } = Layout;
-const { Text, Title } = Typography;
-
-// 样式组件
-const StyledHeader = styled(Header)(({ theme }: any) => `
-  position: fixed;
-  top: 0;
-  width: 100%;
-  z-index: 100;
-  padding: 0 ${theme?.token?.paddingSM || 8}px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: ${theme?.token?.colorBgContainer || '#fff'};
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  height: 56px;
-`);
-
-const StyledContent = styled(Content)(({ theme }: any) => `
-  margin-top: 56px;
-  padding: ${theme?.token?.paddingSM || 8}px;
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-`);
-
-const ContentWrapper = styled(motion.div)(({ theme }: any) => `
-  padding: ${theme?.token?.paddingSM || 8}px;
-  background: ${theme?.token?.colorBgContainer || '#fff'};
-  border-radius: ${theme?.token?.borderRadiusSM || 4}px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-`);
-
-const StyledFooter = styled(Footer)(({ theme }: any) => `
-  text-align: center;
-  padding: ${theme?.token?.paddingXS || 4}px;
-  background: transparent;
-  height: 50px;
-`);
-
-const LogoContainer = styled(Flexbox)`
-  align-items: center;
-  gap: 8px;
-`;
-
-// 页面过渡动画
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 }
-};
+import { cn } from '@/lib/utils';
 
 const MobileLayout = memo(({ nav }: LayoutProps) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const { themeMode, toggleTheme } = useThemeStore();
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -84,99 +25,95 @@ const MobileLayout = memo(({ nav }: LayoutProps) => {
     if (drawerVisible) setDrawerVisible(false);
   };
 
-  const handleThemeSwitch = (mode: any) => {
-    toggleTheme(mode);
+  const handleThemeSwitch = (mode: string) => {
+    toggleTheme(mode as 'light' | 'dark' | 'auto');
+  };
+
+  const ThemeToggle = () => {
+    const themeIcons = {
+      light: <Sun className="h-4 w-4" />,
+      dark: <Moon className="h-4 w-4" />,
+      auto: <MonitorSpeaker className="h-4 w-4" />
+    };
+
+    return (
+      <div className="flex items-center space-x-1 bg-muted rounded-md p-1">
+        {(['light', 'dark', 'auto'] as const).map((mode) => (
+          <Button
+            key={mode}
+            variant={themeMode === mode ? "default" : "ghost"}
+            size="sm"
+            onClick={() => handleThemeSwitch(mode)}
+            className="h-8 w-8 p-0"
+          >
+            {themeIcons[mode]}
+          </Button>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <ConfigProvider
-      theme={{
-        components: {
-          Layout: {
-            headerBg: token.colorBgContainer,
-            bodyBg: token.colorBgLayout,
-          }
-        }
-      }}
-    >
-      <Layout style={{ minHeight: '100vh', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <StyledHeader theme={{ token }}>
-          <LogoContainer horizontal>
-            <Button
-              type="text"
-              icon={<MenuOutlined />}
-              onClick={toggleDrawer}
-              size="large"
-            />
-            <Flexbox gap={8} align="center" horizontal onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
-              <Avatar 
-                src='/logo.png' 
-                size={32} 
-                shape="square" 
-                style={{ 
-                  borderRadius: token.borderRadiusSM,
-                  boxShadow: `0 2px 8px ${token.colorPrimaryBg}` 
-                }} 
-              />
-              <Title level={5} style={{ margin: 0 }}>Thor</Title>
-            </Flexbox>
-          </LogoContainer>
-          
-          <Space>
-            <LanguageSwitcher />
-            <ThemeSwitch
-              onThemeSwitch={handleThemeSwitch}
-              themeMode={themeMode}
-              size="small"
-            />
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<HomeOutlined />}
-              onClick={() => navigate('/model')}
-            >
-              {t('nav.model')}
-            </Button>
-          </Space>
-        </StyledHeader>
-        
-        <StyledContent theme={{ token }}>
-          <ContentWrapper
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.3 }}
-            theme={{ token }}
-          >
-            <Outlet />
-          </ContentWrapper>
-        </StyledContent>
+    <div className="min-h-screen h-screen flex flex-col overflow-hidden bg-background">
+      <header className="fixed top-0 w-full z-50 h-14 px-4 flex items-center justify-between bg-background border-b border-border">
+        <div className="flex items-center gap-2">
+          <Sheet open={drawerVisible} onOpenChange={setDrawerVisible}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="p-2">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0">
+              <SheetHeader className="p-4 border-b border-border">
+                <SheetTitle className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src="/logo.png" alt="Thor" />
+                    <AvatarFallback>T</AvatarFallback>
+                  </Avatar>
+                  <span className="font-semibold">Thor AI</span>
+                </SheetTitle>
+              </SheetHeader>
+              <div className="h-full overflow-y-auto">
+                {nav}
+              </div>
+            </SheetContent>
+          </Sheet>
 
-        {/* 导航抽屉 */}
-        <Drawer
-          title={
-            <Flexbox gap={8} align="center" horizontal>
-              <Avatar 
-                src='/logo.png' 
-                size={24} 
-                shape="square" 
-                style={{ borderRadius: token.borderRadiusSM }} 
-              />
-              <Text strong>Thor AI</Text>
-            </Flexbox>
-          }
-          placement="left"
-          closable={true}
-          onClose={toggleDrawer}
-          open={drawerVisible}
-          bodyStyle={{ padding: 0 }}
-        >
-          {nav}
-        </Drawer>
-      </Layout>
-    </ConfigProvider>
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={handleLogoClick}
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage src="/logo.png" alt="Thor" />
+              <AvatarFallback>T</AvatarFallback>
+            </Avatar>
+            <h1 className="text-lg font-semibold text-foreground">
+              Thor
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <ThemeToggle />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/model')}
+            className="gap-1"
+          >
+            <Home className="h-4 w-4" />
+            {t('nav.model')}
+          </Button>
+        </div>
+      </header>
+
+      <main className="mt-14 p-2 flex-1 overflow-auto">
+        <div className="bg-card rounded-lg border border-border p-2 flex-1 min-h-0 overflow-auto">
+          <Outlet />
+        </div>
+      </main>
+    </div>
   );
 });
 

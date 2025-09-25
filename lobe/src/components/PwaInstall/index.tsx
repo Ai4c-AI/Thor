@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Modal, Typography, Space, Row, Col } from 'antd';
-import { DownloadOutlined, CloseOutlined } from '@ant-design/icons';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Download, X } from 'lucide-react';
 import { isPwaInstalled, showInstallPrompt } from '../../utils/pwa';
 import useThemeStore from '../../store/theme';
 import { useTranslation } from 'react-i18next';
-
-const { Title, Paragraph, Text } = Typography;
 
 interface PwaInstallProps {
   /** The logo URL to display in the install prompt */
@@ -14,10 +13,10 @@ interface PwaInstallProps {
   buttonMode?: boolean;
   /** Button text (only used when buttonMode is true) */
   buttonText?: string;
-  /** Button type (only used when buttonMode is true) */
-  buttonType?: 'primary' | 'default' | 'dashed' | 'link' | 'text';
+  /** Button variant (only used when buttonMode is true) */
+  buttonVariant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   /** Button size (only used when buttonMode is true) */
-  buttonSize?: 'large' | 'middle' | 'small';
+  buttonSize?: 'default' | 'sm' | 'lg' | 'icon';
   /** Additional button style (only used when buttonMode is true) */
   buttonStyle?: React.CSSProperties;
 }
@@ -30,12 +29,12 @@ interface PwaInstallProps {
  * 1. Auto-popup mode (default): Automatically shows installation modal when possible
  * 2. Button mode: Renders as a button that user can click to trigger installation
  */
-const PwaInstall: React.FC<PwaInstallProps> = ({ 
+const PwaInstall: React.FC<PwaInstallProps> = ({
   logoUrl = '/logo.png',
   buttonMode = false,
-  buttonText = '安装应用',
-  buttonType = 'primary',
-  buttonSize = 'middle',
+  buttonText,
+  buttonVariant = 'default',
+  buttonSize = 'default',
   buttonStyle = {}
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -134,13 +133,14 @@ const PwaInstall: React.FC<PwaInstallProps> = ({
   if (!deferredPrompt && buttonMode) {
     return (
       <Button
-        type={buttonType}
+        variant={buttonVariant}
         size={buttonSize}
-        icon={<DownloadOutlined />}
         disabled
         style={buttonStyle}
+        className="gap-2"
       >
-        {buttonText}
+        <Download className="h-4 w-4" />
+        {buttonText || t('install.install')}
       </Button>
     );
   }
@@ -149,13 +149,14 @@ const PwaInstall: React.FC<PwaInstallProps> = ({
   if (buttonMode) {
     return (
       <Button
-        type={buttonType}
+        variant={buttonVariant}
         size={buttonSize}
-        icon={<DownloadOutlined />}
         onClick={showInstallModal}
         style={buttonStyle}
+        className="gap-2"
       >
-        {buttonText}
+        <Download className="h-4 w-4" />
+        {buttonText || t('install.install')}
       </Button>
     );
   }
@@ -165,71 +166,48 @@ const PwaInstall: React.FC<PwaInstallProps> = ({
     return null;
   }
 
-  // 根据主题设置样式
-  const modalStyle = {
-    // 暗色模式下设置暗色背景
-    ...(isDarkMode ? {
-      bodyStyle: { background: '#1f1f1f', color: 'rgba(255, 255, 255, 0.85)' },
-    } : {})
-  };
-
   return (
-    <Modal
-      open={isOpen}
-      footer={null}
-      closable
-      closeIcon={<CloseOutlined />}
-      onCancel={handleClose}
-      width={400}
-      centered
-      {...modalStyle}
-    >
-      <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
-        <img 
-          src={logoUrl} 
-          alt="Thor AI Platform" 
-          style={{ 
-            width: 80, 
-            height: 80, 
-            margin: '0 auto',
-            borderRadius: '8px',
-            boxShadow: isDarkMode 
-              ? '0 2px 8px rgba(0, 0, 0, 0.6)' 
-              : '0 2px 8px rgba(0, 0, 0, 0.15)'
-          }} 
-        />
-        
-        <Title level={4}>{t('install.title')}</Title>
-        
-        <Paragraph>
-          {t('install.description')}
-        </Paragraph>
-        
-        <Row gutter={16}>
-          <Col span={12}>
-            <Button 
-              block
-              type="default" 
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-center">
+            {t('install.title')}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-center space-y-6 py-4">
+          <img
+            src={logoUrl}
+            alt="Thor AI Platform"
+            className="w-20 h-20 rounded-lg shadow-lg"
+          />
+
+          <p className="text-center text-muted-foreground">
+            {t('install.description')}
+          </p>
+
+          <div className="grid grid-cols-2 gap-4 w-full">
+            <Button
+              variant="outline"
               onClick={handleClose}
+              className="w-full"
             >
               {t('install.later')}
             </Button>
-          </Col>
-          <Col span={12}>
-            <Button 
-              block
-              type="primary" 
-              icon={<DownloadOutlined />} 
+            <Button
               onClick={handleInstallClick}
+              className="w-full gap-2"
             >
+              <Download className="h-4 w-4" />
               {t('install.install')}
             </Button>
-          </Col>
-        </Row>
-        
-        <Text type="secondary">{t('install.browser')}</Text>
-      </Space>
-    </Modal>
+          </div>
+
+          <p className="text-sm text-muted-foreground text-center">
+            {t('install.browser')}
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

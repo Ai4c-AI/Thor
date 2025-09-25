@@ -20,6 +20,7 @@ const enUS = {
       update: 'Update',
       back: 'Back',
       next: 'Next',
+      previous: 'Previous',
       copySuccess: 'Copy Success',
       copyFailed: 'Copy Failed',
       deleteSuccess: 'Delete Success',
@@ -46,6 +47,7 @@ const enUS = {
       download: 'Download',
       view: 'View',
       refresh: 'Refresh',
+      refreshSuccess: 'Refreshed successfully',
       more: 'More',
       optional: 'Optional',
       total: 'Total',
@@ -53,7 +55,31 @@ const enUS = {
       updateSuccess: 'Updated successfully',
       installApp: 'Install App',
       you: 'You',
-      saveSuccess: 'Saved successfully'
+      saveSuccess: 'Saved successfully',
+      submitting: 'Submitting...',
+      error: 'Error',
+      loadError: 'Load error',
+      retry: 'Retry',
+      // Pagination related
+      previousPage: 'Previous',
+      nextPage: 'Next',
+      page: 'Page',
+      totalPages: 'Total Pages',
+      pageSize: 'Page Size',
+      operationSuccess: 'Operation Successful',
+      operationFailed: 'Operation Failed',
+      loadFailed: 'Load Failed',
+      searchPlaceholder: 'Search Keywords',
+      createdAt: 'Created At',
+      operations: 'Operations',
+      selectDate: 'Select Date',
+      actionMenu: 'Action Menu',
+      unsavedChanges: 'Unsaved Changes',
+      unsavedChangesWarning: 'You have unsaved changes. Are you sure you want to leave?',
+      updating: 'Updating',
+      creating: 'Creating',
+      upToDate: 'Up to Date',
+      tips: 'Tips',
     },
 
     // Navigation
@@ -63,7 +89,6 @@ const enUS = {
       token: 'Token Management',
       modelManager: 'Model Manager',
       product: 'Product',
-      logger: 'Logger',
       redeemCode: 'Redeem Code',
       user: 'User',
       current: 'Current',
@@ -94,8 +119,6 @@ const enUS = {
       token: 'API keys',
       modelManager: 'Model Manager',
       product: 'Product',
-      logger: 'Logger',
-      requestLog: 'Request Log',
       redeemCode: 'Redeem Code',
       user: 'User Management',
       current: 'Wallet/Personal',
@@ -109,6 +132,7 @@ const enUS = {
       playground: 'Playground',
       usage: 'Usage',
       announcement: 'Announcements',
+      logger: 'Logger',
       tracing: 'Tracing'
     },
 
@@ -120,8 +144,6 @@ const enUS = {
         token: 'Loading Token Management',
         modelManager: 'Loading Model Manager',
         product: 'Loading Product',
-        logger: 'Loading Logger',
-        requestLog: 'Loading Request Log',
         redeemCode: 'Loading Redeem Code',
         user: 'Loading User',
         current: 'Loading Current',
@@ -138,6 +160,7 @@ const enUS = {
         model: 'Loading Model Page',
         usage: 'Loading Usage Page',
         announcement: 'Loading Announcements Page',
+        logger: 'Loading Logger Page',
         tracing: 'Loading Tracing Page'
       }
     },
@@ -145,7 +168,9 @@ const enUS = {
     // Usage Page
     usage: {
       title: 'Usage',
+      subtitle: 'Monitor your API usage and spending',
       totalSpend: 'Total Spend',
+      totalSpendDescription: 'Daily spending breakdown',
       budget: 'Budget',
       budgetReset: 'days. Reset in',
       totalTokens: 'Total tokens',
@@ -161,6 +186,7 @@ const enUS = {
       outputTokens: 'Output tokens',
       images: 'Images',
       chatCompletions: 'Chat Completions',
+      chatCompletion: 'Chat Completion',
       webSearches: 'Web Searches',
       fileSearches: 'File Searches',
       moderation: 'Moderation',
@@ -222,7 +248,7 @@ const enUS = {
       usernameLabel: 'Username',
       usernamePlaceholder: 'Please enter username',
       usernameRequired: 'Please enter username',
-      emailLabel: 'Email',
+      emailLabel: 'Email or Account',
       emailPlaceholder: 'Please enter email',
       emailRequired: 'Please enter email',
       emailInvalid: 'Please enter a valid email',
@@ -256,86 +282,197 @@ const enUS = {
       // Brand promotion area translations
       brandSlogan: 'A professional ai gateway management platform to help you easily manage multi-channel AI',
       feature1Title: 'Intelligent forwarding',
-      feature1Desc: 'One-click usage, easily access multi-channel AI'
+      feature1Desc: 'One-click usage, easily access multi-channel AI',
+      step1Desc: 'Enter basic account information',
+      step2Desc: 'Set up your password and optional invite code',
+      registering: 'Creating account...',
+      description: 'Enter your details below to create your account'
     },
 
     // Home Page
     welcome: {
-      title: 'Thor',
-      subtitle: 'Access multiple models with standard OpenAI interface protocol',
-      description: 'Access 68+ models with standard OpenAI interface protocol, no time limit, pay-per-use, no reverse engineering, fast dialogue, transparent details, no hidden costs.',
-      tagline: 'Providing you with the best AI service!',
-      startNow: 'Start Now',
-      giveStar: 'Star the Project',
-      features: {
-        title: 'Our Advantages',
-        description: 'Thor provides developers with one-stop AI model calling service, simplifying your AI application development process',
-        multiModel: {
-          title: 'Multi-Model Support',
-          description: 'Support 200+ models, including mainstream large language models and professional domain models, to meet various AI application scenarios.',
-          action: 'Learn about supported models'
+      hero: {
+        badge: 'Enterprise AI Gateway',
+        title: 'Thor AI Gateway',
+        subtitle: 'Professional AI Gateway Management Platform',
+        description: 'Unified management of 20+ AI models, providing enterprise-level user management, channel management, billing, and monitoring capabilities.',
+        primaryButton: 'Get Started',
+        secondaryButton: 'View Documentation',
+        starButton: 'Star on GitHub'
+      },
+      stats: {
+        models: {
+          title: 'Supported Models',
+          description: 'Multiple AI providers integrated'
         },
-        fastResponse: {
-          title: 'Fast Response',
-          description: 'Optimized service architecture ensures high-speed conversation experience, reduces waiting time, and improves work efficiency.',
-          action: 'View performance tests'
+        users: {
+          title: 'Enterprise Users',
+          description: 'Trusted by businesses worldwide'
+        },
+        requests: {
+          title: 'Daily Requests',
+          description: 'High-performance request processing'
+        },
+        uptime: {
+          title: 'System Uptime',
+          description: 'Reliable service guarantee'
+        }
+      },
+      features: {
+        title: 'Core Features',
+        subtitle: 'Thor provides comprehensive AI gateway management solutions',
+        unified: {
+          title: 'Unified API Interface',
+          description: 'Standard OpenAI compatible interface, supporting seamless integration of multiple AI providers, simplifying development complexity.'
+        },
+        intelligent: {
+          title: 'Intelligent Load Balancing',
+          description: 'Intelligent request distribution based on model performance and cost optimization, ensuring optimal user experience.'
+        },
+        enterprise: {
+          title: 'Enterprise Management',
+          description: 'Complete user management, permission control, quota management, and billing system to meet enterprise-level security requirements.'
+        },
+        monitoring: {
+          title: 'Real-time Monitoring',
+          description: 'Comprehensive request monitoring, performance analysis, and cost statistics to provide transparent operational insights.'
+        },
+        scalable: {
+          title: 'Highly Scalable',
+          description: 'Microservices architecture design supporting horizontal scaling to easily handle high-concurrency scenarios.'
+        },
+        security: {
+          title: 'Security Assurance',
+          description: 'Multi-layered security protection including API key management, request rate limiting, and data encryption transmission.'
+        }
+      },
+      footer: {
+        product: {
+          title: 'Product',
+          home: 'Home',
+          pricing: 'Model Pricing',
+          docs: 'Documentation',
+          console: 'Console'
         },
         community: {
-          title: 'Community Driven',
-          description: 'Maintained by the AIDotNet community, continuously updated, providing professional technical support and rich resource sharing.',
-          action: 'Join our community'
-        }
-      },
-      community: {
-        title: 'Powerful Community',
-        description: 'Thor is maintained by the AIDotNet community, which has rich AI resources including models, datasets, tools, etc.',
-        payPerUse: {
-          title: 'Pay Per Use',
-          description: 'Support user quota management, users can customize Token management, pay by usage.'
+          title: 'Community',
+          github: 'GitHub',
+          discord: 'Discord',
+          support: 'Support',
+          feedback: 'Feedback'
         },
-        appSupport: {
-          title: 'Application Support',
-          description: 'Support for OpenAI official libraries, most open-source chat applications, Utools GPT plugin'
+        company: {
+          title: 'Company',
+          about: 'About Us',
+          blog: 'Blog',
+          careers: 'Careers',
+          contact: 'Contact'
         },
-        transparency: {
-          title: 'Transparent Details',
-          description: 'Statistics on each request consumption details, transparent pricing, no hidden costs, use with peace of mind'
-        }
-      },
-      statistics: {
-        models: 'Supported Models',
-        users: 'Community Users',
-        requests: 'Daily Requests',
-        contributors: 'Contributors'
-      },
-      modelHot: {
-        title: 'Model Popularity Ranking',
-        description: 'Learn about users\' favorite AI models and choose the model that best suits your needs',
-        distribution: 'Model Usage Distribution',
-        distributionDesc: 'Model heat distribution map based on actual user usage',
-        ranking: 'Popular Model Ranking',
-        rankingDesc: 'Ranking of the most popular AI models'
-      },
-      callToAction: {
-        title: 'Ready to start using Thor?',
-        description: 'Register now and get free quota to start your AI development journey',
-        register: 'Register for Free',
-        docs: 'View Documentation'
-      },
-      projects: {
-        title: 'Related Open Source Projects',
-        description: 'AIDotNet community maintains multiple open source projects, aiming to promote the development of AI technology and provide a better learning and communication platform for AI developers.',
-        aidotnet: {
-          title: 'AIDotNet',
-          description: 'AIDotNet Community is a community of AI developers, aiming to promote the development of AI technology and provide a better learning and communication platform for AI developers.',
-          action: 'Learn More'
+        legal: {
+          title: 'Legal',
+          privacy: 'Privacy Policy',
+          terms: 'Terms of Service',
+          security: 'Security',
+          compliance: 'Compliance'
         },
-        koala: {
-          title: 'Koala AI',
-          description: 'An open-source project for intelligent knowledge base, which can be used to develop enterprise-level intelligent customer service management systems. Supporting multiple knowledge base formats, providing efficient retrieval and answer generation capabilities.',
-          action: 'Learn More'
-        }
+        copyright: '© 2024 Thor AI Gateway. All rights reserved.'
       }
+    },
+
+    // Announcement Management Page
+    announcement: {
+      title: 'Announcement Management',
+      create: 'Create Announcement',
+      edit: 'Edit Announcement',
+      delete: 'Delete Announcement',
+      searchPlaceholder: 'Search announcements...',
+
+      // Table Headers
+      titleColumn: 'Title',
+      typeColumn: 'Type',
+      statusColumn: 'Status',
+      priorityColumn: 'Priority',
+      orderColumn: 'Order',
+      expireTimeColumn: 'Expire Time',
+      createdAtColumn: 'Created At',
+      actionsColumn: 'Actions',
+
+      // Announcement Fields
+      titleField: 'Title',
+      contentField: 'Content',
+      typeField: 'Type',
+      enabledField: 'Enabled Status',
+      pinnedField: 'Pinned Status',
+      orderField: 'Sort Order',
+      expireTimeField: 'Expire Time',
+
+      // Announcement Types
+      typeInfo: 'Info',
+      typeSuccess: 'Success',
+      typeWarning: 'Warning',
+      typeError: 'Error',
+
+      // Status
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      pinned: 'Pinned',
+      normal: 'Normal',
+      neverExpires: 'Never expires',
+
+      // Forms
+      titlePlaceholder: 'Enter announcement title',
+      contentPlaceholder: 'Enter announcement content...',
+      titleRequired: 'Please enter announcement title',
+      contentRequired: 'Please enter announcement content',
+      typeRequired: 'Please select announcement type',
+      selectType: 'Select announcement type',
+      orderHint: 'Higher numbers appear first',
+      expireTimeHint: 'Optional - leave empty for never expires',
+      markdownSupport: 'Supports Markdown',
+      charactersCount: 'characters',
+      charactersLimit: '/2000 characters',
+
+      // Dialogs
+      createTitle: 'Create Announcement',
+      createDescription: 'Create a new announcement for users. Supports Markdown formatting.',
+      editTitle: 'Edit Announcement',
+      editDescription: 'Update the announcement details. Supports Markdown formatting.',
+
+      // Tabs
+      editTab: 'Edit',
+      previewTab: 'Preview',
+      previewEmpty: 'Enter content in the Edit tab to see preview',
+
+      // Actions
+      enable: 'Enable',
+      disable: 'Disable',
+      creating: 'Creating...',
+      updating: 'Updating...',
+
+      // Messages
+      createSuccess: 'Announcement created successfully',
+      updateSuccess: 'Announcement updated successfully',
+      deleteSuccess: 'Announcement deleted successfully',
+      statusUpdateSuccess: 'Status updated successfully',
+      createFailed: 'Failed to create announcement',
+      updateFailed: 'Failed to update announcement',
+      deleteFailed: 'Failed to delete announcement',
+      statusUpdateFailed: 'Failed to update status',
+      loadFailed: 'Failed to load announcements',
+
+      // Empty States
+      noAnnouncements: 'No announcements found',
+      loading: 'Loading...',
+
+      // Pagination
+      totalAnnouncements: 'Total: {total} announcements',
+      previous: 'Previous',
+      next: 'Next',
+
+      // Confirmation Dialogs
+      confirmDelete: 'Are you sure you want to delete this announcement?',
+      confirmDisable: 'Are you sure you want to disable this announcement?',
+      confirmEnable: 'Are you sure you want to enable this announcement?'
     },
 
     // Redeem Code Page
@@ -359,20 +496,39 @@ const enUS = {
       unlimited: 'Unlimited',
       customQuantity: 'Custom Quantity',
       createSuccess: 'Creation Successful',
-      createFailed: 'Creation Failed'
+      createFailed: 'Creation Failed',
+      nameRequired: 'Name is required',
+      nameMinLength: 'Name must be at least 3 characters',
+      quotaRequired: 'Quota is required',
+      countRequired: 'Count must be at least 1',
+      namePlaceholder: 'Please enter name',
+      quotaPlaceholder: 'Please enter quota',
+      countPlaceholder: 'Please enter count',
+      unlimitedQuota: 'Unlimited Quota',
+      expiredTime: 'Expiry Time',
+      neverExpired: 'Never Expires',
+      selectDate: 'Select Date',
+      createDescription: 'Create new redeem codes for user recharge',
+      updateDescription: 'Update redeem code configuration',
+      count: 'Count'
     },
 
     // User Page
     user: {
       title: 'User Management',
+      userName: 'Username',
       username: 'Username',
       email: 'Email',
+      role: 'Role',
       roles: 'Roles',
+      groups: 'Groups',
       status: 'Status',
+      statistics: 'Statistics',
       createdAt: 'Created At',
       lastLogin: 'Last Login',
       action: 'Action',
       addUser: 'Add User',
+      createUser: 'Create User',
       editUser: 'Edit User',
       deleteUser: 'Delete User',
       resetPassword: 'Reset Password',
@@ -383,7 +539,10 @@ const enUS = {
       deleteSuccess: 'User deleted',
       resetPasswordSuccess: 'Password reset',
       confirmDelete: 'Are you sure you want to delete this user?',
-      confirmResetPassword: 'Are you sure you want to reset this user\'s password?'
+      confirmResetPassword: 'Are you sure you want to reset this user\'s password?',
+      consumedTokens: 'Consumed Tokens',
+      requestCount: 'Request Count',
+      remainingCredit: 'Remaining Credit'
     },
 
     // Token Management Page
@@ -396,6 +555,7 @@ const enUS = {
       status: 'Status',
       createToken: 'Create Token',
       editToken: 'Edit Token',
+      updateToken: 'Update Token',
       deleteToken: 'Delete Token',
       regenerateToken: 'Regenerate Token',
       copyToken: 'Copy Token',
@@ -403,7 +563,41 @@ const enUS = {
       expired: 'Expired',
       active: 'Active',
       inactive: 'Inactive',
-      remaining: 'Remaining'
+      remaining: 'Remaining',
+      // Token page specific translations
+      usedQuota: 'Used Quota',
+      remainingQuota: 'Remaining Quota',
+      lastAccessTime: 'Last Access Time',
+      expiredTime: 'Expired Time',
+      unlimited: 'Unlimited',
+      copySuccess: 'Copy Success',
+      copyFailed: 'Copy Failed',
+      copyKey: 'Copy Key',
+      viewKey: 'View Key',
+      searchToken: 'Search Token',
+      bindLobeChat: 'Bind LobeChat',
+      bindCherryStudio: 'Bind CherryStudio',
+      // Create/Edit Token form
+      namePlaceholder: 'Please enter Token name',
+      unlimitedQuota: 'Unlimited Quota',
+      quota: 'Quota',
+      groups: 'Groups',
+      limitModels: 'Limit Models (leave empty for no restriction)',
+      selectModels: 'Select Models',
+      whiteIpList: 'IP Whitelist',
+      addIp: 'Enter IP address and press Enter to add',
+      rate: 'Rate',
+      // Form descriptions and labels
+      unlimitedQuotaDesc: 'Token will have unlimited quota when enabled',
+      neverExpireDesc: 'Token will never expire when enabled',
+      userGroupDesc: 'Select the user group for this token',
+      selectUserGroup: 'Please select user group',
+      advancedSettings: 'Advanced Settings',
+      advancedSettingsDesc: 'Optional configurations to limit token usage scope',
+      modelLimitLabel: 'Model Restrictions',
+      modelLimitDesc: 'Limit which models this token can use, leave empty for no restrictions',
+      selectAvailableModels: 'Select available models',
+      ipWhitelistDesc: 'Restrict token usage to specific IP addresses, leave empty for no restrictions'
     },
 
     // Model Management Page
@@ -499,7 +693,38 @@ const enUS = {
       iconRequired: 'Please select an icon',
       confirm: 'Confirm',
       no: 'No',
-      yes: 'Yes'
+      yes: 'Yes',
+      basicInfoDesc: 'Configure basic model information including name, type and description',
+      rateConfigDesc: 'Set billing parameters and pricing information for the model',
+      billingType: 'Billing Type',
+      selectBillingType: 'Please select billing type',
+      inputRate: 'Input Rate',
+      inputRateDesc: 'Cost per 1M input tokens',
+      outputRate: 'Output Rate',
+      outputRateDesc: 'Cost per 1M output tokens',
+      perUsageRate: 'Per Usage Rate',
+      perUsageRateDesc: 'Cost per API call',
+      audioInputRate: 'Audio Input Rate',
+      audioInputRateDesc: 'Cost for audio input',
+      audioOutputRate: 'Audio Output Rate',
+      audioOutputRateDesc: 'Cost for audio output',
+      maxContext: 'Max Context',
+      maxContextDesc: 'Maximum context length supported by the model',
+      defaultContext: 'Default Context',
+      defaultContextDesc: 'Default context length for the model',
+      advancedSettingsDesc: 'Configure advanced parameters (optional)',
+      realTimeModelDesc: 'Whether this is a real-time model (like GPT-4o)',
+      tagsDesc: 'Add model tags for categorization and filtering',
+      livePreview: 'Live Preview',
+      billingInfo: 'Billing Info',
+      input: 'Input',
+      output: 'Output',
+      perRequest: 'Per Request',
+      createTips: 'Live preview helps you see the actual effect of the model',
+      updateModelDesc: 'Modify existing model configuration',
+      updateTips: 'Please modify configuration carefully, changes will take effect immediately after saving',
+      noChanges: 'Model configuration is up to date',
+      contextPricingTiersDesc: 'Set different billing rates based on context length'
     },
 
     // Model Library Page
@@ -678,7 +903,22 @@ const enUS = {
       importSuccess: 'Import successful',
       importFailed: 'Import failed',
       routeDefaultFormat: 'Route Default Format',
-      supportsResponses: 'Supports Responses'
+      supportsResponses: 'Supports Responses',
+      bulkEnable: 'Bulk Enable',
+      bulkDisable: 'Bulk Disable',
+      bulkDelete: 'Bulk Delete',
+      confirmBulkEnable: 'Confirm Bulk Enable',
+      confirmBulkDisable: 'Confirm Bulk Disable',
+      confirmBulkDelete: 'Confirm Bulk Delete',
+      confirmBulkEnableDescription: 'Are you sure you want to enable {{count}} selected channels?',
+      confirmBulkDisableDescription: 'Are you sure you want to disable {{count}} selected channels?',
+      confirmBulkDeleteDescription: 'Are you sure you want to delete {{count}} selected channels? This action cannot be undone.',
+      bulkEnableSuccess: 'Bulk enable successful',
+      bulkDisableSuccess: 'Bulk disable successful',
+      bulkDeleteSuccess: 'Bulk delete successful',
+      bulkEnableFailed: 'Bulk enable failed',
+      bulkDisableFailed: 'Bulk disable failed',
+      bulkDeleteFailed: 'Bulk delete failed'
     },
 
     // Payment Page
@@ -711,11 +951,14 @@ const enUS = {
       paymentCompleted: 'Payment Completed',
       cancel: 'Cancel',
       mobilePayment: 'Scan with Alipay mobile app to pay instantly',
-      save: 'Save'
+      save: 'Save',
+      redeemCodePlaceholder: 'Please enter redeem code'
     },
 
     // User profile page
     userProfile: {
+      title: 'User Profile',
+      subtitle: 'Manage your account and preferences',
       userInfo: 'User Information',
       balance: 'Recharge Balance',
       basicInfo: 'Basic Information',
@@ -742,7 +985,33 @@ const enUS = {
       inviteLink: 'Invitation Link',
       copyInvite: 'Copy Invitation Link',
       inviteCopied: 'Invitation link copied to clipboard',
-      accountStatus: 'Account Status'
+      accountStatus: 'Account Status',
+      personalInformation: 'Personal Information',
+      balanceManagement: 'Balance Management',
+      dataRefreshed: 'Data refreshed successfully',
+      noDataDescription: 'Unable to load user data',
+      info: 'Info',
+      wallet: 'Wallet',
+      // Form validation
+      usernameRequired: 'Please enter username',
+      emailRequired: 'Please enter a valid email address',
+      currentPasswordRequired: 'Please enter current password',
+      newPasswordRequired: 'Please enter new password',
+      confirmPasswordRequired: 'Please confirm new password',
+      passwordMismatch: 'The two passwords do not match',
+      unknown: 'Unknown',
+      // Form placeholders
+      usernamePlaceholder: 'Please enter username',
+      emailPlaceholder: 'Please enter email address',
+      currentPasswordPlaceholder: 'Please enter current password',
+      newPasswordPlaceholder: 'Please enter new password',
+      confirmPasswordPlaceholder: 'Please confirm new password',
+      status: {
+        active: 'Active',
+        inactive: 'Inactive',
+        suspended: 'Suspended',
+        pending: 'Pending'
+      }
     },
 
     // Model Map Page
@@ -850,9 +1119,15 @@ const enUS = {
       }
     },
 
+    // Logger page
+    logger: {
+      title: 'System Logger',
+    },
+
     // Playground page
     playground: {
       title: 'AI Assistant',
+      modelConfig: 'Model Configuration',
       selectToken: 'Select Token',
       selectModel: 'Select Model',
       inputMessage: 'Enter message...',
@@ -861,6 +1136,7 @@ const enUS = {
       saveChat: 'Save Chat',
       chatHistory: 'Chat History',
       systemPrompt: 'System Prompt',
+      defaultSystemPrompt: 'You are a helpful AI assistant.',
       temperature: 'Temperature',
       precise: 'Precise',
       lowCreativity: 'Low Creativity',
@@ -886,8 +1162,9 @@ const enUS = {
       emptyChat: {
         title: 'AI Assistant',
         description: 'Select a Token and model to start chatting with the AI assistant. The AI assistant can help you answer questions, create content, and more.',
-        suggestion1: 'Write a short story',
-        suggestion2: 'Explain quantum computing'
+        suggestion1: 'Explain how artificial intelligence works',
+        suggestion2: 'Write a Python quicksort algorithm',
+        suggestion3: 'Recommend some programming learning resources'
       },
       pinned: 'Pinned Chats',
       allChats: 'All Chats',
@@ -980,17 +1257,66 @@ const enUS = {
         quotaDistribution: 'Quota Distribution',
         consumedQuota: 'Consumed Quota',
         remainingQuota: 'Remaining Quota',
+        averageRPM: 'Average Requests Per Minute',
+        averageTPM: 'Average Tokens Per Minute',
+        realtime: 'Realtime',
+        quickStats: 'Quick Stats',
+        balanceOverview: 'Balance Overview',
+        remainingBalance: 'Remaining Balance',
+        consumed: 'Consumed',
       },
 
       // Chart Titles
       charts: {
         consumptionTrend: 'Consumption Trend',
-        requestTrend: 'Request Trend',
-        tokenTrend: 'Token Trend',
+        requestsTrend: 'Requests Trend',
+        tokensTrend: 'Tokens Trend',
         modelDistribution: 'Model Consumption Distribution (Last 7 Days)',
+        modelDistributionDesc: 'Shows usage patterns and consumption distribution across AI models',
         newUserRegistration: 'New User Registration (Last 7 Days)',
+        userGrowthAnalysis: 'User Growth Trend Analysis',
         recentRechargeData: 'Recent Recharge Data',
+        revenueAnalysis: 'Revenue Source Analysis',
         quotaDistributionChart: 'Quota Distribution Chart',
+        modelStats: 'Model Statistics',
+        totalModels: 'Total Models',
+        topModels: 'Top Models',
+        modelLegend: 'Model Legend',
+      },
+
+      // Tabs
+      tabs: {
+        trends: 'Trends',
+        models: 'Models',
+        users: 'Users',
+        revenue: 'Revenue',
+      },
+
+      // Time Range Selection
+      timeRange: {
+        '1d': 'Last 1 Day',
+        '7d': 'Last 7 Days',
+        '30d': 'Last 30 Days',
+        '90d': 'Last 90 Days',
+      },
+
+      // No Data Messages
+      noData: {
+        users: 'No user registration data available',
+        revenue: 'No recharge revenue data available',
+      },
+
+      // Health Status
+      health: {
+        healthy: 'System Healthy',
+        warning: 'High Usage',
+        critical: 'Critical Usage',
+      },
+
+      // Alert Messages
+      alerts: {
+        criticalUsage: 'Critical Quota Usage!',
+        criticalUsageDesc: 'Current quota usage exceeds 90%. Please recharge to avoid service interruption.',
       },
 
       // Chart Data Labels
@@ -1033,17 +1359,6 @@ const enUS = {
         fullscreen: 'Fullscreen Display',
       },
 
-      // Time Range
-      timeRange: {
-        today: 'Today',
-        yesterday: 'Yesterday',
-        last7Days: 'Last 7 Days',
-        last30Days: 'Last 30 Days',
-        thisMonth: 'This Month',
-        lastMonth: 'Last Month',
-        custom: 'Custom',
-      },
-
       // Data Units
       units: {
         quota: 'Quota',
@@ -1063,6 +1378,159 @@ const enUS = {
         empty: 'No Data',
         success: 'Success',
       },
+
+      // Theme
+      theme: {
+        auto: 'Auto',
+        light: 'Light',
+        dark: 'Dark',
+      },
+    },
+
+    // User Group Management
+    userGroup: {
+      title: 'User Group Management',
+      create: 'Create Group',
+      createTitle: 'Create User Group',
+      createDescription: 'Fill in the information below to create a new user group',
+      updateTitle: 'Update User Group',
+      updateDescription: 'Modify user group information',
+      searchPlaceholder: 'Enter name or code to search',
+      getListFailed: 'Failed to get user group list',
+      name: 'Group Name',
+      code: 'Unique Code',
+      rate: 'Group Rate',
+      order: 'Sort Order',
+      namePlaceholder: 'Please enter group name',
+      nameRequired: 'Please enter group name',
+      codePlaceholder: 'Please enter unique code',
+      codeRequired: 'Please enter unique code',
+      descriptionPlaceholder: 'Please enter description',
+      descriptionRequired: 'Please enter description',
+      rateRequired: 'Please enter group rate',
+      rateMinError: 'Rate cannot be less than 0',
+      orderRequired: 'Please enter sort order',
+      orderMinError: 'Sort order cannot be less than 0',
+      enableLabel: 'Enable Status',
+      enableDescription: 'Group will be effective after being enabled'
+    },
+
+    // Auth Page
+    auth: {
+      thirdPartyTitle: 'Third Party Authorization',
+      processing: 'Processing authorization request...',
+      success: 'Authorization successful',
+      waiting: 'Waiting for authorization...',
+      backToLogin: 'Back to Login',
+      secureService: 'Secure and reliable third-party authorization service'
+    },
+
+    // Offline Indicator
+    offline: {
+      message: 'You are currently offline, some features may not be available',
+      syncNote: 'Your changes will be automatically synced when network is restored'
+    },
+
+    // Fal AI Workspace
+    fal: {
+      title: 'Fal AI Studio',
+      subtitle: 'Powerful AI image generation and editing tool',
+      generation: 'Generation',
+      edit: 'Edit',
+
+      // Form labels
+      prompt: 'Prompt',
+      promptRequired: 'Prompt',
+      promptPlaceholder: 'Describe the image you want to generate...',
+      editPrompt: 'Edit Prompt',
+      editPromptPlaceholder: 'Describe the editing effect you want...',
+      sourceImage: 'Source Image',
+      sourceImageRequired: 'Source Image',
+      maskImage: 'Mask Image',
+      maskImageOptional: 'Mask Image (Optional)',
+      maskImageHint: 'Black areas will be edited',
+
+      // Parameter settings
+      numImages: 'Number of Images',
+      guidanceScale: 'Guidance Scale',
+      inferenceSteps: 'Inference Steps',
+      seed: 'Random Seed',
+      seedOptional: 'Random Seed (Optional)',
+      seedPlaceholder: 'Leave empty for random',
+      editStrength: 'Edit Strength',
+      editStrengthHint: '0.1 = Subtle edit, 1.0 = Complete redraw',
+
+      // Buttons
+      selectFile: 'Select File',
+      uploadMask: 'Upload Mask',
+      generateImage: 'Generate Image',
+      editImage: 'Edit Image',
+      generating: 'Generating...',
+      editing: 'Editing...',
+
+      // Task management
+      taskHistory: 'Task History',
+      noTasks: 'No Tasks',
+      noTasksHint: 'Start your first AI image generation or editing task, results will be displayed here.',
+      imageGeneration: 'Image Generation',
+      imageEdit: 'Image Edit',
+
+      // Task status
+      pending: 'Pending',
+      processing: 'Processing',
+      completed: 'Completed',
+      failed: 'Failed',
+      progress: 'Processing progress',
+
+      // Actions
+      preview: 'Preview',
+      download: 'Download',
+      delete: 'Delete',
+      clear: 'Clear',
+      clearAll: 'Confirm Clear',
+      clearConfirm: 'This will delete all task records. This operation cannot be undone.',
+      taskDeleted: 'Task deleted',
+      allTasksCleared: 'All tasks cleared',
+      downloadStarted: 'Download started',
+
+      // Time and performance
+      createdAt: 'Created',
+      completedIn: 'Completed in',
+      seconds: 's',
+
+      // Error messages
+      errors: {
+        promptRequired: 'Please enter a prompt',
+        tokenRequired: 'Please select a token',
+        sourceImageRequired: 'Please upload source image',
+        invalidImageFile: 'Please select an image file',
+        generationFailed: 'Generation failed: {{error}}',
+        editFailed: 'Edit failed: {{error}}',
+        taskTimeout: 'Task timeout',
+        taskFailed: 'Processing failed',
+        downloadFailed: 'Download failed',
+        compressionFailed: 'Image compression failed'
+      },
+
+      // Success messages
+      success: {
+        generationComplete: 'Image generation completed',
+        editComplete: 'Image editing completed',
+        taskComplete: 'Image processing completed'
+      },
+
+      // File handling
+      characterCount: ' characters',
+      characterLimit: '/1000 characters',
+      imageCount: {
+        one: '1 image',
+        two: '2 images',
+        four: '4 images'
+      },
+
+      // Upload hints
+      uploadHint: 'Click to upload image',
+      dragUploadHint: 'Click or drag image to upload area'
     }
   }
 };

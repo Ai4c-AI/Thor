@@ -38,7 +38,7 @@ public sealed class ChannelService(
     /// <summary>
     /// 获取渠道列表 如果缓存中有则从缓存中获取
     /// </summary>
-    public async Task<ChatChannel[]> GetChannelsAsync()
+    public async Task<ChatChannel[]?> GetChannelsAsync()
     {
         return await cache.GetOrCreateAsync(CacheKey,
             async () => { return await DbContext.Channels.AsNoTracking().Where(x => !x.Disable).ToArrayAsync(); },
@@ -51,19 +51,160 @@ public sealed class ChannelService(
     /// <param name="model">模型名</param>
     /// <param name="user"></param>
     /// <param name="token"></param>
+    /// <param name="isResponses"></param>
     /// <returns></returns>
     public async ValueTask<IEnumerable<ChatChannel>> GetChannelsContainsModelAsync(string model, User user,
         Token? token, bool isResponses = false)
     {
-        var group = token?.Groups ?? (user).Groups;
-        var result = (await GetChannelsAsync()).Where(x =>
-            x.Models.Contains(model)
-            && x.SupportsResponses == isResponses // 是否支持Responses
-            // 防止重试重复分配 - 确保渠道ID不在已使用列表中
-            && !ChannelAsyncLocal.ChannelIds.Contains(x.Id)).ToList();
+        var preferredGroups = (token?.Groups?.Length ?? 0) > 0 ? token!.Groups : user.Groups;
 
-        return result.Where(x => x.Groups.Any(g => group.Contains(g, StringComparer.OrdinalIgnoreCase)))
+        var normalizedGroups = preferredGroups
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var groupPriority = normalizedGroups
+            .Select((code, index) => new { code, index })
+            .ToDictionary(x => x.code, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        var channels = await GetChannelsAsync() ?? Array.Empty<ChatChannel>();
+
+        var result = channels.Where(x =>
+                x.Models.Contains(model)
+                && (!isResponses || x.SupportsResponses)
+                // 防止重试重复分配 - 确保渠道ID不在已使用列表中
+                && !ChannelAsyncLocal.ChannelIds.Contains(x.Id))
+            .ToList();
+
+        if (result.Count == 0) return Enumerable.Empty<ChatChannel>();
+
+        if (groupPriority.Count == 0)
+        {
+            return result.OrderByDescending(x => x.Order);
+        }
+
+        var filtered = result
+            .Select(channel => new
+            {
+                Channel = channel,
+                Priority = channel.Groups
+                    .Select(g =>
+                        string.IsNullOrWhiteSpace(g)
+                            ? (int?)null
+                            : (groupPriority.TryGetValue(g.Trim(), out var idx) ? idx : (int?)null))
+                    .Where(idx => idx.HasValue)
+                    .DefaultIfEmpty(int.MaxValue)
+                    .Min()!
+            })
+            .Where(x => x.Priority != int.MaxValue)
+            .ToList();
+
+        if (filtered.Count == 0)
+        {
+            return Enumerable.Empty<ChatChannel>();
+        }
+
+        var topPriority = filtered.Min(x => x.Priority);
+
+        return filtered
+            .Where(x => x.Priority == topPriority)
+            .Select(x => x.Channel)
             .OrderByDescending(x => x.Order);
+    }
+
+    /// <summary>
+    /// 按分组优先级获取渠道，支持指定具体的分组索引
+    /// 用于分组级故障转移，当优先级高的分组失败时切换到下一个分组
+    /// </summary>
+    /// <param name="model">模型名</param>
+    /// <param name="user">用户</param>
+    /// <param name="token">Token</param>
+    /// <param name="groupIndex">分组索引（0为最高优先级）</param>
+    /// <param name="isResponses">是否支持响应</param>
+    /// <returns>指定优先级分组的渠道列表</returns>
+    public async ValueTask<IEnumerable<ChatChannel>> GetChannelsByGroupIndexAsync(
+        string model,
+        User user,
+        Token? token,
+        int groupIndex,
+        bool isResponses = false)
+    {
+        var preferredGroups = (token?.Groups?.Length ?? 0) > 0 ? token!.Groups : user.Groups;
+
+        var normalizedGroups = preferredGroups
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        // 检查分组索引是否有效
+        if (groupIndex < 0 || groupIndex >= normalizedGroups.Length)
+        {
+            return [];
+        }
+
+        var targetGroup = normalizedGroups[groupIndex];
+        var channels = await GetChannelsAsync() ?? [];
+
+        var result = channels.Where(x =>
+                x.Models.Contains(model)
+                && (!isResponses || x.SupportsResponses)
+                && x.Groups.Any(g => string.Equals(g?.Trim(), targetGroup, StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(x => x.Order);
+
+        return result;
+    }
+
+    /// <summary>
+    /// 获取用户/Token可用的所有分组列表，按优先级排序
+    /// </summary>
+    /// <param name="user">用户</param>
+    /// <param name="token">Token</param>
+    /// <returns>分组列表，按优先级排序</returns>
+    public string[] GetAvailableGroups(User user, Token? token)
+    {
+        var preferredGroups = (token?.Groups?.Length ?? 0) > 0 ? token!.Groups : user.Groups;
+
+        return preferredGroups
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    /// <summary>
+    /// 获取所有可用分组对应的渠道统计信息
+    /// 用于监控和诊断分组状态
+    /// </summary>
+    /// <param name="model">模型名</param>
+    /// <param name="user">用户</param>
+    /// <param name="token">Token</param>
+    /// <param name="isResponses">是否支持响应</param>
+    /// <returns>分组渠道统计</returns>
+    public async ValueTask<Dictionary<string, int>> GetGroupChannelStatsAsync(
+        string model,
+        User user,
+        Token? token,
+        bool isResponses = false)
+    {
+        var preferredGroups = GetAvailableGroups(user, token);
+        var stats = new Dictionary<string, int>();
+
+        var channels = await GetChannelsAsync() ?? Array.Empty<ChatChannel>();
+
+        foreach (var group in preferredGroups)
+        {
+            var groupChannelCount = channels.Count(x =>
+                x.Models.Contains(model)
+                && (!isResponses || x.SupportsResponses)
+                && !x.Disable
+                && x.Groups.Any(g => string.Equals(g?.Trim(), group, StringComparison.OrdinalIgnoreCase)));
+
+            stats[group] = groupChannelCount;
+        }
+
+        return stats;
     }
 
     /// <summary>

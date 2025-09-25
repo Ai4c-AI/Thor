@@ -44,9 +44,9 @@ public static class EndpointRouteExtensions
             .WithName("删除模型");
 
         modelManager.MapGet(string.Empty,
-                async (ModelManagerService modelManagerService, string? model, int page, int pageSize, string? type,
-                        string[]? tags = null, bool isPublic = false, bool? enabled = null) =>
-                    await modelManagerService.GetListAsync(model, page, pageSize, isPublic, type, tags, enabled))
+                async (ModelManagerService modelManagerService, string? model, int page, int pageSize,
+                        string? type, string? modelType, string[]? tags = null, bool isPublic = false, bool? enabled = null) =>
+                    await modelManagerService.GetListAsync(model, page, pageSize, isPublic, type, modelType, tags, enabled))
             .WithDescription("获取模型列表")
             .AllowAnonymous()
             .WithName("获取模型列表");
