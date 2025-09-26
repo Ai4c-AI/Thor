@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Responses;
 using Thor.Abstractions.Responses.Dto;
+using Thor.Abstractions.Responses.Input;
 using Thor.Domain.Chats;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
@@ -32,12 +33,18 @@ public sealed class ResponsesService(
     : AIService(serviceProvider, imageService)
 {
     [HttpPost("/responses")]
-    public async Task ExecuteAsync(HttpContext context, ResponsesInput request)
+    public async Task ExecuteAsync(HttpContext context,ResponsesInput request)
     {
         using var chatCompletions =
             Activity.Current?.Source.StartActivity("对话补全调用");
 
         var model = request.Model;
+
+        if (request.Model?.StartsWith("gpt-5-codex") == true)
+        {
+            request.Store = false;
+            request.ServiceTier = null;
+        }
 
         var rateLimit = 0;
         Exception? exception = null;

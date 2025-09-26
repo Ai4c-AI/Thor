@@ -8,7 +8,7 @@ public class ResponsesSSEDto<T>
 
     [JsonPropertyName("sequence_number")] public int SequenceNumber { get; set; }
 
-    [System.Text.Json.Serialization.JsonPropertyName("response")]
+    [JsonPropertyName("response")]
     public T Response { get; set; }
 
     [JsonPropertyName("delta")] public string? Delta { get; set; }
@@ -25,6 +25,13 @@ public class ResponsesSSEDto<T>
     [JsonPropertyName("part")] public ResponsesSSEDtoPart? Parts { get; set; }
 
     [JsonPropertyName("item")] public ResponsesSSEDtoItem? Item { get; set; }
+
+    [JsonPropertyName("summary_index")] public int SummaryIndex { get; set; }
+
+    [JsonPropertyName("obfuscation")] public string? Obfuscation { get; set; }
+
+    [JsonPropertyName("arguments")]
+    public string? Arguments { get; set; }
 }
 
 public class ResponsesSSEDtoPart
@@ -38,14 +45,21 @@ public class ResponsesSSEDtoPart
 
 public class ResponsesSSEDtoItem
 {
-    [JsonPropertyName("id")] public string Id { get; set; }
+    [JsonPropertyName("id")] public string? Id { get; set; }
 
-    [JsonPropertyName("type")] public string Type { get; set; }
+    [JsonPropertyName("type")] public string? Type { get; set; }
 
-    [JsonPropertyName("status")] public string Status { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
 
-    [JsonPropertyName("content")] public ResponsesSSEDtoPart[] Content { get; set; }
-    
-    [JsonPropertyName("role")]
-    public string Role { get; set; }
+    [JsonPropertyName("content")] public ResponsesSSEDtoPart[]? Content { get; set; }
+
+    [JsonPropertyName("summary")] public object[]? Summary { get; set; }
+
+    [JsonPropertyName("role")] public string? Role { get; set; }
+
+    [JsonPropertyName("arguments")] public string? Arguments { get; set; }
+
+    [JsonPropertyName("call_id")] public string? CallId { get; set; }
+
+    [JsonPropertyName("name")] public string? Name { get; set; }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -12,6 +13,7 @@ using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Extensions;
 using Thor.Abstractions.Responses;
 using Thor.Abstractions.Responses.Dto;
+using Thor.Abstractions.Responses.Input;
 
 namespace Thor.CustomOpenAI.Responses;
 
@@ -58,7 +60,8 @@ public sealed class CustomOpenAIResponsesService(ILogger<CustomOpenAIResponsesSe
         return result;
     }
 
-    public async IAsyncEnumerable<(string @event, ResponsesSSEDto<ResponsesDto> responses)> GetResponsesAsync(ResponsesInput input,
+    public async IAsyncEnumerable<(string @event, ResponsesSSEDto<ResponsesDto> responses)> GetResponsesAsync(
+        ResponsesInput input,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -83,7 +86,8 @@ public sealed class CustomOpenAIResponsesService(ILogger<CustomOpenAIResponsesSe
             case >= HttpStatusCode.BadRequest:
             {
                 var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}", options.Address,
+                logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}",
+                    options.Address,
                     response.StatusCode, error);
 
                 throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
@@ -116,7 +120,6 @@ public sealed class CustomOpenAIResponsesService(ILogger<CustomOpenAIResponsesSe
             {
                 line = line[6..].Trim();
             }
-            
 
             var result = JsonSerializer.Deserialize<ResponsesSSEDto<ResponsesDto>>(line,
                 ThorJsonSerializer.DefaultOptions);

@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using Thor.Abstractions.Chats.Dtos;
 using Thor.Abstractions.ObjectModels.ObjectModels.SharedModels;
 
-namespace Thor.Abstractions.Responses;
+namespace Thor.Abstractions.Responses.Input;
 
 public class ResponsesInput : IOpenAiModels.IModel, IOpenAiModels.IUser
 {
@@ -115,6 +115,12 @@ public class ResponsesInput : IOpenAiModels.IModel, IOpenAiModels.IUser
     [JsonPropertyName("model")] public string? Model { get; set; }
 
     [JsonPropertyName("user")] public string? User { get; set; }
+
+    [JsonPropertyName("prompt_cache_key")]
+    public string? PromptCacheKey { get; set; }
+
+    [JsonPropertyName("include")]
+    public string[]? Include { get; set; }
 }
 
 public sealed class ReasoningResponsesInput

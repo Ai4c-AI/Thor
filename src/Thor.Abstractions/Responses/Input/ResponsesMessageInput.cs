@@ -2,10 +2,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Thor.Abstractions.Responses;
+namespace Thor.Abstractions.Responses.Input;
 
 public class ResponsesMessageInput
 {
+    [JsonPropertyName("type")] public string? Type { get; set; }
+
     [JsonPropertyName("role")] public string Role { get; set; }
 
     [JsonPropertyName("content")]
@@ -36,6 +38,12 @@ public class ResponsesMessageInput
         }
     }
 
+    [JsonPropertyName("summary")]
+    public ReasoningSummaryInput[]? Summary { get; set; }
+
+    [JsonPropertyName("encrypted_content")]
+    public object? EncryptedContent { get; set; }
+
     [JsonIgnore] public string? Content { get; set; }
 
     [JsonIgnore]
@@ -50,6 +58,25 @@ public class ResponsesMessageInput
     }
 
     [JsonIgnore] public IList<ResponsesMessageContentInput>? Contents { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("arguments")]
+    public string? Arguments { get; set; }
+
+    [JsonPropertyName("call_id")]
+    public string? CallId { get; set; }
+
+    [JsonPropertyName("output")]
+    public string? Output { get; set; }
+}
+
+public class ReasoningSummaryInput
+{
+    [JsonPropertyName("type")] public string? type { get; set; }
+
+    [JsonPropertyName("text")] public string? text { get; set; }
 }
 
 public class ResponsesMessageContentInput
