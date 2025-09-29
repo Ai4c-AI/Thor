@@ -42,4 +42,13 @@ export enum SidebarTabKey {
   Tracing = 'tracing',
 
   Logger = 'logger',
+
+  // 套餐模块
+  Subscription = 'subscription',
+
+  SubscriptionUpgrade = 'subscription-upgrade',
+
+  SubscriptionHistory = 'subscription-history',
+
+  SubscriptionAdmin = 'subscription-admin',
 }

@@ -114,6 +114,75 @@ public sealed class ChannelService(
     }
 
     /// <summary>
+    /// 获取指定模型的渠道（支持套餐分组限制）
+    /// </summary>
+    /// <param name="model">模型名</param>
+    /// <param name="user"></param>
+    /// <param name="token"></param>
+    /// <param name="subscriptionGroups">套餐分组限制（为null时使用用户/token分组）</param>
+    /// <param name="isResponses"></param>
+    /// <returns></returns>
+    public async ValueTask<IEnumerable<ChatChannel>> GetChannelsContainsModelWithSubscriptionGroupAsync(string model, User user,
+        Token? token, string[]? subscriptionGroups, bool isResponses = false)
+    {
+        // 如果有套餐分组限制，则优先使用套餐分组
+        var preferredGroups = subscriptionGroups ?? ((token?.Groups?.Length ?? 0) > 0 ? token!.Groups : user.Groups);
+
+        var normalizedGroups = preferredGroups
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var groupPriority = normalizedGroups
+            .Select((code, index) => new { code, index })
+            .ToDictionary(x => x.code, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        var channels = await GetChannelsAsync() ?? [];
+
+        var result = channels.Where(x =>
+                x.Models.Contains(model)
+                && (!isResponses || x.SupportsResponses)
+                // 防止重试重复分配 - 确保渠道ID不在已使用列表中
+                && !ChannelAsyncLocal.ChannelIds.Contains(x.Id))
+            .ToList();
+
+        if (result.Count == 0) return [];
+
+        if (groupPriority.Count == 0)
+        {
+            return result.OrderByDescending(x => x.Order);
+        }
+
+        var filtered = result
+            .Select(channel => new
+            {
+                Channel = channel,
+                Priority = channel.Groups
+                    .Select(g =>
+                        string.IsNullOrWhiteSpace(g)
+                            ? (int?)null
+                            : groupPriority.GetValueOrDefault(g.Trim(), int.MaxValue))
+                    .Where(p => p.HasValue)
+                    .Min()
+            })
+            .Where(x => x.Priority.HasValue)
+            .ToList();
+
+        if (filtered.Count == 0)
+        {
+            return Enumerable.Empty<ChatChannel>();
+        }
+
+        var topPriority = filtered.Min(x => x.Priority);
+
+        return filtered
+            .Where(x => x.Priority == topPriority)
+            .Select(x => x.Channel)
+            .OrderByDescending(x => x.Order);
+    }
+
+    /// <summary>
     /// 按分组优先级获取渠道，支持指定具体的分组索引
     /// 用于分组级故障转移，当优先级高的分组失败时切换到下一个分组
     /// </summary>

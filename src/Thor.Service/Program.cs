@@ -90,6 +90,8 @@ try
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.Converters.Add(new JsonDateTimeConverter());
+        // 支持字符串
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 
@@ -169,10 +171,15 @@ try
         .AddScoped<AnnouncementService>()
         .AddScoped<IUserContext, DefaultUserContext>()
         .AddScoped<ContextPricingService>()
+        .AddScoped<SubscriptionService>()
+        .AddScoped<SubscriptionRateLimitService>()
+        .AddScoped<SubscriptionPaymentService>()
+        .AddScoped<SubscriptionUpgradeService>()
         .AddHostedService<StatisticBackgroundTask>()
         .AddHostedService<LoggerBackgroundTask>()
         .AddHostedService<TrackerBackgroundTask>()
         .AddHostedService<AutoChannelDetectionBackgroundTask>()
+        .AddHostedService<SubscriptionMaintenanceBackgroundTask>()
         .AddOpenAIService()
         .AddMoonshotService()
         .AddSparkDeskService()
@@ -646,6 +653,15 @@ try
     user.MapGet("info", async (UserService service) =>
             await service.GetAsync())
         .RequireAuthorization();
+
+    user.MapGet("lookup/{userName}", async (UserService service, string userName) =>
+            await service.GetByUserNameAsync(userName))
+        .RequireAuthorization(new AuthorizeAttribute()
+        {
+            Roles = RoleConstant.Admin
+        })
+        .WithDescription("根据用户名查找用户")
+        .WithDisplayName("根据用户名查找用户");
 
 
     user.MapDelete("{id}", async (UserService service, string id) =>
@@ -1296,6 +1312,7 @@ try
         });
     
     app.MapMiniApis();
+    app.MapSubscription();
 
     if (app.Environment.IsDevelopment())
     {

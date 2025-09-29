@@ -28,12 +28,92 @@ public sealed class ResponsesService(
     UserGroupService userGroupService,
     LoggerService loggerService,
     UserService userService,
-    ImageService imageService
+    ImageService imageService,
+    SubscriptionService subscriptionService
 )
     : AIService(serviceProvider, imageService)
 {
+    /// <summary>
+    /// 检查并处理用户额度（优先使用套餐额度，不足时使用用户余额）
+    /// </summary>
+    /// <param name="user">用户信息</param>
+    /// <param name="model">模型名称</param>
+    /// <param name="quota">需要消费的额度</param>
+    /// <returns>是否成功，使用的额度类型，错误信息，套餐分组</returns>
+    private async Task<(bool success, bool usedSubscription, string? errorMessage, string[]? subscriptionGroups)>
+        CheckAndValidateQuotaAsync(User user, string model, long quota)
+    {
+        // 1. 先检查用户是否有有效套餐
+        var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+
+        if (subscription?.Plan != null)
+        {
+            // 2. 检查套餐是否支持该模型
+            if (subscription.Plan.IsModelAllowed(model))
+            {
+                // 3. 检查套餐额度是否充足
+                var (hasSufficient, reason) = await subscriptionService.CheckQuotaSufficientAsync(user.Id, quota);
+                if (hasSufficient)
+                {
+                    return (true, true, null, subscription.Plan.Groups); // 使用套餐额度，返回套餐分组
+                }
+
+                // 套餐额度不足，尝试使用用户余额
+                if (quota <= user.ResidualCredit)
+                {
+                    return (true, false, null, null); // 使用用户余额
+                }
+
+                return (false, false, "套餐额度不足且用户余额不足，请充值或升级套餐", null);
+            }
+        }
+
+        // 4. 没有套餐或套餐不支持该模型，检查用户余额
+        if (quota <= user.ResidualCredit)
+        {
+            return (true, false, null, null); // 使用用户余额
+        }
+
+        // 5. 根据是否有套餐给出不同提示
+        if (subscription?.Plan != null)
+        {
+            return (false, false, "当前套餐不支持该模型且用户余额不足，请充值或升级套餐", null);
+        }
+
+        return (false, false, "账号余额不足请充值", null);
+    }
+
+    /// <summary>
+    /// 消费额度（优先消费套餐额度）
+    /// </summary>
+    /// <param name="user">用户信息</param>
+    /// <param name="model">模型名称</param>
+    /// <param name="quota">消费的额度</param>
+    /// <param name="requestTokens">请求token数</param>
+    /// <param name="responseTokens">响应token数</param>
+    /// <param name="usedSubscription">是否使用了套餐额度</param>
+    /// <param name="tokenKey">token key</param>
+    /// <param name="channelId">渠道ID</param>
+    /// <param name="context">HTTP上下文</param>
+    private async Task ConsumeQuotaAsync(User user, string model, long quota, int requestTokens, int responseTokens,
+        bool usedSubscription, string? tokenKey, string channelId, HttpContext context)
+    {
+        if (usedSubscription)
+        {
+            // 使用套餐额度
+            await subscriptionService.ConsumeQuotaAsync(
+                user.Id, model, quota, requestTokens, responseTokens,
+                context.GetIpAddress(), context.GetUserAgent());
+        }
+        else
+        {
+            // 使用用户余额
+            await userService.ConsumeAsync(user.Id, quota, requestTokens, tokenKey, channelId, model);
+        }
+    }
+
     [HttpPost("/responses")]
-    public async Task ExecuteAsync(HttpContext context,ResponsesInput request)
+    public async Task ExecuteAsync(HttpContext context, ResponsesInput request)
     {
         using var chatCompletions =
             Activity.Current?.Source.StartActivity("对话补全调用");
@@ -70,10 +150,19 @@ public sealed class ResponsesService(
 
                 request.Model = await modelMapService.ModelMap(request.Model);
 
-                // 获取渠道通过算法计算权重
+                // 检查用户是否有套餐，获取套餐分组信息
+                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+                string[]? subscriptionGroups = null;
+                if (subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model))
+                {
+                    subscriptionGroups = subscription.Plan.Groups;
+                }
+
+                // 获取渠道通过算法计算权重（优先使用套餐分组）
                 var channel =
                     CalculateWeight(
-                        await channelService.GetChannelsContainsModelAsync(request.Model, user, token, true));
+                        await channelService.GetChannelsContainsModelWithSubscriptionGroupAsync(request.Model, user,
+                            token, subscriptionGroups, true));
 
                 if (channel == null && exception == null)
                     throw new NotModelException(
@@ -107,7 +196,8 @@ public sealed class ResponsesService(
 
                 int requestToken;
                 var responseToken = 0;
-                int cachedTokens = 0;
+                int? cachedTokens = null;
+                bool usedSubscription = false;
 
                 var sw = Stopwatch.StartNew();
 
@@ -116,7 +206,7 @@ public sealed class ResponsesService(
                     using var activity =
                         Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens) =
+                    (requestToken, responseToken, cachedTokens, usedSubscription) =
                         await StreamHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
                 }
@@ -125,7 +215,7 @@ public sealed class ResponsesService(
                     using var activity =
                         Activity.Current?.Source.StartActivity("非流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens) =
+                    (requestToken, responseToken, cachedTokens, usedSubscription) =
                         await ChatHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate);
                 }
@@ -160,9 +250,25 @@ public sealed class ResponsesService(
                         // 将quota 四舍五入
                         quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
+                        // 准备内容，记录是否使用套餐
+                        var content = string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio,
+                            userGroup.Rate,
+                            cachedTokens, rate.CacheRate);
+                        if (usedSubscription)
+                        {
+                            var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
+                            if (userSubscription?.Plan != null)
+                            {
+                                content += $" 扣费来源：套餐额度({userSubscription.Plan.Name})";
+                            }
+                        }
+                        else
+                        {
+                            content += " 扣费来源：用户余额";
+                        }
+
                         await loggerService.CreateConsumeAsync("/v1/responses",
-                            string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
-                                cachedTokens, rate.CacheRate),
+                            content,
                             model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
@@ -171,24 +277,54 @@ public sealed class ResponsesService(
                     }
                     else
                     {
+                        // 准备内容，记录是否使用套餐
+                        var content = string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate);
+                        if (usedSubscription)
+                        {
+                            var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
+                            if (userSubscription?.Plan != null)
+                            {
+                                content += $" 扣费来源：套餐额度({userSubscription.Plan.Name})";
+                            }
+                        }
+                        else
+                        {
+                            content += " 扣费来源：用户余额";
+                        }
+
                         await loggerService.CreateConsumeAsync("/v1/responses",
-                            string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate),
+                            content,
                             model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
                             (int)sw.ElapsedMilliseconds, organizationId);
 
-                        await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
-                            model);
+                        await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
+                            usedSubscription, token?.Key, channel.Id, context);
                     }
                 }
                 else
                 {
+                    // 准备内容，记录是否使用套餐
+                    var content = string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
+                        userGroup.Rate);
+                    if (usedSubscription)
+                    {
+                        var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
+                        if (userSubscription?.Plan != null)
+                        {
+                            content += $" 扣费来源：套餐额度({userSubscription.Plan.Name})";
+                        }
+                    }
+                    else
+                    {
+                        content += " 扣费来源：用户余额";
+                    }
+
                     // 费用
                     await loggerService.CreateConsumeAsync("/v1/responses",
-                        string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
-                            userGroup.Rate),
+                        content,
                         model,
                         requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
                         user?.UserName, user?.Id,
@@ -197,9 +333,8 @@ public sealed class ResponsesService(
                         request.Stream is true,
                         (int)sw.ElapsedMilliseconds, organizationId);
 
-                    await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key,
-                        channel.Id,
-                        model);
+                    await ConsumeQuotaAsync(user!, model, (long)rate.PromptRate, requestToken, responseToken,
+                        usedSubscription, token?.Key, channel.Id, context);
                 }
             }
             else
@@ -271,219 +406,281 @@ public sealed class ResponsesService(
         }
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens)> ChatHandlerAsync(HttpContext context,
-        ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
-        ModelManager rate)
+    private async Task<(int requestToken, int responseToken, int? cachedTokens, bool usedSubscription)>
+        ChatHandlerAsync(HttpContext context,
+            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
+            ModelManager rate)
     {
         int requestToken = 0;
         int responseToken = 0;
 
         // 命中缓存tokens数量
-        int cachedTokens = 0;
+        int? cachedTokens = null;
+        bool usedSubscription = false;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
         ResponsesDto result = null;
 
+        var quota = requestToken * rate.PromptRate;
+
+        // 检查额度（优先使用套餐额度）
+        var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+            await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
+        if (!quotaSuccess)
+        {
+            throw new InsufficientQuotaException(quotaErrorMessage!);
+        }
+
+        usedSubscription = quotaUsedSubscription;
+
+        result = await responsesService.GetResponseAsync(request, platformOptions);
+
+        await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
+
+        cachedTokens = result?.Usage?.InputTokensDetails?.CachedTokens;
+        
+        requestToken = result?.Usage?.InputTokens ?? 0;
+
+        responseToken = result?.Usage?.OutputTokens ?? 0;
+
+
         // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
-        if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
-        {
-            requestToken = TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
-                .SelectMany(x => x.Contents)
-                .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
+        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
+        // {
+        //     requestToken = TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
+        //         .SelectMany(x => x.Contents)
+        //         .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
+        //
+        //     requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
+        //         .Select(x => x.Content).ToArray());
+        //
+        //     // 解析图片
+        //     foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
+        //                  .Where(x => x.Type is "input_image"))
+        //     {
+        //         var imageUrl = message.ImageUrl;
+        //         if (imageUrl != null)
+        //         {
+        //             try
+        //             {
+        //                 var imageTokens = await CountImageTokens(message.ImageUrl, "low");
+        //                 requestToken += imageTokens.Item1;
+        //             }
+        //             catch (Exception ex)
+        //             {
+        //                 GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
+        //             }
+        //         }
+        //     }
+        //
+        //     var quota = requestToken * rate.PromptRate;
+        //
+        //     // 检查额度（优先使用套餐额度）
+        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
+        //     if (!quotaSuccess)
+        //     {
+        //         throw new InsufficientQuotaException(quotaErrorMessage!);
+        //     }
+        //
+        //     usedSubscription = quotaUsedSubscription;
+        //
+        //     result = await responsesService.GetResponseAsync(request, platformOptions);
+        //
+        //     await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
+        //
+        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
+        //     {
+        //         requestToken = result.Usage.InputTokens;
+        //     }
+        //
+        //     // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
+        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
+        //     {
+        //         responseToken = result.Usage.OutputTokens;
+        //     }
+        //     else
+        //     {
+        //         responseToken =
+        //             TokenHelper.GetTotalTokens(
+        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
+        //     }
+        // }
+        // else if (rate.QuotaType == ModelQuotaType.OnDemand)
+        // {
+        //     requestToken =
+        //         TokenHelper.GetTotalTokens(result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ??
+        //                                    []);
+        //
+        //     var quota = requestToken * rate.PromptRate;
+        //
+        //     // 检查额度（优先使用套餐额度）
+        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
+        //     if (!quotaSuccess)
+        //     {
+        //         throw new InsufficientQuotaException(quotaErrorMessage!);
+        //     }
+        //
+        //     usedSubscription = quotaUsedSubscription;
+        //
+        //     result = await responsesService.GetResponseAsync(request, platformOptions);
+        //
+        //     await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
+        //
+        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
+        //     {
+        //         requestToken = result.Usage.InputTokens;
+        //     }
+        //
+        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
+        //     {
+        //         responseToken = result.Usage.OutputTokens;
+        //     }
+        //     else
+        //     {
+        //         responseToken =
+        //             TokenHelper.GetTotalTokens(
+        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
+        //     }
+        // }
+        // else
+        // {
+        //     result = await responsesService.GetResponseAsync(request, platformOptions);
+        //
+        //     await context.Response.WriteAsJsonAsync(result);
+        //
+        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
+        //     {
+        //         requestToken = result.Usage.InputTokens;
+        //     }
+        //
+        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
+        //     {
+        //         responseToken = result.Usage.OutputTokens;
+        //     }
+        //     else
+        //     {
+        //         responseToken =
+        //             TokenHelper.GetTotalTokens(
+        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
+        //     }
+        // }
 
-            requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
-                .Select(x => x.Content).ToArray());
+        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.Tools != null && request.Tools.Count != 0)
+        // {
+        //     requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Name))
+        //         .Select(x => x!.Name).ToArray());
+        //     requestToken += TokenHelper.GetTotalTokens(request.Tools
+        //         .Where(x => !string.IsNullOrEmpty(x?.Description))
+        //         .Select(x => x!.Description!).ToArray());
+        //     requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Type))
+        //         .Select(x => x!.Type!).ToArray());
+        // }
 
-            // 解析图片
-            foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
-                         .Where(x => x.Type is "input_image"))
-            {
-                var imageUrl = message.ImageUrl;
-                if (imageUrl != null)
-                {
-                    try
-                    {
-                        var imageTokens = await CountImageTokens(message.ImageUrl, "low");
-                        requestToken += imageTokens.Item1;
-                    }
-                    catch (Exception ex)
-                    {
-                        GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-                    }
-                }
-            }
+        // if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
+        // {
+        //     requestToken = result.Usage.InputTokens;
+        // }
+        //
+        // if (result?.Usage?.InputTokensDetails?.CachedTokens > 0)
+        // {
+        //     cachedTokens = result.Usage.InputTokensDetails.CachedTokens;
+        // }
 
-            var quota = requestToken * rate.PromptRate;
-
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
-
-            result = await responsesService.GetResponseAsync(request, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
-
-            if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-            {
-                requestToken = result.Usage.InputTokens;
-            }
-
-            // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
-            if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-            {
-                responseToken = result.Usage.OutputTokens;
-            }
-            else
-            {
-                responseToken =
-                    TokenHelper.GetTotalTokens(
-                        result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-            }
-        }
-        else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        {
-            requestToken =
-                TokenHelper.GetTotalTokens(result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ??
-                                           []);
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
-
-            result = await responsesService.GetResponseAsync(request, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
-
-            if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-            {
-                requestToken = result.Usage.InputTokens;
-            }
-
-            if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-            {
-                responseToken = result.Usage.OutputTokens;
-            }
-            else
-            {
-                responseToken =
-                    TokenHelper.GetTotalTokens(
-                        result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-            }
-        }
-        else
-        {
-            result = await responsesService.GetResponseAsync(request, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result);
-
-            if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-            {
-                requestToken = result.Usage.InputTokens;
-            }
-
-            if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-            {
-                responseToken = result.Usage.OutputTokens;
-            }
-            else
-            {
-                responseToken =
-                    TokenHelper.GetTotalTokens(
-                        result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-            }
-        }
-
-        if (rate.QuotaType == ModelQuotaType.OnDemand && request.Tools != null && request.Tools.Count != 0)
-        {
-            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Name))
-                .Select(x => x!.Name).ToArray());
-            requestToken += TokenHelper.GetTotalTokens(request.Tools
-                .Where(x => !string.IsNullOrEmpty(x?.Description))
-                .Select(x => x!.Description!).ToArray());
-            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Type))
-                .Select(x => x!.Type!).ToArray());
-        }
-
-        if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        {
-            requestToken = result.Usage.InputTokens;
-        }
-
-        if (result?.Usage?.InputTokensDetails?.CachedTokens > 0)
-        {
-            cachedTokens = result.Usage.InputTokensDetails.CachedTokens;
-        }
-
-        return (requestToken, responseToken, cachedTokens);
+        return (requestToken, responseToken, cachedTokens, usedSubscription);
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens)> StreamHandlerAsync(HttpContext context,
-        ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
-        ModelManager rate)
+    private async Task<(int requestToken, int responseToken, int? cachedTokens, bool usedSubscription)>
+        StreamHandlerAsync(HttpContext context,
+            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
+            ModelManager rate)
     {
         int requestToken = TokenHelper.GetTokens(request.Instructions ?? string.Empty);
         int responseToken = 0;
 
         // 命中缓存tokens数量
-        int cachedTokens = 0;
+        int? cachedTokens = 0;
+        bool usedSubscription = false;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
         // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
-        if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
+        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
+        // {
+        //     requestToken += TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
+        //         .SelectMany(x => x.Contents)
+        //         .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
+        //
+        //     requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
+        //         .Select(x => x.Content).ToArray());
+        //
+        //     // 解析图片
+        //     foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
+        //                  .Where(x => x.Type is "input_image"))
+        //     {
+        //         var imageUrl = message.ImageUrl;
+        //         if (imageUrl != null)
+        //         {
+        //             try
+        //             {
+        //                 var imageTokens = await CountImageTokens(message.ImageUrl, "low");
+        //                 requestToken += imageTokens.Item1;
+        //             }
+        //             catch (Exception ex)
+        //             {
+        //                 GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
+        //             }
+        //         }
+        //     }
+        //
+        //     var quota = requestToken * rate.PromptRate;
+        //
+        //     // 检查额度（优先使用套餐额度）
+        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
+        //     if (!quotaSuccess)
+        //     {
+        //         throw new InsufficientQuotaException(quotaErrorMessage!);
+        //     }
+        //
+        //     usedSubscription = quotaUsedSubscription;
+        // }
+        // else if (rate.QuotaType == ModelQuotaType.OnDemand)
+        // {
+        //     if (request?.Inputs != null)
+        //     {
+        //         requestToken += TokenHelper.GetTotalTokens(request?.Inputs?.Where(x => x.IsMessageArray)
+        //             .Where(x => x.Content != null)
+        //             .SelectMany(x => x.Contents)
+        //             .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
+        //     }
+        //     else
+        //     {
+        //         requestToken += TokenHelper.GetTotalTokens(request?.Input);
+        //     }
+        //
+        //     var quota = requestToken * rate.PromptRate;
+        //
+        //     // 检查额度（优先使用套餐额度）
+        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
+        //     if (!quotaSuccess)
+        //     {
+        //         throw new InsufficientQuotaException(quotaErrorMessage!);
+        //     }
+        //
+        //     usedSubscription = quotaUsedSubscription;
+        // }
+        var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+            await CheckAndValidateQuotaAsync(user, request.Model, (long)(requestToken * rate.PromptRate));
+        if (!quotaSuccess)
         {
-            requestToken += TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
-                .SelectMany(x => x.Contents)
-                .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
-
-            requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
-                .Select(x => x.Content).ToArray());
-
-            // 解析图片
-            foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
-                         .Where(x => x.Type is "input_image"))
-            {
-                var imageUrl = message.ImageUrl;
-                if (imageUrl != null)
-                {
-                    try
-                    {
-                        var imageTokens = await CountImageTokens(message.ImageUrl, "low");
-                        requestToken += imageTokens.Item1;
-                    }
-                    catch (Exception ex)
-                    {
-                        GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-                    }
-                }
-            }
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
-        }
-        else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        {
-            if (request?.Inputs != null)
-            {
-                requestToken += TokenHelper.GetTotalTokens(request?.Inputs?.Where(x => x.IsMessageArray)
-                    .Where(x => x.Content != null)
-                    .SelectMany(x => x.Contents)
-                    .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
-            }
-            else
-            {
-                requestToken += TokenHelper.GetTotalTokens(request?.Input);
-            }
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
+            throw new InsufficientQuotaException(quotaErrorMessage!);
         }
 
+        usedSubscription = quotaUsedSubscription;
         // 是否第一次输出
         bool isFirst = true;
         await foreach (var (@event, item) in responsesService.GetResponsesAsync(request, platformOptions))
@@ -541,6 +738,6 @@ public sealed class ResponsesService(
                 .Select(x => x!.Type!).ToArray());
         }
 
-        return (requestToken, responseToken, cachedTokens);
+        return (requestToken, responseToken, cachedTokens, usedSubscription);
     }
 }

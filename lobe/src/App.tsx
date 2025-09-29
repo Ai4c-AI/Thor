@@ -71,6 +71,12 @@ const UsagePage = createLazyComponent(() => import('./pages/usage/page'), 'Usage
 const AnnouncementPage = createLazyComponent(() => import('./pages/announcement/page'), 'AnnouncementPage');
 const LoggerPage = createLazyComponent(() => import('./pages/logger/page'), 'LoggerPage');
 
+// 套餐相关页面
+const SubscriptionPage = createLazyComponent(() => import('./pages/subscription/page'), 'SubscriptionPage');
+const SubscriptionUpgradePage = createLazyComponent(() => import('./pages/subscription/upgrade'), 'SubscriptionUpgradePage');
+const SubscriptionHistoryPage = createLazyComponent(() => import('./pages/subscription/history'), 'SubscriptionHistoryPage');
+const SubscriptionAdminPage = createLazyComponent(() => import('./pages/subscription-admin/page'), 'SubscriptionAdminPage');
+
 // 智能加载状态组件
 const SmartLoadingFallback = ({ title }: { title: string }) => {
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -324,6 +330,30 @@ function App() {
               <LoggerPage />
             </Suspense>
           )
+        },
+        {
+          path: 'subscription/upgrade',
+          element: (
+            <Suspense fallback={<SmartLoadingFallback title="加载套餐升级页面..." />}>
+              <SubscriptionUpgradePage />
+            </Suspense>
+          )
+        },
+        {
+          path: 'subscription/history',
+          element: (
+            <Suspense fallback={<SmartLoadingFallback title="加载订阅记录页面..." />}>
+              <SubscriptionHistoryPage />
+            </Suspense>
+          )
+        },
+        {
+          path: 'subscription-admin',
+          element: (
+            <Suspense fallback={<SmartLoadingFallback title="加载套餐管理页面..." />}>
+              <SubscriptionAdminPage />
+            </Suspense>
+          )
         }
       ]
     },
@@ -387,6 +417,14 @@ function App() {
           element: (
             <Suspense fallback={<SmartLoadingFallback title={t('pageTitle.loading.model')} />}>
               <ModelPage />
+            </Suspense>
+          )
+        },
+        {
+          path: '/subscription',
+          element: (
+            <Suspense fallback={<SmartLoadingFallback title="加载套餐购买页面..." />}>
+              <SubscriptionPage />
             </Suspense>
           )
         },

@@ -286,7 +286,7 @@ public class ResponsesInputTokensDetailsDto
     /// 缓存的令牌数量。
     /// </summary>
     [JsonPropertyName("cached_tokens")]
-    public int CachedTokens { get; set; }
+    public int? CachedTokens { get; set; }
 }
 
 /// <summary>

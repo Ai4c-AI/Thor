@@ -34,5 +34,15 @@ public interface IThorContext
 
     DbSet<Announcement> Announcements { get; set; }
 
+    DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+
+    DbSet<UserSubscription> UserSubscriptions { get; set; }
+
+    DbSet<SubscriptionPurchaseRecord> SubscriptionPurchaseRecords { get; set; }
+
+    DbSet<SubscriptionQuotaUsage> SubscriptionQuotaUsages { get; set; }
+
+    DbSet<SubscriptionUpgrade> SubscriptionUpgrades { get; set; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken());
 }

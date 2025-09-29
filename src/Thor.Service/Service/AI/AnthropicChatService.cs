@@ -23,9 +23,87 @@ public class AnthropicChatService(
     LoggerService loggerService,
     UserService userService,
     ILogger<AnthropicChatService> logger,
-    ContextPricingService contextPricingService)
+    ContextPricingService contextPricingService,
+    SubscriptionService subscriptionService)
     : AIService(serviceProvider, imageService)
 {
+    /// <summary>
+    /// 检查并处理用户额度（优先使用套餐额度，不足时使用用户余额）
+    /// </summary>
+    /// <param name="user">用户信息</param>
+    /// <param name="model">模型名称</param>
+    /// <param name="quota">需要消费的额度</param>
+    /// <returns>是否成功，使用的额度类型，错误信息，套餐分组</returns>
+    private async Task<(bool success, bool usedSubscription, string? errorMessage, string[]? subscriptionGroups)> CheckAndValidateQuotaAsync(User user, string model, long quota)
+    {
+        // 1. 先检查用户是否有有效套餐
+        var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+
+        if (subscription?.Plan != null)
+        {
+            // 2. 检查套餐是否支持该模型
+            if (subscription.Plan.IsModelAllowed(model))
+            {
+                // 3. 检查套餐额度是否充足
+                var (hasSufficient, reason) = await subscriptionService.CheckQuotaSufficientAsync(user.Id, quota);
+                if (hasSufficient)
+                {
+                    return (true, true, null, subscription.Plan.Groups); // 使用套餐额度，返回套餐分组
+                }
+
+                // 套餐额度不足，尝试使用用户余额
+                if (quota <= user.ResidualCredit)
+                {
+                    return (true, false, null, null); // 使用用户余额
+                }
+
+                return (false, false, "套餐额度不足且用户余额不足，请充值或升级套餐", null);
+            }
+        }
+
+        // 4. 没有套餐或套餐不支持该模型，检查用户余额
+        if (quota <= user.ResidualCredit)
+        {
+            return (true, false, null, null); // 使用用户余额
+        }
+
+        // 5. 根据是否有套餐给出不同提示
+        if (subscription?.Plan != null)
+        {
+            return (false, false, "当前套餐不支持该模型且用户余额不足，请充值或升级套餐", null);
+        }
+
+        return (false, false, "账号余额不足请充值", null);
+    }
+
+    /// <summary>
+    /// 消费额度（优先消费套餐额度）
+    /// </summary>
+    /// <param name="user">用户信息</param>
+    /// <param name="model">模型名称</param>
+    /// <param name="quota">消费的额度</param>
+    /// <param name="requestTokens">请求token数</param>
+    /// <param name="responseTokens">响应token数</param>
+    /// <param name="usedSubscription">是否使用了套餐额度</param>
+    /// <param name="tokenKey">token key</param>
+    /// <param name="channelId">渠道ID</param>
+    /// <param name="context">HTTP上下文</param>
+    private async Task ConsumeQuotaAsync(User user, string model, long quota, int requestTokens, int responseTokens,
+        bool usedSubscription, string? tokenKey, string channelId, HttpContext context)
+    {
+        if (usedSubscription)
+        {
+            // 使用套餐额度
+            await subscriptionService.ConsumeQuotaAsync(
+                user.Id, model, quota, requestTokens, responseTokens,
+                context.GetIpAddress(), context.GetUserAgent());
+        }
+        else
+        {
+            // 使用用户余额
+            await userService.ConsumeAsync(user.Id, quota, requestTokens, tokenKey, channelId, model);
+        }
+    }
     public async Task MessageAsync(HttpContext context, AnthropicInput request)
     {
         using var chatCompletions =
@@ -61,9 +139,17 @@ public class AnthropicChatService(
 
                 request.Model = await modelMapService.ModelMap(request.Model);
 
-                // 获取渠道通过算法计算权重
+                // 检查用户是否有套餐，获取套餐分组信息
+                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+                string[]? subscriptionGroups = null;
+                if (subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model))
+                {
+                    subscriptionGroups = subscription.Plan.Groups;
+                }
+
+                // 获取渠道通过算法计算权重（优先使用套餐分组）
                 var channel =
-                    CalculateWeight(await channelService.GetChannelsContainsModelAsync(request.Model, user, token));
+                    CalculateWeight(await channelService.GetChannelsContainsModelWithSubscriptionGroupAsync(request.Model, user, token, subscriptionGroups));
 
                 switch (channel)
                 {
@@ -111,6 +197,7 @@ public class AnthropicChatService(
                 var responseToken = 0;
                 int cachedTokens = 0;
                 int cacheWriteTokens = 0;
+                bool usedSubscription = false;
 
                 var sw = Stopwatch.StartNew();
 
@@ -119,7 +206,7 @@ public class AnthropicChatService(
                     using var activity =
                         Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens, cacheWriteTokens) =
+                    (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription) =
                         await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate).ConfigureAwait(false);
                 }
@@ -128,7 +215,7 @@ public class AnthropicChatService(
                     using var activity =
                         Activity.Current?.Source.StartActivity("非流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens, cacheWriteTokens) =
+                    (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription) =
                         await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
                             rate).ConfigureAwait(false);
                 }
@@ -189,6 +276,20 @@ public class AnthropicChatService(
                             userGroup.Rate);
                     }
 
+                    // 添加扣费来源信息
+                    if (usedSubscription)
+                    {
+                        var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
+                        if (userSubscription?.Plan != null)
+                        {
+                            template += $" 扣费来源：套餐额度({userSubscription.Plan.Name})";
+                        }
+                    }
+                    else
+                    {
+                        template += " 扣费来源：用户余额";
+                    }
+
                     await loggerService.CreateConsumeAsync("/v1/messages", template,
                         model,
                         requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
@@ -196,15 +297,30 @@ public class AnthropicChatService(
                         request.Stream is true,
                         (int)sw.ElapsedMilliseconds, organizationId);
 
-                    await userService.ConsumeAsync(user!.Id, (long)quota, requestToken, token?.Key, channel.Id,
-                        model);
+                    await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
+                        usedSubscription, token?.Key, channel.Id, context);
                 }
                 else
                 {
+                    // 准备内容，记录是否使用套餐
+                    var content = string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
+                        userGroup.Rate);
+                    if (usedSubscription)
+                    {
+                        var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
+                        if (userSubscription?.Plan != null)
+                        {
+                            content += $" 扣费来源：套餐额度({userSubscription.Plan.Name})";
+                        }
+                    }
+                    else
+                    {
+                        content += " 扣费来源：用户余额";
+                    }
+
                     // 费用
                     await loggerService.CreateConsumeAsync("/v1/messages",
-                        string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
-                            userGroup.Rate),
+                        content,
                         model,
                         requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
                         user?.UserName, user?.Id,
@@ -213,9 +329,8 @@ public class AnthropicChatService(
                         request.Stream is true,
                         (int)sw.ElapsedMilliseconds, organizationId);
 
-                    await userService.ConsumeAsync(user!.Id, (long)rate.PromptRate, requestToken, token?.Key,
-                        channel.Id,
-                        model);
+                    await ConsumeQuotaAsync(user!, model, (long)rate.PromptRate, requestToken, responseToken,
+                        usedSubscription, token?.Key, channel.Id, context);
                 }
             }
         }
@@ -301,7 +416,7 @@ public class AnthropicChatService(
         }
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool usedSubscription)>
         ChatCompletionsHandlerAsync(
             HttpContext context, AnthropicInput input, ChatChannel channel,
             IAnthropicChatCompletionsService openService, User? user, ModelManager rate)
@@ -312,6 +427,7 @@ public class AnthropicChatService(
         // 命中缓存tokens数量
         int cachedTokens = 0;
         int cacheWriteTokens = 0;
+        bool usedSubscription = false;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
@@ -381,8 +497,13 @@ public class AnthropicChatService(
 
             var quota = requestToken * rate.PromptRate;
 
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
+            // 检查额度（优先使用套餐额度）
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            if (!quotaSuccess)
+            {
+                throw new InsufficientQuotaException(quotaErrorMessage!);
+            }
+            usedSubscription = quotaUsedSubscription;
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
 
@@ -411,8 +532,13 @@ public class AnthropicChatService(
 
             var quota = requestToken * rate.PromptRate;
 
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
+            // 检查额度（优先使用套餐额度）
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            if (!quotaSuccess)
+            {
+                throw new InsufficientQuotaException(quotaErrorMessage!);
+            }
+            usedSubscription = quotaUsedSubscription;
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
 
@@ -454,10 +580,10 @@ public class AnthropicChatService(
             cacheWriteTokens = result.Usage.CacheCreationInputTokens.Value;
         }
 
-        return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
+        return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool usedSubscription)>
         StreamChatCompletionsHandlerAsync(
             HttpContext context,
             AnthropicInput input, ChatChannel channel, IAnthropicChatCompletionsService openService, User? user,
@@ -470,6 +596,7 @@ public class AnthropicChatService(
         var responseMessage = new StringBuilder();
         int cachedTokens = 0;
         int cacheWriteTokens = 0;
+        bool usedSubscription = false;
 
         requestToken += TokenHelper.GetTotalTokens(input?.System);
         requestToken += TokenHelper.GetTotalTokens(input?.Systems?.Select(x => x.Text).ToArray() ?? []);
@@ -536,11 +663,14 @@ public class AnthropicChatService(
             }
 
             var quota = requestToken * rate.PromptRate;
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit)
+
+            // 检查额度（优先使用套餐额度）
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            if (!quotaSuccess)
             {
-                throw new InsufficientQuotaException("账号���额不足请充值");
+                throw new InsufficientQuotaException(quotaErrorMessage!);
             }
+            usedSubscription = quotaUsedSubscription;
         }
         else if (rate.QuotaType == ModelQuotaType.OnDemand)
         {
@@ -549,8 +679,13 @@ public class AnthropicChatService(
 
             var quota = requestToken * rate.PromptRate;
 
-            // 判断请求token数量是否超过额度
-            if (quota > user.ResidualCredit) throw new InsufficientQuotaException("账号余额不足请充值");
+            // 检查额度（优先使用套餐额度）
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            if (!quotaSuccess)
+            {
+                throw new InsufficientQuotaException(quotaErrorMessage!);
+            }
+            usedSubscription = quotaUsedSubscription;
         }
 
         // 是否第一次输出
@@ -605,6 +740,6 @@ public class AnthropicChatService(
             _ => responseToken
         };
 
-        return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
+        return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
     }
 }

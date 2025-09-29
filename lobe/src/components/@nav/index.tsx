@@ -25,7 +25,11 @@ import {
   Github,
   Book,
   HelpCircle,
-  Zap
+  Zap,
+  Crown,
+  ArrowUp,
+  Receipt,
+  CreditCard,
 } from "lucide-react";
 
 import { useActiveTabKey } from "../../hooks/useActiveTabKey";
@@ -188,6 +192,37 @@ label: t('sidebar.chat'),
             onClick: () => handleCherryStudioClick(),
             role: "user,admin",
           }
+        ]
+      },
+      {
+        key: 'subscription',
+        label: '套餐管理',
+        role: "user,admin",
+        items: [
+          {
+            icon: <ArrowUp className="w-4 h-4" />,
+            enable: true,
+            label: '套餐升级',
+            key: SidebarTabKey.SubscriptionUpgrade,
+            onClick: () => navigate("/subscription/upgrade"),
+            role: "user,admin",
+          },
+          {
+            icon: <Receipt className="w-4 h-4" />,
+            enable: true,
+            label: '订阅记录',
+            key: SidebarTabKey.SubscriptionHistory,
+            onClick: () => navigate("/subscription/history"),
+            role: "user,admin",
+          },
+          {
+            icon: <CreditCard className="w-4 h-4" />,
+            enable: true,
+            label: '套餐管理',
+            key: SidebarTabKey.SubscriptionAdmin,
+            onClick: () => navigate("/subscription-admin"),
+            role: "admin",
+          },
         ]
       },
       {
@@ -399,7 +434,38 @@ label: t('sidebar.chat'),
       ...getMenuStructure.groups.flatMap(group => group.items)
     ];
 
-    for (const item of allItems) {
+    // 创建路径到key的映射，支持精确匹配
+    const pathToKeyMap: Record<string, string> = {
+      '/panel': SidebarTabKey.Panel,
+      '/playground': SidebarTabKey.Playground,
+      '/token': SidebarTabKey.Token,
+      '/usage': SidebarTabKey.Usage,
+      '/current': SidebarTabKey.Current,
+      '/channel': SidebarTabKey.Channel,
+      '/model-manager': SidebarTabKey.ModelManager,
+      '/model-map': SidebarTabKey.ModelMap,
+      '/redeem-code': SidebarTabKey.RedeemCode,
+      '/product': SidebarTabKey.Product,
+      '/announcement': SidebarTabKey.Announcement,
+      '/logger': SidebarTabKey.Logger,
+      '/rate-limit': SidebarTabKey.RateLimit,
+      '/user': SidebarTabKey.User,
+      '/user-group': SidebarTabKey.UserGroup,
+      '/setting': 'system-setting',
+      '/subscription/upgrade': SidebarTabKey.SubscriptionUpgrade,
+      '/subscription/history': SidebarTabKey.SubscriptionHistory,
+      '/subscription-admin': SidebarTabKey.SubscriptionAdmin
+    };
+
+    // 首先尝试精确匹配
+    if (pathToKeyMap[path]) {
+      setSidebarKey(pathToKeyMap[path] as SidebarTabKey);
+      return;
+    }
+
+    // 如果没有精确匹配，则使用包含匹配（按key长度降序排序，优先匹配更长的key）
+    const sortedItems = allItems.sort((a, b) => b.key.length - a.key.length);
+    for (const item of sortedItems) {
       if (item.onClick && path.includes(item.key)) {
         setSidebarKey(item.key as SidebarTabKey);
         return;

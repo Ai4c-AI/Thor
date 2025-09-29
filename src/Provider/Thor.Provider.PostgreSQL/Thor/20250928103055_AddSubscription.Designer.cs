@@ -2,79 +2,82 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Thor.Provider;
 
 #nullable disable
 
-namespace Thor.Provider.MySql.Thor
+namespace Thor.Provider.PostgreSql.Thor
 {
-    [DbContext(typeof(MySqlThorContext))]
-    partial class MySqlThorContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(PostgreSQLThorContext))]
+    [Migration("20250928103055_AddSubscription")]
+    partial class AddSubscription
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "9.0.2")
-                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Thor.Domain.Chats.ChatChannel", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("ControlAutomatically")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Disable")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Extension")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Groups")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Key")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Models")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<int>("Order")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Other")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("Quota")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<long>("RemainQuota")
                         .HasColumnType("bigint");
@@ -83,14 +86,14 @@ namespace Thor.Provider.MySql.Thor
                         .HasColumnType("bigint");
 
                     b.Property<bool>("SupportsResponses")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -105,67 +108,67 @@ namespace Thor.Provider.MySql.Thor
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("AccessedTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("Disabled")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ExpiredTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Groups")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsDelete")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(42)
-                        .HasColumnType("varchar(42)");
+                        .HasColumnType("character varying(42)");
 
                     b.Property<string>("LimitModels")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("RemainQuota")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("UnlimitedExpired")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("UnlimitedQuota")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<long>("UsedQuota")
                         .HasColumnType("bigint");
 
                     b.Property<string>("WhiteIpList")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -179,12 +182,12 @@ namespace Thor.Provider.MySql.Thor
                         new
                         {
                             Id = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 93, DateTimeKind.Local).AddTicks(4948),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 854, DateTimeKind.Local).AddTicks(1373),
                             Creator = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
                             Disabled = false,
                             Groups = "[\"default\"]",
                             IsDelete = false,
-                            Key = "sk-itbY8ghSpVTLHkLCI0sVRdXQAIfgc9BcPh5umq",
+                            Key = "sk-Cahewod1wslM4Bg10wQNba9P8JhdThZ7PZMvHE",
                             LimitModels = "[]",
                             Name = "默认Token",
                             RemainQuota = 0L,
@@ -199,40 +202,40 @@ namespace Thor.Provider.MySql.Thor
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Enable")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<int>("Order")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<double>("Rate")
-                        .HasColumnType("double");
+                        .HasColumnType("double precision");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -251,7 +254,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = new Guid("ca378c74-19e7-458a-918b-4dbb7ae1729d"),
                             Code = "default",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 94, DateTimeKind.Local).AddTicks(3994),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 854, DateTimeKind.Local).AddTicks(9331),
                             Description = "默认用户组",
                             Enable = true,
                             Name = "默认",
@@ -262,7 +265,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = new Guid("ca378c74-19e7-458a-918b-4dbb7ae17291"),
                             Code = "vip",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 94, DateTimeKind.Local).AddTicks(4415),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 854, DateTimeKind.Local).AddTicks(9707),
                             Description = "VIP用户组",
                             Enable = true,
                             Name = "VIP",
@@ -274,47 +277,47 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.Announcement", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ExpireTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("Order")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("Pinned")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -325,86 +328,86 @@ namespace Thor.Provider.MySql.Thor
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("AudioCacheRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("AudioOutputRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("AudioPromptRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<bool>("Available")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<decimal?>("CacheHitRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("CacheRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("CompletionRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("ContextPricingTiers")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasColumnType("text")
                         .HasColumnName("ContextPricingTiers");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<int>("DefaultContextLength")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Enable")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Extension")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Icon")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsVersion2")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Model")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("PromptRate")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("QuotaMax")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("QuotaType")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Tags")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -417,10 +420,10 @@ namespace Thor.Provider.MySql.Thor
                     b.HasData(
                         new
                         {
-                            Id = new Guid("c5cd434c-0339-4da6-b473-8bda5fd51cb5"),
+                            Id = new Guid("4087dca7-e617-48a0-a5e4-159e368958c7"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1033),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2701),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 文本模型",
                             Enable = true,
@@ -436,10 +439,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("c625cda3-7255-43b9-b8a3-d78886887253"),
+                            Id = new Guid("2222864a-3503-4a7b-ae19-55659f433423"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1274),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2950),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 0125 文本模型",
                             Enable = true,
@@ -455,10 +458,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("2ad5d9d7-03d8-4925-a660-bf76e9aa23f6"),
+                            Id = new Guid("3865c5f3-4c30-44ca-8baa-a1a55e67b406"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1277),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2953),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 0301 文本模型",
                             Enable = true,
@@ -474,10 +477,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("706fcd7c-c6e3-4df7-8eca-c186ffbdaa4b"),
+                            Id = new Guid("74198007-8402-4af3-b8a7-51bb31af24fb"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1279),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2954),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 0613 文本模型",
                             Enable = true,
@@ -493,10 +496,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("ed726f69-17a8-47a8-a349-a4195e502ac1"),
+                            Id = new Guid("e7418622-752f-46a4-9354-1f5025c4437a"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1281),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2956),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 1106 文本模型",
                             Enable = true,
@@ -512,10 +515,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("c7a214ce-4da6-4108-b6e5-a8d604fb085e"),
+                            Id = new Guid("b2d753ec-af00-4ff5-a3ad-3a308fb3354b"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1290),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2957),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 16k 文本模型",
                             Enable = true,
@@ -531,10 +534,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("e60bbb35-b59b-420f-aed9-65ba1831a6c9"),
+                            Id = new Guid("e5ddec72-a5b7-4a77-8216-c87ba85f4bb4"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1292),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2958),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo 16k 0613 文本模型",
                             Enable = true,
@@ -550,10 +553,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("3cf60c44-f9a8-4dce-9332-08dd53dc9be5"),
+                            Id = new Guid("fc136a37-a7c4-4635-8ada-51865657ad8e"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1293),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2959),
                             DefaultContextLength = 4096,
                             Description = "GPT-3.5 Turbo Instruct 文本模型",
                             Enable = true,
@@ -569,10 +572,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("91a9473d-427e-48b9-b2e1-7693772fa51e"),
+                            Id = new Guid("03633520-f0e4-442b-8474-d9c9461bed0e"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1296),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2964),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 文本模型",
                             Enable = true,
@@ -588,10 +591,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("c56630f4-8eb9-40e3-8f54-e8a20fd6994e"),
+                            Id = new Guid("90182f83-fff9-4b7a-b6d2-c722da10901a"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1298),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2966),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 0125 预览文本模型",
                             Enable = true,
@@ -607,10 +610,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("47bbec6e-8d8a-4379-aa21-6c023289f4bd"),
+                            Id = new Guid("6cb76bd6-d4aa-437e-9761-e614e862fc63"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1300),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2967),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 0314 文本模型",
                             Enable = true,
@@ -626,10 +629,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("8c7110f8-9a10-488e-9852-7e7b0382eb94"),
+                            Id = new Guid("33c81e52-7b27-4244-98e9-869442d1deec"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1301),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2968),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 0613 文本模型",
                             Enable = true,
@@ -645,10 +648,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("694d53fa-51c3-4b44-ab4d-ac56abaa8bbb"),
+                            Id = new Guid("3dcffdba-3d62-436f-8fc3-8fb44021d530"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1302),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2970),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 1106 预览文本模型",
                             Enable = true,
@@ -664,10 +667,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("d0f28c37-a9d2-4755-b1a4-09c0904d8e70"),
+                            Id = new Guid("27a4176a-fade-466a-a1b2-46e0559dc216"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1306),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2971),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 1106 视觉预览模型",
                             Enable = true,
@@ -683,10 +686,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("3bbe5340-a7a9-499b-9d79-e4ab3de99fed"),
+                            Id = new Guid("b291c75b-5789-4f4f-b0a8-2876f9642364"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1307),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2972),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 32k 文本模型",
                             Enable = true,
@@ -702,10 +705,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("edeb57a6-3089-452d-be26-583ce8c30ee0"),
+                            Id = new Guid("2475b52d-d0b7-4ddf-b60c-6395b5d3c0fb"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1309),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2973),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 32k 0314 文本模型",
                             Enable = true,
@@ -721,10 +724,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("dde7b114-623f-4383-b1aa-e9c131fe33be"),
+                            Id = new Guid("c6279b88-7bdd-4e91-a20a-6b0ad5be1aad"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1310),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2976),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 32k 0613 文本模型",
                             Enable = true,
@@ -740,10 +743,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("5ff165a5-2df7-4c8d-b1c4-a35ea6c0115f"),
+                            Id = new Guid("dfcf5a89-4bea-485a-80fa-90ed171dae70"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1311),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2977),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 全部文本模型",
                             Enable = true,
@@ -759,10 +762,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("84b883f3-88c5-403f-a767-df4520753f89"),
+                            Id = new Guid("d89bfd2e-8761-4b0f-87af-f6fa5a7c8b35"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1313),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2978),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 Turbo 文本模型",
                             Enable = true,
@@ -778,11 +781,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("1c4668db-3991-4d42-934b-4f5bcda4eec0"),
+                            Id = new Guid("63026992-c427-4874-a9fc-629a011f1e7f"),
                             Available = true,
                             CompletionRate = 2m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1314),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2979),
                             DefaultContextLength = 4096,
                             Description = "Gemini 1.5 Pro 文本模型",
                             Enable = true,
@@ -798,11 +801,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("53929adb-c2a3-4e54-911a-89cf9068a7a4"),
+                            Id = new Guid("c3ee7e1e-eef7-43cd-a3bc-c2b2bb8226a2"),
                             Available = true,
                             CompletionRate = 3m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1316),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2980),
                             DefaultContextLength = 4096,
                             Description = "Gemini Pro 文本模型",
                             Enable = true,
@@ -818,11 +821,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("bb4df278-a99b-41ba-b69b-b172b9affc92"),
+                            Id = new Guid("2d35a800-3139-4bd2-bbe5-8c0d98e044a7"),
                             Available = true,
                             CompletionRate = 3m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1320),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2980),
                             DefaultContextLength = 4096,
                             Description = "Gemini Pro 视觉模型",
                             Enable = true,
@@ -838,11 +841,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("a80556de-1f15-47f0-8615-bce267972dc6"),
+                            Id = new Guid("eb20cfa7-b0f3-4313-a66c-97479232e9c6"),
                             Available = true,
                             CompletionRate = 3m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1321),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2981),
                             DefaultContextLength = 4096,
                             Description = "Gemini 1.5 Flash 文本模型",
                             Enable = true,
@@ -858,10 +861,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("a177dfaa-3617-4e56-b57c-cd212b215815"),
+                            Id = new Guid("ae042ce9-2a5a-4b52-8920-6a8610d2557f"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1322),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2984),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 Turbo 2024-04-09 文本模型",
                             Enable = true,
@@ -877,10 +880,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("093c576f-fc7d-4b58-9e50-63d5265c9025"),
+                            Id = new Guid("390bf3f7-b862-4ee9-be78-fa8e2c93f28f"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1324),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2987),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 Turbo 预览文本模型",
                             Enable = true,
@@ -896,10 +899,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("77ec51ba-a789-45fb-8ebc-f1b5d4bae59a"),
+                            Id = new Guid("c8611616-009b-48ca-86c8-6ca4244746ae"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1325),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2988),
                             DefaultContextLength = 4096,
                             Description = "GPT-4 视觉预览模型",
                             Enable = true,
@@ -915,11 +918,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("3a2be667-4cc5-4356-a12c-899c4e21dcc5"),
+                            Id = new Guid("4d94478f-8de8-4ea9-bc90-857544f75231"),
                             Available = true,
                             CompletionRate = 3m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1326),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2988),
                             DefaultContextLength = 4096,
                             Description = "GPT-4o 文本模型",
                             Enable = true,
@@ -935,11 +938,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("d6ca9fde-9006-44c4-bac6-8b7fbe9f0bde"),
+                            Id = new Guid("3f23c9f4-fb01-4235-b320-7fb8f0883541"),
                             Available = true,
                             CompletionRate = 4m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1328),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2992),
                             DefaultContextLength = 4096,
                             Description = "ChatGPT 4o 最新文本模型",
                             Enable = true,
@@ -955,11 +958,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("be59e207-c6e9-4e69-8f2e-7287215b53bc"),
+                            Id = new Guid("1dde2251-4221-4103-a8e4-a9795dd38f6c"),
                             Available = true,
                             CompletionRate = 4m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1329),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2993),
                             DefaultContextLength = 4096,
                             Description = "GPT-4o Mini 文本模型",
                             Enable = true,
@@ -975,11 +978,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("fe6c0247-8534-4029-a1e2-ca63559c35e6"),
+                            Id = new Guid("aadaf61b-259a-4c90-a834-10e6f56e1c83"),
                             Available = true,
                             CompletionRate = 4m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1332),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2994),
                             DefaultContextLength = 4096,
                             Description = "GPT-4o Mini 2024-07-18 文本模型",
                             Enable = true,
@@ -995,11 +998,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("f72cbb66-085d-4125-abba-e1fb35e6fcdb"),
+                            Id = new Guid("5214e157-bad1-4c23-a957-59842d747264"),
                             Available = true,
                             CompletionRate = 4m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1343),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2995),
                             DefaultContextLength = 4096,
                             Description = "GPT-4o 2024-05-13 文本模型",
                             Enable = true,
@@ -1015,11 +1018,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("558649b2-be08-4033-80bd-617f205ca123"),
+                            Id = new Guid("e030d0b6-529d-4500-b716-e459a6f8dbbc"),
                             Available = true,
                             CompletionRate = 4m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1345),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2996),
                             DefaultContextLength = 4096,
                             Description = "GPT-4o 2024-08-06 文本模型",
                             Enable = true,
@@ -1035,10 +1038,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("b1b3732f-809e-445d-90da-0c71929b8ef3"),
+                            Id = new Guid("01685267-0f42-47ab-b948-a5095f67f0c4"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1346),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2998),
                             DefaultContextLength = 4096,
                             Description = "Moonshot v1 128k 文本模型",
                             Enable = true,
@@ -1054,10 +1057,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("bbc63b14-afbc-4999-955c-e06d2e9074ad"),
+                            Id = new Guid("904b5bc8-db09-49a2-9c35-f4598c65602b"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1347),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2998),
                             DefaultContextLength = 4096,
                             Description = "Moonshot v1 32k 文本模型",
                             Enable = true,
@@ -1073,10 +1076,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("d5e55609-f584-48e9-a0a1-30cb9bde507c"),
+                            Id = new Guid("597a22f0-08a2-47ed-b776-4c81824cbca5"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1348),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(2999),
                             DefaultContextLength = 4096,
                             Description = "Moonshot v1 8k 文本模型",
                             Enable = true,
@@ -1092,10 +1095,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("22cb49aa-4fc1-4a84-a7bd-7e1527ac84a4"),
+                            Id = new Guid("4d7d4e18-d47c-42dd-b308-02e4090e27ee"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1349),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3000),
                             DefaultContextLength = 4096,
                             Description = "Text Babbage 001 文本模型",
                             Enable = true,
@@ -1111,10 +1114,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("394acc2b-2996-4d10-8833-1bf95079240c"),
+                            Id = new Guid("3978fc04-23fa-4cf2-892f-741ec4f8823e"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1350),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3000),
                             DefaultContextLength = 4096,
                             Description = "Text Curie 001 文本模型",
                             Enable = true,
@@ -1130,10 +1133,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("71a1e230-2d69-4d6b-8ab2-6f074996c617"),
+                            Id = new Guid("4ea21332-accb-40df-9a49-93f761a5ec19"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1353),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3001),
                             DefaultContextLength = 4096,
                             Description = "Text Davinci 002 文本模型",
                             Enable = true,
@@ -1149,10 +1152,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("afe16bb8-3673-459a-9bef-94ae6c7e0b70"),
+                            Id = new Guid("a8c16aa4-ccd6-46e1-bb50-b7dc2f6d0860"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1354),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3002),
                             DefaultContextLength = 4096,
                             Description = "Text Davinci 003 文本模型",
                             Enable = true,
@@ -1168,10 +1171,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("a4a49a9e-f836-476c-9f13-a8a63a38473c"),
+                            Id = new Guid("9bdd6fcf-6430-4e43-8806-5c6c0278ee26"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1355),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3002),
                             DefaultContextLength = 4096,
                             Description = "Text Davinci Edit 001 文本模型",
                             Enable = true,
@@ -1187,10 +1190,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("c1c2c3a1-51aa-427c-b716-9862fb8f38d1"),
+                            Id = new Guid("46b8af67-e06e-4b56-87e2-364c8404350b"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1356),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3005),
                             DefaultContextLength = 4096,
                             Description = "Text Embedding 3 Large 嵌入模型",
                             Enable = true,
@@ -1206,10 +1209,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("e50109d5-9952-4e42-bc87-ed058493d246"),
+                            Id = new Guid("f83471cd-b843-47b9-b399-373701b9981c"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1357),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3006),
                             DefaultContextLength = 4096,
                             Description = "Text Embedding 3 Small 嵌入模型",
                             Enable = true,
@@ -1225,10 +1228,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("4284ca54-9ea9-4792-b2ea-a6bb3b1704d8"),
+                            Id = new Guid("a7864037-aa04-49ca-9a81-f3800be73773"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1358),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3007),
                             DefaultContextLength = 4096,
                             Description = "Text Embedding Ada 002 嵌入模型",
                             Enable = true,
@@ -1244,10 +1247,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("5a2ab4a4-cc96-4a57-9630-213d8a5b4e52"),
+                            Id = new Guid("88ccd2a2-ef02-4bca-8983-d7188fbc381a"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1359),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3007),
                             DefaultContextLength = 4096,
                             Description = "TTS 1 语音合成模型",
                             Enable = true,
@@ -1262,10 +1265,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("11ec94bc-81e4-46f0-88e0-f57311cf1509"),
+                            Id = new Guid("25fe535c-e5e3-4840-b55a-0edbd7ee4683"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1360),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3008),
                             DefaultContextLength = 4096,
                             Description = "TTS 1 1106 语音合成模型",
                             Enable = true,
@@ -1280,10 +1283,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("b34c92fb-c46e-485f-8483-daefce9ce9e0"),
+                            Id = new Guid("278ae415-af50-46a9-9394-906321ab06ce"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1362),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3009),
                             DefaultContextLength = 4096,
                             Description = "TTS 1 HD 语音合成模型",
                             Enable = true,
@@ -1298,10 +1301,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("ae2c2f86-549c-4103-840e-ebd8b801ec0a"),
+                            Id = new Guid("b56138b4-1b0b-4944-9ebe-904c499ef224"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1364),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3010),
                             DefaultContextLength = 4096,
                             Description = "TTS 1 HD 1106 语音合成模型",
                             Enable = true,
@@ -1316,10 +1319,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("9d09efed-2f9f-41f8-b07d-b7785bc9f73d"),
+                            Id = new Guid("a9c08c31-f282-4bde-97ea-5de94a199ab0"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1365),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3010),
                             DefaultContextLength = 4096,
                             Description = "Whisper 1 语音识别模型",
                             Enable = true,
@@ -1334,10 +1337,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("412cfe8c-c178-443e-a0ea-c63c0542b520"),
+                            Id = new Guid("63b47a17-523b-4850-a1bc-d28ee11fbfec"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1366),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3012),
                             DefaultContextLength = 4096,
                             Description = "Hunyuan Lite 文本模型",
                             Enable = true,
@@ -1353,11 +1356,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("94d3b839-2bfb-4695-b354-2c0c2a43a07a"),
+                            Id = new Guid("e1ff9a77-42ae-45ec-bc55-d78ffc7d1ec9"),
                             Available = true,
                             CompletionRate = 2m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1366),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3013),
                             DefaultContextLength = 4096,
                             Description = "通用文本模型",
                             Enable = true,
@@ -1373,11 +1376,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("bed7686d-4cd3-464c-9d88-35952befd2c9"),
+                            Id = new Guid("ef1ec240-1888-410e-9ef7-44b3c4fe99c4"),
                             Available = true,
                             CompletionRate = 2m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1367),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3014),
                             DefaultContextLength = 4096,
                             Description = "通用文本模型 v3",
                             Enable = true,
@@ -1393,11 +1396,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("fb9405b3-7df8-4fcc-9af9-65bdfb63b25b"),
+                            Id = new Guid("a06314b1-33df-4aba-9d0d-deb515c5ecff"),
                             Available = true,
                             CompletionRate = 2m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1368),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3015),
                             DefaultContextLength = 4096,
                             Description = "通用文本模型 v3.5",
                             Enable = true,
@@ -1413,11 +1416,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("8cbda16f-5c2f-49e6-8602-4620a118f547"),
+                            Id = new Guid("7a5f9805-bdfa-4d7f-a542-87aa30da0855"),
                             Available = true,
                             CompletionRate = 3m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1369),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3015),
                             DefaultContextLength = 4096,
                             Description = "4.0 超级文本模型",
                             Enable = true,
@@ -1433,10 +1436,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("55fd781e-0527-48f0-8c20-f122b4a20a0a"),
+                            Id = new Guid("f7aa459b-d45a-4bce-a684-dd5501f8374a"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1371),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3016),
                             DefaultContextLength = 4096,
                             Description = "ChatGLM Lite 文本模型",
                             Enable = true,
@@ -1452,10 +1455,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("6a6c00f7-c0de-4e22-9661-3fcd06149b04"),
+                            Id = new Guid("5ffba569-e6fc-4d4e-8c8a-751591330310"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1372),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3017),
                             DefaultContextLength = 4096,
                             Description = "ChatGLM Pro 文本模型",
                             Enable = true,
@@ -1471,10 +1474,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("d24198f7-64d5-4ec7-8025-fa39c2987e7f"),
+                            Id = new Guid("bd37add2-b256-4e5c-8e01-368aa6a637f6"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1373),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3018),
                             DefaultContextLength = 4096,
                             Description = "ChatGLM 标准文本模型",
                             Enable = true,
@@ -1490,10 +1493,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("81ad86c5-531c-4887-89fa-7c24566d7ad9"),
+                            Id = new Guid("206297d6-6a11-45ca-932d-9fe4502143ba"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1374),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3020),
                             DefaultContextLength = 4096,
                             Description = "ChatGLM Turbo 文本模型",
                             Enable = true,
@@ -1509,10 +1512,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("a01a9686-ff09-4a2b-835e-eb047629d372"),
+                            Id = new Guid("1b628ea1-d28a-404b-9eb8-f0e2cc7b51d5"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1374),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3020),
                             DefaultContextLength = 4096,
                             Description = "Claude 2 文本模型",
                             Enable = true,
@@ -1528,10 +1531,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("defb14cc-c6c8-43df-ae9f-a0dadcd26536"),
+                            Id = new Guid("db36600d-59f8-427d-8e2c-dbe3f0602c84"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1375),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3021),
                             DefaultContextLength = 4096,
                             Description = "Claude 2.0 文本模型",
                             Enable = true,
@@ -1547,10 +1550,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("094a4976-e15c-4cb7-9dfd-9437bcefbd78"),
+                            Id = new Guid("1d475e77-1c5d-47bd-ab65-160c4a8b2291"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1376),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3022),
                             DefaultContextLength = 4096,
                             Description = "Claude 2.1 文本模型",
                             Enable = true,
@@ -1566,11 +1569,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("ab9f902a-b2b3-404d-b574-8e8164e6a81c"),
+                            Id = new Guid("85907d16-9f6e-434d-9ad5-f7c1f494af14"),
                             Available = true,
                             CompletionRate = 5m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1377),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3023),
                             DefaultContextLength = 4096,
                             Description = "Claude 3 Haiku 文本模型",
                             Enable = true,
@@ -1586,11 +1589,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("166e77d2-9a41-4906-878b-aac842ec177a"),
+                            Id = new Guid("80122932-7965-4a61-bb82-36156333ab44"),
                             Available = true,
                             CompletionRate = 5m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1379),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3023),
                             DefaultContextLength = 4096,
                             Description = "Claude 3 Haiku 20240307 文本模型",
                             Enable = true,
@@ -1606,11 +1609,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("e2f4bf47-98dd-40c4-ae15-e12f039929c8"),
+                            Id = new Guid("77151cbe-b1fb-4f21-81d4-186628a412e3"),
                             Available = true,
                             CompletionRate = 5m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1380),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3024),
                             DefaultContextLength = 4096,
                             Description = "Claude 3.5 Sonnet 20240620 文本模型",
                             Enable = true,
@@ -1626,11 +1629,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("ab356ccb-7ea4-453f-ae1a-9eae59132fdb"),
+                            Id = new Guid("d144000f-2804-4876-a31e-ba894e74d0c2"),
                             Available = true,
                             CompletionRate = 5m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1381),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3025),
                             DefaultContextLength = 4096,
                             Description = "Claude 3 Sonnet 20240229 文本模型",
                             Enable = true,
@@ -1646,11 +1649,11 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("b06a4453-48b6-4372-8a9c-ef2780a07010"),
+                            Id = new Guid("619518d4-4aab-438f-a0a8-3ee3f99fbee3"),
                             Available = true,
                             CompletionRate = 5m,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1381),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3027),
                             DefaultContextLength = 4096,
                             Description = "Claude 3 Opus 20240229 文本模型",
                             Enable = true,
@@ -1666,10 +1669,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("725102e8-e6e9-4d1c-a31b-7b8ffa854256"),
+                            Id = new Guid("8a8c63b6-4479-4136-abcf-9cb0551fe970"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1382),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3027),
                             DefaultContextLength = 4096,
                             Description = "Claude Instant 1 文本模型",
                             Enable = true,
@@ -1685,10 +1688,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("96d30d83-6702-4d61-93d6-c6a723ce1ac0"),
+                            Id = new Guid("426d7379-9137-446c-95ea-477bfcec4aa4"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1383),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3029),
                             DefaultContextLength = 4096,
                             Description = "Claude Instant 1.2 文本模型",
                             Enable = true,
@@ -1704,10 +1707,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("963fad35-f4c4-4ef2-ab36-12ce290fd51c"),
+                            Id = new Guid("ceb7bb39-cd9e-4691-9358-2045d3edbf63"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1384),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3029),
                             DefaultContextLength = 4096,
                             Description = "DALL-E 2 图像生成模型",
                             Enable = true,
@@ -1722,10 +1725,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("99efeb28-2dd3-4af0-8826-48a54d0e390e"),
+                            Id = new Guid("d3b79040-e6a4-411f-af98-01277bee3987"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1384),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3030),
                             DefaultContextLength = 4096,
                             Description = "DALL-E 3 图像生成模型",
                             Enable = true,
@@ -1740,10 +1743,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("cfcf3d76-1e7b-4b82-87cf-5b567b78353c"),
+                            Id = new Guid("acd63f4a-0cb5-4030-877e-0311702d3c63"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1386),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3031),
                             DefaultContextLength = 4096,
                             Description = "GPT Image 图片生成模型",
                             Enable = true,
@@ -1758,10 +1761,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("151c26e8-9af7-4aa1-a50a-dd1ec0704a6e"),
+                            Id = new Guid("349e7d9a-619b-4246-b7ef-38eade74e234"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1387),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3032),
                             DefaultContextLength = 4096,
                             Description = "Embedding 2 嵌入模型",
                             Enable = true,
@@ -1777,10 +1780,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("a28687a4-eb31-49d0-90c2-caf6030c5077"),
+                            Id = new Guid("f52ca7de-2d77-40de-b542-e3763b22edf1"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1388),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3032),
                             DefaultContextLength = 4096,
                             Description = "Embedding BERT 512 v1 嵌入模型",
                             Enable = true,
@@ -1796,10 +1799,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("9692eacf-b7a3-47e6-bcaa-fc5075251278"),
+                            Id = new Guid("34f746c2-f951-4cb9-a884-4329ebc585e9"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1389),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3034),
                             DefaultContextLength = 4096,
                             Description = "Embedding S1 v1 嵌入模型",
                             Enable = true,
@@ -1814,10 +1817,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("1fba2301-f9d2-43e4-9317-792d476d3b0a"),
+                            Id = new Guid("5873e79d-2f3f-4113-8ce9-5db99895f486"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1390),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3035),
                             DefaultContextLength = 4096,
                             Description = "GLM 3 Turbo 文本模型",
                             Enable = true,
@@ -1833,10 +1836,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("0d3eca64-d9c8-42ef-9b7b-4495822ce6d5"),
+                            Id = new Guid("00d2ae44-95b1-4508-81e6-efb954f7ae70"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1391),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3036),
                             DefaultContextLength = 4096,
                             Description = "GLM 4 文本模型",
                             Enable = true,
@@ -1852,10 +1855,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("4d198047-5d4b-44a9-bd67-6ad4163a5027"),
+                            Id = new Guid("6ae9313b-be10-44c6-973d-131cc47d0c93"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1392),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3036),
                             DefaultContextLength = 4096,
                             Description = "GLM 4 全部文本模型",
                             Enable = true,
@@ -1871,10 +1874,10 @@ namespace Thor.Provider.MySql.Thor
                         },
                         new
                         {
-                            Id = new Guid("b077e88f-9479-42bc-826f-9e6dadc6ccec"),
+                            Id = new Guid("52e78d31-69d2-49d0-8f77-c0af7efb36a9"),
                             Available = true,
                             ContextPricingTiers = "[]",
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 151, DateTimeKind.Local).AddTicks(1393),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 900, DateTimeKind.Local).AddTicks(3037),
                             DefaultContextLength = 4096,
                             Description = "GLM 4v 文本模型",
                             Enable = true,
@@ -1894,31 +1897,31 @@ namespace Thor.Provider.MySql.Thor
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Group")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("ModelId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ModelMapItems")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1930,36 +1933,36 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.Product", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("Price")
-                        .HasColumnType("decimal(65,30)");
+                        .HasColumnType("numeric");
 
                     b.Property<long>("RemainQuota")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Stock")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1969,43 +1972,43 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.ProductPurchaseRecord", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("ProductId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("PurchaseTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<long>("RemainQuota")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2019,51 +2022,51 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.RateLimitModel", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("BlackList")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Enable")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Limit")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Model")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Strategy")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("Value")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("WhiteList")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2078,45 +2081,45 @@ namespace Thor.Provider.MySql.Thor
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Disabled")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("Quota")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("RedeemedTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("RedeemedUserId")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("RedeemedUserName")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("State")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2128,18 +2131,18 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.Setting", b =>
                 {
                     b.Property<string>("Key")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("Private")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Value")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.HasKey("Key");
 
@@ -2417,17 +2420,17 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.SubscriptionPlan", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("AllowedModels")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("DailyQuotaLimit")
                         .HasColumnType("bigint");
@@ -2435,42 +2438,39 @@ namespace Thor.Provider.MySql.Thor
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<string>("Groups")
-                        .HasColumnType("longtext");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Icon")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Level")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Sort")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Tag")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("Type")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<long>("WeeklyQuotaLimit")
                         .HasColumnType("bigint");
@@ -2490,7 +2490,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = "plan-basic-monthly",
                             AllowedModels = "[\"gpt-3.5-turbo\",\"claude-3-haiku\"]",
-                            CreatedAt = new DateTime(2025, 9, 28, 19, 4, 42, 112, DateTimeKind.Utc).AddTicks(59),
+                            CreatedAt = new DateTime(2025, 9, 28, 10, 30, 54, 868, DateTimeKind.Utc).AddTicks(1690),
                             DailyQuotaLimit = 500L,
                             Description = "适合轻度使用者，包含基础AI模型访问权限",
                             IsActive = true,
@@ -2505,7 +2505,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = "plan-premium-monthly",
                             AllowedModels = "[\"gpt-3.5-turbo\",\"gpt-4\",\"gpt-4-turbo\",\"claude-3-sonnet\",\"claude-3-haiku\"]",
-                            CreatedAt = new DateTime(2025, 9, 28, 19, 4, 42, 112, DateTimeKind.Utc).AddTicks(260),
+                            CreatedAt = new DateTime(2025, 9, 28, 10, 30, 54, 868, DateTimeKind.Utc).AddTicks(1838),
                             DailyQuotaLimit = 2000L,
                             Description = "包含GPT-4和Claude等高级模型，适合专业用户",
                             IsActive = true,
@@ -2521,7 +2521,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = "plan-enterprise-monthly",
                             AllowedModels = "[\"gpt-3.5-turbo\",\"gpt-4\",\"gpt-4-turbo\",\"gpt-5-codex\",\"claude-3-opus\",\"claude-3-sonnet\",\"claude-3-haiku\"]",
-                            CreatedAt = new DateTime(2025, 9, 28, 19, 4, 42, 112, DateTimeKind.Utc).AddTicks(266),
+                            CreatedAt = new DateTime(2025, 9, 28, 10, 30, 54, 868, DateTimeKind.Utc).AddTicks(1844),
                             DailyQuotaLimit = 5000L,
                             Description = "包含最新GPT-5-Codex等顶级模型，无限制使用",
                             IsActive = true,
@@ -2537,7 +2537,7 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = "plan-premium-yearly",
                             AllowedModels = "[\"gpt-3.5-turbo\",\"gpt-4\",\"gpt-4-turbo\",\"claude-3-sonnet\",\"claude-3-haiku\"]",
-                            CreatedAt = new DateTime(2025, 9, 28, 19, 4, 42, 112, DateTimeKind.Utc).AddTicks(271),
+                            CreatedAt = new DateTime(2025, 9, 28, 10, 30, 54, 868, DateTimeKind.Utc).AddTicks(1848),
                             DailyQuotaLimit = 2000L,
                             Description = "年付享受8折优惠，包含GPT-4和Claude等高级模型",
                             IsActive = true,
@@ -2553,64 +2553,64 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.SubscriptionPurchaseRecord", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("OrderId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("PaymentStatus")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("PlanId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("PurchaseTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal?>("RefundAmount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("RefundTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Remarks")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("TransactionId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("ValidFrom")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime?>("ValidTo")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2631,65 +2631,65 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.SubscriptionQuotaUsage", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("ErrorMessage")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsSuccess")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ModelName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("QuotaUsed")
                         .HasColumnType("bigint");
 
                     b.Property<string>("RequestId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("RequestIp")
                         .HasMaxLength(45)
-                        .HasColumnType("varchar(45)");
+                        .HasColumnType("character varying(45)");
 
                     b.Property<int>("RequestTokens")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ResponseTokens")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("SubscriptionId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<int>("TotalTokens")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("UsageTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserAgent")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2707,68 +2707,68 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.SubscriptionUpgrade", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("ActualPayAmount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("FromPlanId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FromSubscriptionId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("NewEndDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("NewStartDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("NewSubscriptionId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("PaymentRecordId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<int>("RemainingDays")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("RemainingValue")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Remarks")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("TargetPrice")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ToPlanId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("UpgradeTime")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2792,47 +2792,47 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.User", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Avatar")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("ConsumeToken")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Groups")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsDelete")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDisabled")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("Password")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("PasswordHas")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("RequestCount")
                         .HasColumnType("bigint");
@@ -2842,14 +2842,14 @@ namespace Thor.Provider.MySql.Thor
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserName")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2860,13 +2860,13 @@ namespace Thor.Provider.MySql.Thor
                         {
                             Id = "CA378C74-19E7-458A-918B-4DBB7AE1729D",
                             ConsumeToken = 0L,
-                            CreatedAt = new DateTime(2025, 9, 29, 3, 4, 42, 91, DateTimeKind.Local).AddTicks(6599),
+                            CreatedAt = new DateTime(2025, 9, 28, 18, 30, 54, 852, DateTimeKind.Local).AddTicks(4957),
                             Email = "239573049@qq.com",
                             Groups = "[\"default\",\"vip\"]",
                             IsDelete = false,
                             IsDisabled = false,
-                            Password = "b85b6fd284bd0af0f9612fa86d7f3500",
-                            PasswordHas = "9aa83db904ba4c5eafda03267285d236",
+                            Password = "1147cfcbb29fb6e81fd3009dae2de3b9",
+                            PasswordHas = "88f89dba231a40e9a576f35cf6d6d1e0",
                             RequestCount = 0L,
                             ResidualCredit = 1000000000L,
                             Role = "admin",
@@ -2877,51 +2877,51 @@ namespace Thor.Provider.MySql.Thor
             modelBuilder.Entity("Thor.Service.Domain.UserSubscription", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("AutoRenew")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Creator")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<long>("DailyUsedQuota")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime>("EndDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("LastDailyResetDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("LastWeeklyResetDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Modifier")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<string>("PlanId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<string>("PurchaseRecordId")
-                        .HasColumnType("longtext");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("text");
 
                     b.Property<long>("WeeklyUsedQuota")
                         .HasColumnType("bigint");

@@ -11,7 +11,7 @@ import {
   NavigationMenuTrigger,
 } from '../ui/navigation-menu';
 import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet';
-import { Menu, X, Zap, FileText, DollarSign, User, LogOut } from 'lucide-react';
+import { Menu, X, Zap, FileText, DollarSign, User, LogOut, Crown, ArrowUp, Receipt } from 'lucide-react';
 import { SimpleLanguageToggle } from '../language-toggle-simple';
 import { ThemeToggleDropdown } from '../theme-toggle-dropdown';
 
@@ -71,6 +71,12 @@ export function HeaderNavigation({ className }: HeaderNavigationProps) {
       href: '/model',
       icon: <DollarSign className="w-4 h-4" />,
       description: '查看所有AI模型的定价详情'
+    },
+    {
+      label: '套餐购买',
+      href: '/subscription',
+      icon: <Crown className="w-4 h-4" />,
+      description: '选择适合您的AI模型访问套餐'
     },
     {
       label: '文档',

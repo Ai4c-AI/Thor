@@ -83,3 +83,12 @@ export const GetEmailCode = (email: string) => {
 export const getSimpleList = () => {
     return get(prefix + '/simple-list');
 }
+
+/**
+ * 根据用户名查找用户信息
+ * @param userName 用户名
+ * @returns 用户信息
+ */
+export const getUserByUserName = (userName: string) => {
+    return get(prefix + `/lookup/${userName}`);
+}
