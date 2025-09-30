@@ -47,7 +47,7 @@ interface UserSubscription {
   planId: string;
   startDate: string;
   endDate: string;
-  status: 'Active' | 'Expired' | 'Cancelled';
+  status: 0 | 1 | 2 | 3 | 4; // 0=Pending, 1=Active, 2=Expired, 3=Cancelled, 4=Suspended
   plan: SubscriptionPlan;
   currentDailyUsage: number;
   currentWeeklyUsage: number;
@@ -155,24 +155,57 @@ export default function SubscriptionHistoryPage() {
     }
   }
 
-  function getStatusBadge(status: string, type: 'subscription' | 'payment' | 'upgrade') {
-    const variants: Record<string, { variant: any; text: string; icon?: any }> = {
-      // 订阅状态
-      Active: { variant: 'default', text: '有效', icon: CheckCircle },
-      Expired: { variant: 'secondary', text: '已过期', icon: Clock },
-      Cancelled: { variant: 'destructive', text: '已取消', icon: XCircle },
-
-      // 支付状态
-      Pending: { variant: 'outline', text: '待支付', icon: Clock },
-      Paid: { variant: 'default', text: '已支付', icon: CheckCircle },
-      Failed: { variant: 'destructive', text: '支付失败', icon: XCircle },
-      Refunded: { variant: 'secondary', text: '已退款', icon: RefreshCw },
-
-      // 升级状态
-      Completed: { variant: 'default', text: '已完成', icon: CheckCircle }
+  function getStatusBadge(status: number | string, type: 'subscription' | 'payment' | 'upgrade') {
+    // 支付状态映射
+    const paymentStatusMap: Record<string, number> = {
+      'Pending': 10,
+      'Paid': 11,
+      'Failed': 12,
+      'Cancelled': 12,
+      'Refunded': 13
     };
 
-    const config = variants[status] || { variant: 'outline', text: status };
+    // 升级状态映射
+    const upgradeStatusMap: Record<string, number> = {
+      'Pending': 10,
+      'Completed': 20,
+      'Failed': 12,
+      'Cancelled': 12
+    };
+
+    // 转换字符串状态为数字
+    let numericStatus: number;
+    if (typeof status === 'string') {
+      if (type === 'payment') {
+        numericStatus = paymentStatusMap[status] || 10;
+      } else if (type === 'upgrade') {
+        numericStatus = upgradeStatusMap[status] || 10;
+      } else {
+        numericStatus = 0;
+      }
+    } else {
+      numericStatus = status;
+    }
+
+    const variants: Record<number, { variant: any; text: string; icon?: any }> = {
+      // 订阅状态
+      0: { variant: 'outline', text: '待激活', icon: Clock },
+      1: { variant: 'default', text: '有效', icon: CheckCircle },
+      2: { variant: 'secondary', text: '已过期', icon: Clock },
+      3: { variant: 'destructive', text: '已取消', icon: XCircle },
+      4: { variant: 'secondary', text: '已暂停', icon: RefreshCw },
+
+      // 支付状态
+      10: { variant: 'outline', text: '待支付', icon: Clock },
+      11: { variant: 'default', text: '已支付', icon: CheckCircle },
+      12: { variant: 'destructive', text: '支付失败', icon: XCircle },
+      13: { variant: 'secondary', text: '已退款', icon: RefreshCw },
+
+      // 升级状态
+      20: { variant: 'default', text: '已完成', icon: CheckCircle }
+    };
+
+    const config = variants[numericStatus] || { variant: 'outline', text: String(status), icon: undefined };
     const Icon = config.icon;
 
     return (
@@ -328,7 +361,9 @@ export default function SubscriptionHistoryPage() {
                           <TableCell>¥{record.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {record.paymentMethod === 'alipay' ? '支付宝' : record.paymentMethod}
+                              {record.paymentMethod === 'alipay' ? '支付宝' :
+                               record.paymentMethod === 'gift' ? '赠送' :
+                               record.paymentMethod}
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(record.purchaseTime)}</TableCell>

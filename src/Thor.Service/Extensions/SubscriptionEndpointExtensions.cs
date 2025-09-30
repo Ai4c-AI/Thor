@@ -373,7 +373,7 @@ public static class SubscriptionEndpointExtensions
 
         // 获取额度使用统计
         subscriptionAdmin.MapGet("usage-stats",
-                async (IThorContext dbContext, SubscriptionService service, string? userId = null,
+                async (IThorContext dbContext, string? userId = null,
                     DateTime? startDate = null, DateTime? endDate = null) =>
                 {
                     var query = dbContext.SubscriptionQuotaUsages

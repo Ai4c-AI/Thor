@@ -142,6 +142,7 @@ try
         .AddScoped<IEventHandler<ImageTaskLogger>, ImageTaskLoggerEventHandler>()
         .AddScoped<IEventHandler<CreateUserEto>, CreateUserEventHandler>()
         .AddScoped<IEventHandler<UpdateModelManagerCache>, ModelManagerEventHandler>()
+        .AddScoped<IEventHandler<SubscriptionQuotaUsageEto>, SubscriptionQuotaUsageEventHandler>()
         .AddTransient<JwtHelper>()
         .AddSingleton<OpenTelemetryMiddlewares>()
         .AddSingleton<UnitOfWorkMiddleware>()

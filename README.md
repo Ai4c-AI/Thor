@@ -25,7 +25,7 @@
 ## 📈 Data Visualization
 
 ![Data Statistics Preview](https://github.com/user-attachments/assets/eb508d89-6834-4064-95c2-937c939ddbd7)
-
+usage-stats
 ## 📋 Feature Overview
 
 ### Core Features

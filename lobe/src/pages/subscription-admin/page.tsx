@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { MoreHorizontal, Plus, Edit, Trash2, Settings, Users, Receipt, TrendingUp, Gift } from "lucide-react";
+import { MoreHorizontal, Plus, Edit, Trash2, Settings, Users, Receipt, TrendingUp, Gift, CheckCircle, XCircle, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import CreateSubscriptionPlan from "./features/CreateSubscriptionPlan";
 import UpdateSubscriptionPlan from "./features/UpdateSubscriptionPlan";
@@ -56,7 +56,7 @@ interface UserSubscription {
   planId: string;
   startDate: string;
   endDate: string;
-  status: 'Active' | 'Expired' | 'Cancelled';
+  status: 0 | 1 | 2 | 3 | 4; // 0=Pending, 1=Active, 2=Expired, 3=Cancelled, 4=Suspended
   plan: SubscriptionPlan;
   user: { userName: string };
 }
@@ -67,7 +67,7 @@ interface PurchaseRecord {
   planId: string;
   amount: number;
   paymentMethod: string;
-  paymentStatus: 'Pending' | 'Paid' | 'Failed' | 'Cancelled' | 'Refunded';
+  paymentStatus: 0 | 1 | 2 | 3 | 4; // 0=Pending, 1=Paid, 2=Failed, 3=Cancelled, 4=Refunded
   purchaseTime: string;
   paidTime?: string;
   plan: SubscriptionPlan;
@@ -200,22 +200,43 @@ export default function SubscriptionAdminPage() {
     }
   }
 
-  function getStatusBadge(status: string, type: 'subscription' | 'payment') {
-    const variants: Record<string, { variant: any; text: string }> = {
-      // 订阅状态
-      Active: { variant: 'default', text: '有效' },
-      Expired: { variant: 'secondary', text: '已过期' },
-      Cancelled: { variant: 'destructive', text: '已取消' },
-
-      // 支付状态
-      Pending: { variant: 'outline', text: '待支付' },
-      Paid: { variant: 'default', text: '已支付' },
-      Failed: { variant: 'destructive', text: '支付失败' },
-      Refunded: { variant: 'secondary', text: '已退款' }
+  function getStatusBadge(status: number, type: 'subscription' | 'payment') {
+    const variants: Record<number, { variant: any; text: string; icon?: any }> = {
+      // 订阅状态 (0-4)
+      0: { variant: 'outline', text: '待激活', icon: Clock },
+      1: { variant: 'default', text: '有效', icon: CheckCircle },
+      2: { variant: 'secondary', text: '已过期', icon: Clock },
+      3: { variant: 'destructive', text: '已取消', icon: XCircle },
+      4: { variant: 'secondary', text: '已暂停', icon: RefreshCw }
     };
 
-    const config = variants[status] || { variant: 'outline', text: status };
-    return <Badge variant={config.variant}>{config.text}</Badge>;
+    // 支付状态映射 (使用不同的数字范围避免冲突)
+    if (type === 'payment') {
+      const paymentVariants: Record<number, { variant: any; text: string; icon?: any }> = {
+        0: { variant: 'outline', text: '待支付', icon: Clock },
+        1: { variant: 'default', text: '已支付', icon: CheckCircle },
+        2: { variant: 'destructive', text: '支付失败', icon: XCircle },
+        3: { variant: 'destructive', text: '已取消', icon: XCircle },
+        4: { variant: 'secondary', text: '已退款', icon: RefreshCw }
+      };
+      const config = paymentVariants[status] || { variant: 'outline', text: String(status), icon: undefined };
+      const Icon = config.icon;
+      return (
+        <Badge variant={config.variant} className="flex items-center gap-1">
+          {Icon && <Icon className="h-3 w-3" />}
+          {config.text}
+        </Badge>
+      );
+    }
+
+    const config = variants[status] || { variant: 'outline', text: String(status), icon: undefined };
+    const Icon = config.icon;
+    return (
+      <Badge variant={config.variant} className="flex items-center gap-1">
+        {Icon && <Icon className="h-3 w-3" />}
+        {config.text}
+      </Badge>
+    );
   }
 
   useMemo(() => {
@@ -452,7 +473,9 @@ export default function SubscriptionAdminPage() {
                           <TableCell>¥{purchase.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {purchase.paymentMethod === 'alipay' ? '支付宝' : purchase.paymentMethod}
+                              {purchase.paymentMethod === 'alipay' ? '支付宝' :
+                               purchase.paymentMethod === 'gift' ? '赠送' :
+                               purchase.paymentMethod}
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(purchase.purchaseTime)}</TableCell>

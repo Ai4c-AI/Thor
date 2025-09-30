@@ -59,7 +59,7 @@ interface UserSubscription {
   planId: string;
   startDate: string;
   endDate: string;
-  status: 'Active' | 'Expired' | 'Cancelled';
+  status: 1 | 2 | 3; // 1=Active, 2=Expired, 3=Cancelled
   plan: SubscriptionPlan;
   dailyUsedQuota: number;
   weeklyUsedQuota: number;
@@ -235,8 +235,8 @@ export default function SubscriptionPage() {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">状态</div>
-                <Badge variant={currentSubscription.status === 'Active' ? 'default' : 'secondary'}>
-                  {currentSubscription.status === 'Active' ? '有效' : '已过期'}
+                <Badge variant={currentSubscription.status === 1? 'default' : 'secondary'}>
+                  {currentSubscription.status === 1 ? '有效' : '已过期'}
                 </Badge>
               </div>
             </div>
