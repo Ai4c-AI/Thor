@@ -24,6 +24,7 @@ public sealed class LoggerService(
     /// <summary>
     /// 创建消费日志
     /// </summary>
+    /// <param name="url"></param>
     /// <param name="content"></param>
     /// <param name="model"></param>
     /// <param name="promptTokens"></param>

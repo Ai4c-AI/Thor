@@ -1,7 +1,7 @@
-using System.Text.Json.Serialization;
+using Thor.Service.Domain;
 using Thor.Service.Domain.Core;
 
-namespace Thor.Service.Domain;
+namespace Thor.Domain.System;
 
 /// <summary>
 /// 用户套餐订阅
@@ -34,12 +34,12 @@ public class UserSubscription : Entity<string>
     public SubscriptionStatus Status { get; set; }
 
     /// <summary>
-    /// 当日已使用额度（美分）
+    /// 当日已使用额度（计费）
     /// </summary>
     public long DailyUsedQuota { get; set; }
 
     /// <summary>
-    /// 当周已使用额度（美分）
+    /// 当周已使用额度（计费）
     /// </summary>
     public long WeeklyUsedQuota { get; set; }
 

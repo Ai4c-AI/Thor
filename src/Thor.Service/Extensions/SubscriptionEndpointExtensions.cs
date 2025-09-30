@@ -338,7 +338,7 @@ public static class SubscriptionEndpointExtensions
                         .Take(pageSize)
                         .ToListAsync();
 
-                    return Results.Ok(new { items, total, page, pageSize });
+                    return new { items, total, page, pageSize };
                 })
             .WithDescription("获取用户订阅列表")
             .WithName("获取用户订阅列表");

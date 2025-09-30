@@ -355,16 +355,16 @@ export default function SubscriptionUpgradePage() {
                     </CardContent>
                   </Card>
                 ) : calculation ? (
-                  <Card className="bg-green-50 border-green-200">
+                  <Card >
                     <CardContent className="p-4">
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-sm">目标价格:</span>
-                          <span className="font-medium">¥{calculation.targetPrice.toFixed(2)}</span>
+                          <span className="font-medium">¥{calculation.targetPrice?.toFixed(2) || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm">剩余价值抵扣:</span>
-                          <span className="font-medium text-green-600">-¥{calculation.remainingValue.toFixed(2)}</span>
+                          <span className="font-medium text-green-600">-¥{calculation.remainingValue?.toFixed(2) || 'N/A'}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between items-center">
@@ -373,7 +373,7 @@ export default function SubscriptionUpgradePage() {
                             {calculation.actualPayAmount === 0 ? (
                               <span className="text-green-600">免费升级</span>
                             ) : (
-                              `¥${calculation.actualPayAmount.toFixed(2)}`
+                              `¥${calculation.actualPayAmount?.toFixed(2) || 'N/A'}`
                             )}
                           </span>
                         </div>

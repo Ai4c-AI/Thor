@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Thor.Domain.Chats;
+using Thor.Domain.System;
 using Thor.Domain.Users;
 using Thor.Service.Domain;
 

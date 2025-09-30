@@ -7,6 +7,7 @@ using Thor.Abstractions.Responses;
 using Thor.Abstractions.Responses.Dto;
 using Thor.Abstractions.Responses.Input;
 using Thor.Domain.Chats;
+using Thor.Domain.System;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
@@ -128,6 +129,7 @@ public sealed class ResponsesService(
 
         var rateLimit = 0;
         Exception? exception = null;
+        bool header = false;
 
         // 用于限流重试，如果限流则重试并且进行重新负载均衡计算
         limitGoto:
@@ -142,7 +144,40 @@ public sealed class ResponsesService(
 
             if (ModelManagerService.PromptRate.TryGetValue(request.Model, out var rate))
             {
-                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+                // 首先不检查Token额度获取用户信息，以便检查套餐状态
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate, false);
+
+                // 检查用户是否有套餐，获取套餐分组信息
+                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+                bool hasValidSubscription =
+                    subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model);
+
+                // 如果没有有效套餐支持该模型，则需要检查Token额度和用户余额
+                if (!hasValidSubscription)
+                {
+                    // 重新进行完整的Token检查（包括Token额度）
+                    (token, user) = await tokenService.CheckTokenAsync(context, rate, true);
+                }
+                else
+                {
+                    // 请求前先校验套餐额度当天是否充足
+                    if (subscription!.Plan!.DailyQuotaLimit > 0 &&
+                        subscription.DailyUsedQuota >= subscription.Plan.DailyQuotaLimit)
+                    {
+                        context.Response.StatusCode = 402;
+                        await context.WriteErrorAsync("当前套餐日额度已用尽，请明天再试或升级套餐", "402");
+                        return;
+                    }
+
+                    // 请求前先校验套餐额度每周是否充足
+                    if (subscription!.Plan!.WeeklyQuotaLimit > 0 &&
+                        subscription.WeeklyUsedQuota >= subscription.Plan.WeeklyQuotaLimit)
+                    {
+                        context.Response.StatusCode = 402;
+                        await context.WriteErrorAsync("当前套餐周额度已用尽，请下周再试或升级套餐", "402");
+                        return;
+                    }
+                }
 
                 await rateLimitModelService.CheckAsync(request.Model, user.Id);
 
@@ -150,12 +185,10 @@ public sealed class ResponsesService(
 
                 request.Model = await modelMapService.ModelMap(request.Model);
 
-                // 检查用户是否有套餐，获取套餐分组信息
-                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
                 string[]? subscriptionGroups = null;
-                if (subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model))
+                if (hasValidSubscription)
                 {
-                    subscriptionGroups = subscription.Plan.Groups;
+                    subscriptionGroups = subscription!.Plan!.Groups;
                 }
 
                 // 获取渠道通过算法计算权重（优先使用套餐分组）
@@ -197,27 +230,31 @@ public sealed class ResponsesService(
                 int requestToken;
                 var responseToken = 0;
                 int? cachedTokens = null;
-                bool usedSubscription = false;
 
                 var sw = Stopwatch.StartNew();
+
+                // 如果使用套餐额度，添加响应头
+                if (hasValidSubscription && !header)
+                {
+                    AddSubscriptionUsageHeaders(context, subscription!);
+                    header = true;
+                }
 
                 if (request.Stream == true)
                 {
                     using var activity =
                         Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens, usedSubscription) =
-                        await StreamHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate);
+                    (requestToken, responseToken, cachedTokens) =
+                        await StreamHandlerAsync(context, request, channel, chatCompletionsService);
                 }
                 else
                 {
                     using var activity =
                         Activity.Current?.Source.StartActivity("非流式对话", ActivityKind.Internal);
 
-                    (requestToken, responseToken, cachedTokens, usedSubscription) =
-                        await ChatHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate);
+                    (requestToken, responseToken, cachedTokens) =
+                        await ChatHandlerAsync(context, request, channel, chatCompletionsService);
                 }
 
                 var quota = requestToken * rate.PromptRate;
@@ -239,9 +276,14 @@ public sealed class ResponsesService(
                     // 如果命中缓存 并且缓存倍率大于0 小于0则不计算缓存
                     if (cachedTokens > 0 && rate.CacheRate > 0)
                     {
-                        // 如果命中缓存充值quota
-                        quota = requestToken * rate.CacheRate.Value;
+                        // 未命中缓存的token按原价计费
+                        var uncachedRequestTokens = requestToken - cachedTokens.Value;
+                        quota = uncachedRequestTokens * rate.PromptRate;
 
+                        // 命中缓存的token按缓存价格计费
+                        quota += cachedTokens.Value * rate.CacheRate.Value;
+
+                        // 响应token按缓存价格计费
                         quota += responseToken * rate.CacheRate.Value * completionRatio;
 
                         // 计算分组倍率
@@ -254,7 +296,7 @@ public sealed class ResponsesService(
                         var content = string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio,
                             userGroup.Rate,
                             cachedTokens, rate.CacheRate);
-                        if (usedSubscription)
+                        if (hasValidSubscription)
                         {
                             var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
                             if (userSubscription?.Plan != null)
@@ -279,7 +321,7 @@ public sealed class ResponsesService(
                     {
                         // 准备内容，记录是否使用套餐
                         var content = string.Format(ConsumerTemplate, rate.PromptRate, completionRatio, userGroup.Rate);
-                        if (usedSubscription)
+                        if (hasValidSubscription)
                         {
                             var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
                             if (userSubscription?.Plan != null)
@@ -299,17 +341,17 @@ public sealed class ResponsesService(
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                             request.Stream is true,
                             (int)sw.ElapsedMilliseconds, organizationId);
-
-                        await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
-                            usedSubscription, token?.Key, channel.Id, context);
                     }
+
+                    await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
+                        hasValidSubscription, token?.Key, channel.Id, context);
                 }
                 else
                 {
                     // 准备内容，记录是否使用套餐
                     var content = string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
                         userGroup.Rate);
-                    if (usedSubscription)
+                    if (hasValidSubscription)
                     {
                         var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
                         if (userSubscription?.Plan != null)
@@ -333,8 +375,9 @@ public sealed class ResponsesService(
                         request.Stream is true,
                         (int)sw.ElapsedMilliseconds, organizationId);
 
-                    await ConsumeQuotaAsync(user!, model, (long)rate.PromptRate, requestToken, responseToken,
-                        usedSubscription, token?.Key, channel.Id, context);
+                    await ConsumeQuotaAsync(user!, model, (int)((int)rate.PromptRate * (decimal)userGroup.Rate),
+                        requestToken, responseToken,
+                        hasValidSubscription, token?.Key, channel.Id, context);
                 }
             }
             else
@@ -406,281 +449,44 @@ public sealed class ResponsesService(
         }
     }
 
-    private async Task<(int requestToken, int responseToken, int? cachedTokens, bool usedSubscription)>
+    private async Task<(int requestToken, int responseToken, int? cachedTokens)>
         ChatHandlerAsync(HttpContext context,
-            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
-            ModelManager rate)
+            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService)
     {
         int requestToken = 0;
         int responseToken = 0;
 
         // 命中缓存tokens数量
         int? cachedTokens = null;
-        bool usedSubscription = false;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
-        ResponsesDto result = null;
-
-        var quota = requestToken * rate.PromptRate;
-
-        // 检查额度（优先使用套餐额度）
-        var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-            await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
-        if (!quotaSuccess)
-        {
-            throw new InsufficientQuotaException(quotaErrorMessage!);
-        }
-
-        usedSubscription = quotaUsedSubscription;
-
-        result = await responsesService.GetResponseAsync(request, platformOptions);
+        var result = await responsesService.GetResponseAsync(request, platformOptions);
 
         await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
 
         cachedTokens = result?.Usage?.InputTokensDetails?.CachedTokens;
-        
+
         requestToken = result?.Usage?.InputTokens ?? 0;
 
         responseToken = result?.Usage?.OutputTokens ?? 0;
 
 
-        // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
-        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
-        // {
-        //     requestToken = TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
-        //         .SelectMany(x => x.Contents)
-        //         .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
-        //
-        //     requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
-        //         .Select(x => x.Content).ToArray());
-        //
-        //     // 解析图片
-        //     foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
-        //                  .Where(x => x.Type is "input_image"))
-        //     {
-        //         var imageUrl = message.ImageUrl;
-        //         if (imageUrl != null)
-        //         {
-        //             try
-        //             {
-        //                 var imageTokens = await CountImageTokens(message.ImageUrl, "low");
-        //                 requestToken += imageTokens.Item1;
-        //             }
-        //             catch (Exception ex)
-        //             {
-        //                 GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-        //             }
-        //         }
-        //     }
-        //
-        //     var quota = requestToken * rate.PromptRate;
-        //
-        //     // 检查额度（优先使用套餐额度）
-        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
-        //     if (!quotaSuccess)
-        //     {
-        //         throw new InsufficientQuotaException(quotaErrorMessage!);
-        //     }
-        //
-        //     usedSubscription = quotaUsedSubscription;
-        //
-        //     result = await responsesService.GetResponseAsync(request, platformOptions);
-        //
-        //     await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
-        //
-        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        //     {
-        //         requestToken = result.Usage.InputTokens;
-        //     }
-        //
-        //     // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
-        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-        //     {
-        //         responseToken = result.Usage.OutputTokens;
-        //     }
-        //     else
-        //     {
-        //         responseToken =
-        //             TokenHelper.GetTotalTokens(
-        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-        //     }
-        // }
-        // else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        // {
-        //     requestToken =
-        //         TokenHelper.GetTotalTokens(result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ??
-        //                                    []);
-        //
-        //     var quota = requestToken * rate.PromptRate;
-        //
-        //     // 检查额度（优先使用套餐额度）
-        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
-        //     if (!quotaSuccess)
-        //     {
-        //         throw new InsufficientQuotaException(quotaErrorMessage!);
-        //     }
-        //
-        //     usedSubscription = quotaUsedSubscription;
-        //
-        //     result = await responsesService.GetResponseAsync(request, platformOptions);
-        //
-        //     await context.Response.WriteAsJsonAsync(result, ThorJsonSerializer.DefaultOptions);
-        //
-        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        //     {
-        //         requestToken = result.Usage.InputTokens;
-        //     }
-        //
-        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-        //     {
-        //         responseToken = result.Usage.OutputTokens;
-        //     }
-        //     else
-        //     {
-        //         responseToken =
-        //             TokenHelper.GetTotalTokens(
-        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-        //     }
-        // }
-        // else
-        // {
-        //     result = await responsesService.GetResponseAsync(request, platformOptions);
-        //
-        //     await context.Response.WriteAsJsonAsync(result);
-        //
-        //     if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        //     {
-        //         requestToken = result.Usage.InputTokens;
-        //     }
-        //
-        //     if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-        //     {
-        //         responseToken = result.Usage.OutputTokens;
-        //     }
-        //     else
-        //     {
-        //         responseToken =
-        //             TokenHelper.GetTotalTokens(
-        //                 result?.Output?.SelectMany(x => x.Content?.Select(x => x.Text)).ToArray() ?? []);
-        //     }
-        // }
-
-        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.Tools != null && request.Tools.Count != 0)
-        // {
-        //     requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Name))
-        //         .Select(x => x!.Name).ToArray());
-        //     requestToken += TokenHelper.GetTotalTokens(request.Tools
-        //         .Where(x => !string.IsNullOrEmpty(x?.Description))
-        //         .Select(x => x!.Description!).ToArray());
-        //     requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Type))
-        //         .Select(x => x!.Type!).ToArray());
-        // }
-
-        // if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        // {
-        //     requestToken = result.Usage.InputTokens;
-        // }
-        //
-        // if (result?.Usage?.InputTokensDetails?.CachedTokens > 0)
-        // {
-        //     cachedTokens = result.Usage.InputTokensDetails.CachedTokens;
-        // }
-
-        return (requestToken, responseToken, cachedTokens, usedSubscription);
+        return (requestToken, responseToken, cachedTokens);
     }
 
-    private async Task<(int requestToken, int responseToken, int? cachedTokens, bool usedSubscription)>
+    private async Task<(int requestToken, int responseToken, int? cachedTokens)>
         StreamHandlerAsync(HttpContext context,
-            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService, User? user,
-            ModelManager rate)
+            ResponsesInput request, ChatChannel channel, IThorResponsesService responsesService)
     {
         int requestToken = TokenHelper.GetTokens(request.Instructions ?? string.Empty);
         int responseToken = 0;
 
         // 命中缓存tokens数量
         int? cachedTokens = 0;
-        bool usedSubscription = false;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
-        // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
-        // if (rate.QuotaType == ModelQuotaType.OnDemand && request.IsMessageArray)
-        // {
-        //     requestToken += TokenHelper.GetTotalTokens(request?.Inputs.Where(x => x.IsMessageArray)
-        //         .SelectMany(x => x.Contents)
-        //         .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
-        //
-        //     requestToken += TokenHelper.GetTotalTokens(request.Inputs.Where(x => x.Contents == null)
-        //         .Select(x => x.Content).ToArray());
-        //
-        //     // 解析图片
-        //     foreach (var message in request.Inputs.Where(x => x.Contents != null).SelectMany(x => x.Contents)
-        //                  .Where(x => x.Type is "input_image"))
-        //     {
-        //         var imageUrl = message.ImageUrl;
-        //         if (imageUrl != null)
-        //         {
-        //             try
-        //             {
-        //                 var imageTokens = await CountImageTokens(message.ImageUrl, "low");
-        //                 requestToken += imageTokens.Item1;
-        //             }
-        //             catch (Exception ex)
-        //             {
-        //                 GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-        //             }
-        //         }
-        //     }
-        //
-        //     var quota = requestToken * rate.PromptRate;
-        //
-        //     // 检查额度（优先使用套餐额度）
-        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
-        //     if (!quotaSuccess)
-        //     {
-        //         throw new InsufficientQuotaException(quotaErrorMessage!);
-        //     }
-        //
-        //     usedSubscription = quotaUsedSubscription;
-        // }
-        // else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        // {
-        //     if (request?.Inputs != null)
-        //     {
-        //         requestToken += TokenHelper.GetTotalTokens(request?.Inputs?.Where(x => x.IsMessageArray)
-        //             .Where(x => x.Content != null)
-        //             .SelectMany(x => x.Contents)
-        //             .Where(x => x.Type == "input_text").Select(x => x.Text).ToArray());
-        //     }
-        //     else
-        //     {
-        //         requestToken += TokenHelper.GetTotalTokens(request?.Input);
-        //     }
-        //
-        //     var quota = requestToken * rate.PromptRate;
-        //
-        //     // 检查额度（优先使用套餐额度）
-        //     var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-        //         await CheckAndValidateQuotaAsync(user, request.Model, (long)quota);
-        //     if (!quotaSuccess)
-        //     {
-        //         throw new InsufficientQuotaException(quotaErrorMessage!);
-        //     }
-        //
-        //     usedSubscription = quotaUsedSubscription;
-        // }
-        var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-            await CheckAndValidateQuotaAsync(user, request.Model, (long)(requestToken * rate.PromptRate));
-        if (!quotaSuccess)
-        {
-            throw new InsufficientQuotaException(quotaErrorMessage!);
-        }
-
-        usedSubscription = quotaUsedSubscription;
         // 是否第一次输出
         bool isFirst = true;
         await foreach (var (@event, item) in responsesService.GetResponsesAsync(request, platformOptions))
@@ -727,17 +533,71 @@ public sealed class ResponsesService(
             await context.WriteAsEventStreamDataAsync(@event, item).ConfigureAwait(false);
         }
 
-        if (rate.QuotaType == ModelQuotaType.OnDemand && request.Tools != null && request.Tools.Count != 0)
-        {
-            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Name))
-                .Select(x => x!.Name).ToArray());
-            requestToken += TokenHelper.GetTotalTokens(request.Tools
-                .Where(x => !string.IsNullOrEmpty(x?.Description))
-                .Select(x => x!.Description!).ToArray());
-            requestToken += TokenHelper.GetTotalTokens(request.Tools.Where(x => !string.IsNullOrEmpty(x?.Type))
-                .Select(x => x!.Type!).ToArray());
-        }
+        return (requestToken, responseToken, cachedTokens);
+    }
 
-        return (requestToken, responseToken, cachedTokens, usedSubscription);
+    /// <summary>
+    /// 添加套餐使用情况的响应头信息
+    /// </summary>
+    /// <param name="context">HTTP上下文</param>
+    /// <param name="userSubscription">用户订阅信息</param>
+    private static void AddSubscriptionUsageHeaders(HttpContext context, UserSubscription userSubscription)
+    {
+        if (userSubscription?.Plan == null) return;
+
+        var now = DateTime.Now;
+        var plan = userSubscription.Plan;
+
+        // 计算日配额使用百分比
+        var dailyUsedPercent = plan.DailyQuotaLimit > 0
+            ? Math.Min(100, (int)Math.Round((double)userSubscription.DailyUsedQuota / plan.DailyQuotaLimit * 100))
+            : 0;
+
+        // 计算周配额使用百分比
+        var weeklyUsedPercent = plan.WeeklyQuotaLimit > 0
+            ? Math.Min(100, (int)Math.Round((double)userSubscription.WeeklyUsedQuota / plan.WeeklyQuotaLimit * 100))
+            : 0;
+
+        // 计算日重置时间（基于实际的 LastDailyResetDate 和重置逻辑）
+        // 重置条件：subscription.LastDailyResetDate.Date < now.Date
+        var nextDailyReset = userSubscription.LastDailyResetDate.Date < now.Date
+            ? now.Date // 如果已经需要重置，则当前就是重置时间
+            : now.Date.AddDays(1); // 否则下一个 UTC 日期 00:00:00
+        var dailyResetSeconds = (int)(nextDailyReset - now).TotalSeconds;
+
+        // 计算周重置时间（基于实际的 LastWeeklyResetDate 和重置逻辑）
+        // 重置条件：subscription.LastWeeklyResetDate.Date < GetWeekStart(now)
+        var currentWeekStart = GetWeekStart(now);
+        var nextWeeklyReset = userSubscription.LastWeeklyResetDate.Date < currentWeekStart
+            ? currentWeekStart // 如果已经需要重置，则当前周开始就是重置时间
+            : currentWeekStart.AddDays(7); // 否则下周一 00:00:00
+        var weeklyResetSeconds = (int)(nextWeeklyReset - now).TotalSeconds;
+
+        // 计算超过次要限制的百分比（如果日配额超过了周配额的日均值）
+        var dailyAverageLimit = plan.WeeklyQuotaLimit / 7.0;
+        var overSecondaryLimitPercent = dailyAverageLimit > 0
+            ? Math.Max(0,
+                (int)Math.Round((userSubscription.DailyUsedQuota - dailyAverageLimit) / dailyAverageLimit * 100))
+            : 0;
+
+        // 添加响应头
+        context.Response.Headers["x-codex-primary-used-percent"] = dailyUsedPercent.ToString();
+        context.Response.Headers["x-codex-secondary-used-percent"] = weeklyUsedPercent.ToString();
+        context.Response.Headers["x-codex-primary-window-minutes"] = "1440"; // 24小时 = 1440分钟
+        context.Response.Headers["x-codex-secondary-window-minutes"] = "10080"; // 7天 = 10080分钟
+        context.Response.Headers["x-codex-primary-reset-after-seconds"] = dailyResetSeconds.ToString();
+        context.Response.Headers["x-codex-secondary-reset-after-seconds"] = weeklyResetSeconds.ToString();
+        context.Response.Headers["x-codex-primary-over-secondary-limit-percent"] = overSecondaryLimitPercent.ToString();
+    }
+
+    /// <summary>
+    /// 获取周开始时间（周一）
+    /// </summary>
+    /// <param name="date"></param>
+    /// <returns></returns>
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        var days = (int)date.DayOfWeek == 0 ? 6 : (int)date.DayOfWeek - 1; // 周一为0
+        return date.Date.AddDays(-days);
     }
 }

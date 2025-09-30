@@ -87,8 +87,8 @@ export default function GiftSubscription({
 
     try {
       const result = await getUserByUserName(userName.trim());
-      if (result.success && result.value) {
-        setUserInfo(result.value);
+      if (result.success && result.data) {
+        setUserInfo(result.data || {});
         setUserNotFound(false);
       } else {
         setUserNotFound(true);

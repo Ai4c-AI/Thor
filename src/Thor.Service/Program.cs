@@ -90,8 +90,6 @@ try
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.Converters.Add(new JsonDateTimeConverter());
-        // 支持字符串
-        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 

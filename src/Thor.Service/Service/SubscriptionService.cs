@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Thor.BuildingBlocks.Event;
+using Thor.Domain.System;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Eto;
@@ -9,7 +10,11 @@ namespace Thor.Service.Service;
 /// <summary>
 /// 套餐订阅服务
 /// </summary>
-public class SubscriptionService(IServiceProvider serviceProvider, UserService userService, IEventBus<SubscriptionQuotaUsageEto> eventBus)
+public class SubscriptionService(
+    ILogger<SubscriptionService> logger,
+    IServiceProvider serviceProvider,
+    UserService userService,
+    IEventBus<SubscriptionQuotaUsageEto> eventBus)
     : ApplicationService(serviceProvider)
 {
     /// <summary>
@@ -150,7 +155,7 @@ public class SubscriptionService(IServiceProvider serviceProvider, UserService u
     /// 检查用户额度是否充足
     /// </summary>
     /// <param name="userId"></param>
-    /// <param name="requiredQuota">需要的额度（美分）</param>
+    /// <param name="requiredQuota">需要的额度（积分）</param>
     /// <returns></returns>
     public async Task<(bool HasSufficient, string? Reason)> CheckQuotaSufficientAsync(string userId, long requiredQuota)
     {
@@ -201,20 +206,26 @@ public class SubscriptionService(IServiceProvider serviceProvider, UserService u
         string? userAgent = null,
         string? requestId = null)
     {
-        var subscription = await GetUserActiveSubscriptionAsync(userId);
-        if (subscription?.Plan == null)
-            return false;
-
-        // 消费额度
-        subscription.ConsumeQuota(quotaUsed);
-
         // 更新订阅的使用量
-        await DbContext.UserSubscriptions.Where(x => x.Id == subscription.Id)
+        await DbContext.UserSubscriptions.Where(x => x.UserId == userId
+                                                     && x.Status == SubscriptionStatus.Active
+                                                     && x.EndDate > DateTime.UtcNow)
             .ExecuteUpdateAsync(x => x
                 .SetProperty(s => s.DailyUsedQuota, s => s.DailyUsedQuota + quotaUsed)
-                .SetProperty(s => s.WeeklyUsedQuota, s => subscription.WeeklyUsedQuota + quotaUsed));
+                .SetProperty(s => s.UserId, userId)
+                .SetProperty(s => s.WeeklyUsedQuota, s => s.WeeklyUsedQuota + quotaUsed));
 
-        await DbContext.SaveChangesAsync();
+        var subscription = await DbContext.UserSubscriptions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId
+                                      && x.Status == SubscriptionStatus.Active
+                                      && x.EndDate > DateTime.UtcNow);
+
+        if (subscription == null)
+        {
+            logger.LogWarning("User {UserId} has no active subscription when consuming quota.", userId);
+            return false;
+        }
 
         // 发送使用明细事件
         await eventBus.PublishAsync(new SubscriptionQuotaUsageEto

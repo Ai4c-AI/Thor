@@ -139,6 +139,21 @@ public sealed class TokenService(
     /// <exception cref="InsufficientQuotaException"></exception>
     public async ValueTask<(Token?, User)> CheckTokenAsync(HttpContext context, ModelManager value)
     {
+        return await CheckTokenAsync(context, value, true);
+    }
+
+    /// <summary>
+    ///     校验Token 是否有效
+    ///     可选择是否检验Token额度（仅对API Token有效）
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="value"></param>
+    /// <param name="checkTokenQuota">是否检查Token余额（仅对API Token）</param>
+    /// <returns></returns>
+    /// <exception cref="UnauthorizedAccessException"></exception>
+    /// <exception cref="InsufficientQuotaException"></exception>
+    public async ValueTask<(Token?, User)> CheckTokenAsync(HttpContext context, ModelManager value, bool checkTokenQuota)
+    {
         var key = context.Request.Headers.Authorization.ToString().Replace("Bearer ", "").Trim();
 
         if (string.IsNullOrEmpty(key))
@@ -208,8 +223,8 @@ public sealed class TokenService(
                 throw new UnauthorizedAccessException();
             }
 
-            // 余额不足
-            if (token is { UnlimitedQuota: false } && token.RemainQuota < requestQuota)
+            // 检查Token余额（只有在需要检查Token额度时才验证）
+            if (checkTokenQuota && token is { UnlimitedQuota: false } && token.RemainQuota < requestQuota)
             {
                 logger.LogWarning($"IP:{ip} Token 额度不足");
                 context.Response.StatusCode = 402;
@@ -231,6 +246,13 @@ public sealed class TokenService(
             logger.LogWarning("用户已禁用");
             context.Response.StatusCode = 401;
             throw new UnauthorizedAccessException("账号已禁用");
+        }
+
+        // 对于JWT用户，如果不需要检查Token额度，直接返回
+        // 注意：这里的checkTokenQuota主要影响API Token，对JWT用户影响的是用户余额检查
+        if (!checkTokenQuota && token == null) // JWT用户且不需要检查用户余额
+        {
+            return (token, user);
         }
 
         if (value.QuotaType == ModelQuotaType.ByCount)

@@ -33,12 +33,12 @@ public class SubscriptionPlan : Entity<string>
     public string[] AllowedModels { get; set; } = [];
 
     /// <summary>
-    /// 每日额度限制（美分）
+    /// 每日额度限制（积分）
     /// </summary>
     public long DailyQuotaLimit { get; set; }
 
     /// <summary>
-    /// 每周额度限制（美分）
+    /// 每周额度限制（积分）
     /// </summary>
     public long WeeklyQuotaLimit { get; set; }
 

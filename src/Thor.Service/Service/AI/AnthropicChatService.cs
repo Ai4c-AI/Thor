@@ -4,6 +4,7 @@ using System.Text.Json;
 using Thor.Abstractions.Anthropic;
 using Thor.Abstractions.Exceptions;
 using Thor.Domain.Chats;
+using Thor.Domain.System;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 using Thor.Service.Extensions;
@@ -34,7 +35,8 @@ public class AnthropicChatService(
     /// <param name="model">模型名称</param>
     /// <param name="quota">需要消费的额度</param>
     /// <returns>是否成功，使用的额度类型，错误信息，套餐分组</returns>
-    private async Task<(bool success, bool usedSubscription, string? errorMessage, string[]? subscriptionGroups)> CheckAndValidateQuotaAsync(User user, string model, long quota)
+    private async Task<(bool success, bool usedSubscription, string? errorMessage, string[]? subscriptionGroups)>
+        CheckAndValidateQuotaAsync(User user, string model, long quota)
     {
         // 1. 先检查用户是否有有效套餐
         var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
@@ -104,6 +106,7 @@ public class AnthropicChatService(
             await userService.ConsumeAsync(user.Id, quota, requestTokens, tokenKey, channelId, model);
         }
     }
+
     public async Task MessageAsync(HttpContext context, AnthropicInput request)
     {
         using var chatCompletions =
@@ -112,6 +115,7 @@ public class AnthropicChatService(
         var model = request.Model;
         Exception? lastException = null;
 
+        bool header = false;
         var rateLimit = 0;
 
         limitGoto:
@@ -131,7 +135,40 @@ public class AnthropicChatService(
             }
             else
             {
-                var (token, user) = await tokenService.CheckTokenAsync(context, rate);
+                // 首先不检查Token额度获取用户信息，以便检查套餐状态
+                var (token, user) = await tokenService.CheckTokenAsync(context, rate, false);
+
+                // 检查用户是否有套餐，获取套餐分组信息
+                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
+                bool hasValidSubscription =
+                    subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model);
+
+                // 如果没有有效套餐支持该模型，则需要检查Token额度和用户余额
+                if (!hasValidSubscription)
+                {
+                    // 重新进行完整的Token检查（包括Token额度）
+                    (token, user) = await tokenService.CheckTokenAsync(context, rate, true);
+                }
+                else
+                {
+                    // 请求前先校验套餐额度当天是否充足
+                    if (subscription!.Plan!.DailyQuotaLimit > 0 &&
+                        subscription.DailyUsedQuota >= subscription.Plan.DailyQuotaLimit)
+                    {
+                        context.Response.StatusCode = 402;
+                        await context.WriteErrorAsync("当前套餐日额度已用尽，请明天再试或升级套餐", "402");
+                        return;
+                    }
+
+                    // 请求前先校验套餐额度每周是否充足
+                    if (subscription!.Plan!.WeeklyQuotaLimit > 0 &&
+                        subscription.WeeklyUsedQuota >= subscription.Plan.WeeklyQuotaLimit)
+                    {
+                        context.Response.StatusCode = 402;
+                        await context.WriteErrorAsync("当前套餐周额度已用尽，请下周再试或升级套餐", "402");
+                        return;
+                    }
+                }
 
                 await rateLimitModelService.CheckAsync(model, user.Id);
 
@@ -139,17 +176,17 @@ public class AnthropicChatService(
 
                 request.Model = await modelMapService.ModelMap(request.Model);
 
-                // 检查用户是否有套餐，获取套餐分组信息
-                var subscription = await subscriptionService.GetUserActiveSubscriptionAsync(user.Id);
                 string[]? subscriptionGroups = null;
-                if (subscription?.Plan != null && subscription.Plan.IsModelAllowed(request.Model))
+                if (hasValidSubscription)
                 {
-                    subscriptionGroups = subscription.Plan.Groups;
+                    subscriptionGroups = subscription!.Plan!.Groups;
                 }
 
                 // 获取渠道通过算法计算权重（优先使用套餐分组）
                 var channel =
-                    CalculateWeight(await channelService.GetChannelsContainsModelWithSubscriptionGroupAsync(request.Model, user, token, subscriptionGroups));
+                    CalculateWeight(
+                        await channelService.GetChannelsContainsModelWithSubscriptionGroupAsync(request.Model, user,
+                            token, subscriptionGroups));
 
                 switch (channel)
                 {
@@ -200,6 +237,13 @@ public class AnthropicChatService(
                 bool usedSubscription = false;
 
                 var sw = Stopwatch.StartNew();
+
+                // 如果使用套餐额度，添加响应头
+                if (hasValidSubscription && !header)
+                {
+                    AddSubscriptionUsageHeaders(context, subscription!);
+                    header = true;
+                }
 
                 if (request.Stream == true)
                 {
@@ -416,7 +460,8 @@ public class AnthropicChatService(
         }
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool usedSubscription)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool
+            usedSubscription)>
         ChatCompletionsHandlerAsync(
             HttpContext context, AnthropicInput input, ChatChannel channel,
             IAnthropicChatCompletionsService openService, User? user, ModelManager rate)
@@ -498,11 +543,13 @@ public class AnthropicChatService(
             var quota = requestToken * rate.PromptRate;
 
             // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
             if (!quotaSuccess)
             {
                 throw new InsufficientQuotaException(quotaErrorMessage!);
             }
+
             usedSubscription = quotaUsedSubscription;
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
@@ -533,11 +580,13 @@ public class AnthropicChatService(
             var quota = requestToken * rate.PromptRate;
 
             // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
             if (!quotaSuccess)
             {
                 throw new InsufficientQuotaException(quotaErrorMessage!);
             }
+
             usedSubscription = quotaUsedSubscription;
 
             result = await openService.ChatCompletionsAsync(input, platformOptions);
@@ -583,7 +632,8 @@ public class AnthropicChatService(
         return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool usedSubscription)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool
+            usedSubscription)>
         StreamChatCompletionsHandlerAsync(
             HttpContext context,
             AnthropicInput input, ChatChannel channel, IAnthropicChatCompletionsService openService, User? user,
@@ -665,11 +715,13 @@ public class AnthropicChatService(
             var quota = requestToken * rate.PromptRate;
 
             // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
             if (!quotaSuccess)
             {
                 throw new InsufficientQuotaException(quotaErrorMessage!);
             }
+
             usedSubscription = quotaUsedSubscription;
         }
         else if (rate.QuotaType == ModelQuotaType.OnDemand)
@@ -680,11 +732,13 @@ public class AnthropicChatService(
             var quota = requestToken * rate.PromptRate;
 
             // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) = await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
+            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
+                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
             if (!quotaSuccess)
             {
                 throw new InsufficientQuotaException(quotaErrorMessage!);
             }
+
             usedSubscription = quotaUsedSubscription;
         }
 
@@ -741,5 +795,41 @@ public class AnthropicChatService(
         };
 
         return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
+    }
+
+    private static void AddSubscriptionUsageHeaders(HttpContext context, UserSubscription userSubscription)
+    {
+        // 计算剩余配额
+        var dailyRemaining = Math.Max(0, userSubscription.Plan!.DailyQuotaLimit - userSubscription.DailyUsedQuota);
+        var weeklyRemaining = Math.Max(0, userSubscription.Plan.WeeklyQuotaLimit - userSubscription.WeeklyUsedQuota);
+
+        // 添加 Claude API 风格的限流响应头
+        context.Response.Headers["anthropic-ratelimit-requests-limit"] =
+            Math.Min(dailyRemaining, weeklyRemaining).ToString();
+        context.Response.Headers["anthropic-ratelimit-requests-remaining"] =
+            Math.Min(dailyRemaining, weeklyRemaining).ToString();
+
+        // 计算重置时间 (基于SubscriptionService的重置算法)
+        var now = DateTime.UtcNow;
+        var tomorrowUtc = now.Date.AddDays(1); // 下一天UTC零点
+        var dailyResetSeconds = (long)(tomorrowUtc - now).TotalSeconds;
+
+        var weekStart = GetWeekStart(now);
+        var nextWeekStart = weekStart.AddDays(7); // 下周一UTC零点
+        var weeklyResetSeconds = (long)(nextWeekStart - now).TotalSeconds;
+
+        // 使用较短的重置时间
+        var resetSeconds = Math.Min(dailyResetSeconds, weeklyResetSeconds);
+        var resetTime = DateTimeOffset.UtcNow.AddSeconds(resetSeconds);
+
+        context.Response.Headers["anthropic-ratelimit-requests-reset"] = resetTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        context.Response.Headers["retry-after"] = resetSeconds.ToString();
+    }
+
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        // 基于SubscriptionService的GetWeekStart逻辑：周一为一周开始
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.AddDays(-1 * diff).Date;
     }
 }

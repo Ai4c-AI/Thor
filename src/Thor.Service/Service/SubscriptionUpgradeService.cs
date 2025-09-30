@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Thor.Domain.System;
 using Thor.Infrastructure;
 using Thor.Service.Domain.Core;
 

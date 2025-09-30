@@ -122,8 +122,8 @@ export default function SubscriptionAdminPage() {
     getUserSubscriptions(subscriptionPage, subscriptionPageSize)
       .then((res) => {
         if (res.success) {
-          setSubscriptions(res.value.items);
-          setSubscriptionTotal(res.value.total);
+          setSubscriptions(res.data.items || []);
+          setSubscriptionTotal(res.data.total || 0);
         }
       });
   }
@@ -143,7 +143,7 @@ export default function SubscriptionAdminPage() {
     getUsageStats()
       .then((res) => {
         if (res.success) {
-          setUsageStats(res.value || res.data || []);
+          setUsageStats(res.data || []);
         }
       })
       .finally(() => {
