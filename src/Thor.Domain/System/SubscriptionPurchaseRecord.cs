@@ -98,10 +98,10 @@ public class SubscriptionPurchaseRecord : Entity<string>
             UserId = userId,
             PlanId = planId,
             Amount = amount,
-            PurchaseTime = DateTime.UtcNow,
+            PurchaseTime = DateTime.Now,
             PaymentStatus = PaymentStatus.Pending,
             PaymentMethod = paymentMethod,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
     }
 
@@ -117,7 +117,7 @@ public class SubscriptionPurchaseRecord : Entity<string>
         TransactionId = transactionId;
         ValidFrom = validFrom;
         ValidTo = validTo;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public class SubscriptionPurchaseRecord : Entity<string>
     {
         PaymentStatus = PaymentStatus.Failed;
         Remarks = remarks;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 
     /// <summary>
@@ -139,7 +139,7 @@ public class SubscriptionPurchaseRecord : Entity<string>
     {
         PaymentStatus = PaymentStatus.Cancelled;
         Remarks = remarks;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 
     /// <summary>
@@ -151,8 +151,8 @@ public class SubscriptionPurchaseRecord : Entity<string>
     {
         PaymentStatus = PaymentStatus.Refunded;
         RefundAmount = refundAmount;
-        RefundTime = DateTime.UtcNow;
+        RefundTime = DateTime.Now;
         Remarks = remarks;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 }

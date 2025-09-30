@@ -82,7 +82,7 @@ public static class TracingService
     /// <returns>删除的记录数量</returns>
     public static async Task<int> CleanupTracings(ILoggerDbContext loggerDbContext, int retainDays = 30)
     {
-        var cutoffDate = DateTime.UtcNow.AddDays(-retainDays);
+        var cutoffDate = DateTime.Now.AddDays(-retainDays);
         return await DeleteTracingsBefore(loggerDbContext, cutoffDate);
     }
 

@@ -55,5 +55,5 @@ public class SubscriptionQuotaUsageEto
     /// <summary>
     /// 使用时间
     /// </summary>
-    public DateTime UsedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UsedAt { get; set; } = DateTime.Now;
 }

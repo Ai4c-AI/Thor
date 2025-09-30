@@ -117,6 +117,7 @@ public class AnthropicChatService(
 
         bool header = false;
         var rateLimit = 0;
+        bool hasConsumed = false; // 防重复扣费标记
 
         limitGoto:
 
@@ -234,7 +235,6 @@ public class AnthropicChatService(
                 var responseToken = 0;
                 int cachedTokens = 0;
                 int cacheWriteTokens = 0;
-                bool usedSubscription = false;
 
                 var sw = Stopwatch.StartNew();
 
@@ -248,20 +248,20 @@ public class AnthropicChatService(
                 if (request.Stream == true)
                 {
                     using var activity =
-                        Activity.Current?.Source.StartActivity("流式对话", ActivityKind.Internal);
+                        Activity.Current?.Source.StartActivity("流式对话");
 
-                    (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription) =
-                        await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate).ConfigureAwait(false);
+                    (requestToken, responseToken, cachedTokens, cacheWriteTokens) =
+                        await StreamChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService)
+                            .ConfigureAwait(false);
                 }
                 else
                 {
                     using var activity =
-                        Activity.Current?.Source.StartActivity("非流式对话", ActivityKind.Internal);
+                        Activity.Current?.Source.StartActivity("非流式对话");
 
-                    (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription) =
-                        await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService, user,
-                            rate).ConfigureAwait(false);
+                    (requestToken, responseToken, cachedTokens, cacheWriteTokens) =
+                        await ChatCompletionsHandlerAsync(context, request, channel, chatCompletionsService)
+                            .ConfigureAwait(false);
                 }
 
                 sw.Stop();
@@ -272,24 +272,22 @@ public class AnthropicChatService(
                     // 按照Anthropic定价规则计算费用：输入单价 * (文字输入 + 创建缓存Tokens * CacheRate + 命中缓存Tokens * 0.1 + 文字输出 * 补全倍率)
                     var completionRatio = rate.CompletionRate ?? GetCompletionRatio(model);
 
-                    // 文字输入费用
+                    // 文字输入费用（不包括缓存相关的tokens）
                     var quota = requestToken * rate.PromptRate;
 
-                    // 创建缓存费用 (使用动态的CacheRate倍率)
-                    if (cacheWriteTokens > 0 && rate.CacheRate.HasValue)
+                    // 创建缓存费用 (使用动态的CacheRate倍率，默认1.25倍)
+                    // 注意：缓存写入是额外成本，需要累加而非覆盖
+                    if (cacheWriteTokens > 0)
                     {
-                        quota = cacheWriteTokens * rate.CacheRate.Value;
-                    }
-                    else if (cacheWriteTokens > 0)
-                    {
-                        // 如果没有设置CacheRate，则使用默认的1.25倍率
-                        quota += cacheWriteTokens * 1.25m;
+                        var cacheWriteRate = rate.CacheRate ?? 1.25m;
+                        quota += cacheWriteTokens * rate.PromptRate * cacheWriteRate;
                     }
 
-                    // 命中缓存费用 (0.1倍输入单价)
-                    if (cachedTokens > 0 && rate.CacheHitRate.HasValue)
+                    // 命中缓存费用 (缓存命中享受90%折扣，仅按10%计费，默认0.1倍输入单价)
+                    if (cachedTokens > 0)
                     {
-                        quota += cachedTokens * rate.CacheHitRate.Value;
+                        var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                        quota += cachedTokens * rate.PromptRate * cacheHitRate;
                     }
 
                     // 文字输出费用 (输入单价 * 补全倍率)
@@ -304,15 +302,24 @@ public class AnthropicChatService(
                     var template = "";
                     if (cacheWriteTokens > 0)
                     {
+                        var cacheWriteRate = rate.CacheRate ?? 1.25m;
+                        var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                        var savingsPercent = Math.Round((1 - cacheHitRate) * 100, 2);
+                        var writeExtraCost = Math.Round((cacheWriteRate - 1) * 100, 2);
+
                         template = string.Format(ConsumerTemplateCacheWriteTokens,
                             rate.PromptRate, completionRatio, userGroup.Rate,
-                            cachedTokens, rate.CacheRate, cacheWriteTokens);
+                            cachedTokens, cacheHitRate, cacheWriteTokens,
+                            savingsPercent, cacheWriteRate, writeExtraCost);
                     }
                     else if (cachedTokens > 0)
                     {
+                        var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                        var savingsPercent = Math.Round((1 - cacheHitRate) * 100, 2);
+
                         template = string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio,
                             userGroup.Rate,
-                            cachedTokens, rate.CacheRate);
+                            cachedTokens, cacheHitRate, savingsPercent);
                     }
                     else
                     {
@@ -321,7 +328,7 @@ public class AnthropicChatService(
                     }
 
                     // 添加扣费来源信息
-                    if (usedSubscription)
+                    if (hasValidSubscription)
                     {
                         var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
                         if (userSubscription?.Plan != null)
@@ -334,22 +341,28 @@ public class AnthropicChatService(
                         template += " 扣费来源：用户余额";
                     }
 
-                    await loggerService.CreateConsumeAsync("/v1/messages", template,
-                        model,
-                        requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
-                        channel.Name, context.GetIpAddress(), context.GetUserAgent(),
-                        request.Stream is true,
-                        (int)sw.ElapsedMilliseconds, organizationId);
+                    // 防止重试导致重复扣费
+                    if (!hasConsumed)
+                    {
+                        await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
+                            hasValidSubscription, token?.Key, channel.Id, context);
+                        hasConsumed = true;
 
-                    await ConsumeQuotaAsync(user!, model, (long)quota, requestToken, responseToken,
-                        usedSubscription, token?.Key, channel.Id, context);
+                        // 扣费成功后再记录日志，确保数据一致性
+                        await loggerService.CreateConsumeAsync("/v1/messages", template,
+                            model,
+                            requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
+                            channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                            request.Stream is true,
+                            (int)sw.ElapsedMilliseconds, organizationId);
+                    }
                 }
                 else
                 {
                     // 准备内容，记录是否使用套餐
                     var content = string.Format(ConsumerTemplateOnDemand, RenderHelper.RenderQuota(rate.PromptRate),
                         userGroup.Rate);
-                    if (usedSubscription)
+                    if (hasValidSubscription)
                     {
                         var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);
                         if (userSubscription?.Plan != null)
@@ -362,19 +375,24 @@ public class AnthropicChatService(
                         content += " 扣费来源：用户余额";
                     }
 
-                    // 费用
-                    await loggerService.CreateConsumeAsync("/v1/messages",
-                        content,
-                        model,
-                        requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
-                        user?.UserName, user?.Id,
-                        channel.Id,
-                        channel.Name, context.GetIpAddress(), context.GetUserAgent(),
-                        request.Stream is true,
-                        (int)sw.ElapsedMilliseconds, organizationId);
+                    // 防止重试导致重复扣费
+                    if (!hasConsumed)
+                    {
+                        await ConsumeQuotaAsync(user!, model, (long)rate.PromptRate, requestToken, responseToken,
+                            hasValidSubscription, token?.Key, channel.Id, context);
+                        hasConsumed = true;
 
-                    await ConsumeQuotaAsync(user!, model, (long)rate.PromptRate, requestToken, responseToken,
-                        usedSubscription, token?.Key, channel.Id, context);
+                        // 扣费成功后再记录日志，确保数据一致性
+                        await loggerService.CreateConsumeAsync("/v1/messages",
+                            content,
+                            model,
+                            requestToken, responseToken, (int)((int)rate.PromptRate * (decimal)userGroup.Rate), token?.Key,
+                            user?.UserName, user?.Id,
+                            channel.Id,
+                            channel.Name, context.GetIpAddress(), context.GetUserAgent(),
+                            request.Stream is true,
+                            (int)sw.ElapsedMilliseconds, organizationId);
+                    }
                 }
             }
         }
@@ -460,164 +478,23 @@ public class AnthropicChatService(
         }
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool
-            usedSubscription)>
+    private static async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens)>
         ChatCompletionsHandlerAsync(
             HttpContext context, AnthropicInput input, ChatChannel channel,
-            IAnthropicChatCompletionsService openService, User? user, ModelManager rate)
+            IAnthropicChatCompletionsService openService)
     {
-        int requestToken = 0;
-        int responseToken = 0;
+        var requestToken = 0;
+        var responseToken = 0;
 
         // 命中缓存tokens数量
-        int cachedTokens = 0;
-        int cacheWriteTokens = 0;
-        bool usedSubscription = false;
+        var cachedTokens = 0;
+        var cacheWriteTokens = 0;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
-        AnthropicChatCompletionDto result = null;
+        var result = await openService.ChatCompletionsAsync(input, platformOptions);
 
-        if (!string.IsNullOrEmpty(input.System))
-        {
-            requestToken += TokenHelper.GetTotalTokens(input.System);
-        }
-
-        if (input.Systems?.Count > 0)
-        {
-            requestToken += TokenHelper.GetTotalTokens(input.Systems.Select(x => x.Text).ToArray());
-        }
-
-        if (input.Tools != null)
-        {
-            foreach (var tool in input.Tools)
-            {
-                requestToken += TokenHelper.GetTotalTokens(tool.name, tool.Description);
-                requestToken += TokenHelper.GetTotalTokens(tool?.InputSchema?.Required ?? []);
-                requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(tool?.InputSchema?.Properties));
-            }
-        }
-
-        // 这里应该用其他的方式来判断是否是vision模型，目前先这样处理
-        if (rate.QuotaType == ModelQuotaType.OnDemand && input.Messages.Any(x => x.Contents != null))
-        {
-            foreach (var content in input?.Messages.Where(x => x.Contents != null)
-                         .SelectMany(x => x.Contents))
-            {
-                requestToken += TokenHelper.GetTotalTokens(content.Text ?? string.Empty);
-                if (content.Content != null)
-                {
-                    requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(content.Content));
-                }
-
-                if (content.Input != null)
-                {
-                    requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(content.Input));
-                }
-            }
-
-            requestToken += TokenHelper.GetTotalTokens(input.Messages.Where(x => x.Contents == null)
-                .Select(x => x.Content).ToArray());
-
-            // 解析图片
-            foreach (var message in input.Messages.Where(x => x.Contents != null).SelectMany(x => x.Contents)
-                         .Where(x => x.Type is "image" or "image_url"))
-            {
-                var imageUrl = message.Source;
-                if (imageUrl != null)
-                {
-                    var url = imageUrl.Data;
-
-                    try
-                    {
-                        var imageTokens = await CountImageTokens(url, "high");
-                        requestToken += imageTokens.Item1;
-                    }
-                    catch (Exception ex)
-                    {
-                        GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-                    }
-                }
-            }
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
-            if (!quotaSuccess)
-            {
-                throw new InsufficientQuotaException(quotaErrorMessage!);
-            }
-
-            usedSubscription = quotaUsedSubscription;
-
-            result = await openService.ChatCompletionsAsync(input, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result);
-
-            if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-            {
-                requestToken = result.Usage.InputTokens.Value;
-            }
-
-            // 如果存在返回的Usage则使用返回的Usage中的CompletionTokens
-            if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-            {
-                responseToken = result.Usage.OutputTokens.Value;
-            }
-            else
-            {
-                responseToken =
-                    TokenHelper.GetTotalTokens(result?.content?.Select(x => x.text).ToArray() ?? []);
-            }
-        }
-        else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        {
-            var contentArray = input.Messages.Select(x => x.Content).ToArray();
-            requestToken = TokenHelper.GetTotalTokens(contentArray);
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
-            if (!quotaSuccess)
-            {
-                throw new InsufficientQuotaException(quotaErrorMessage!);
-            }
-
-            usedSubscription = quotaUsedSubscription;
-
-            result = await openService.ChatCompletionsAsync(input, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result);
-        }
-        else
-        {
-            result = await openService.ChatCompletionsAsync(input, platformOptions);
-
-            await context.Response.WriteAsJsonAsync(result);
-        }
-
-        if (result?.Usage?.InputTokens is not null && result.Usage.InputTokens > 0)
-        {
-            requestToken = result.Usage.InputTokens.Value;
-        }
-
-        if (result?.Usage?.OutputTokens is not null && result.Usage.OutputTokens > 0)
-        {
-            responseToken = result.Usage.OutputTokens.Value;
-        }
-        else
-        {
-            responseToken += TokenHelper.GetTotalTokens(result?.content?.Select(x => x.text).ToArray() ?? []);
-            responseToken += TokenHelper.GetTotalTokens(result?.content?.Select(x => x.Thinking).ToArray() ?? []);
-            responseToken +=
-                TokenHelper.GetTotalTokens(
-                    result?.content?.Where(x => x.input != null).Select(x =>
-                        JsonSerializer.Serialize(x.input, ThorJsonSerializer.DefaultOptions)).ToArray() ?? []);
-        }
+        await context.Response.WriteAsJsonAsync(result);
 
         if (result?.Usage?.CacheReadInputTokens.HasValue == true)
         {
@@ -629,122 +506,35 @@ public class AnthropicChatService(
             cacheWriteTokens = result.Usage.CacheCreationInputTokens.Value;
         }
 
-        return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
+        if (result?.Usage?.InputTokens.HasValue == true)
+        {
+            requestToken = result.Usage.InputTokens.Value;
+        }
+
+        if (result?.Usage?.OutputTokens.HasValue == true)
+        {
+            responseToken = result.Usage.OutputTokens.Value;
+        }
+
+        return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
     }
 
-    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens, bool
-            usedSubscription)>
+    private async Task<(int requestToken, int responseToken, int cachedTokens, int cacheWriteTokens)>
         StreamChatCompletionsHandlerAsync(
             HttpContext context,
-            AnthropicInput input, ChatChannel channel, IAnthropicChatCompletionsService openService, User? user,
-            ModelManager rate)
+            AnthropicInput input, ChatChannel channel, IAnthropicChatCompletionsService openService)
     {
-        int requestToken = 0;
+        var requestToken = 0;
 
         var platformOptions = new ThorPlatformOptions(channel.Address, channel.Key, channel.Other);
 
-        var responseMessage = new StringBuilder();
-        int cachedTokens = 0;
-        int cacheWriteTokens = 0;
-        bool usedSubscription = false;
+        var cachedTokens = 0;
+        var cacheWriteTokens = 0;
 
-        requestToken += TokenHelper.GetTotalTokens(input?.System);
-        requestToken += TokenHelper.GetTotalTokens(input?.Systems?.Select(x => x.Text).ToArray() ?? []);
-
-        if (!string.IsNullOrEmpty(input.System))
-        {
-            requestToken += TokenHelper.GetTotalTokens(input.System);
-        }
-
-        if (input.Systems?.Count > 0)
-        {
-            requestToken += TokenHelper.GetTotalTokens(input.Systems.Select(x => x.Text).ToArray());
-        }
-
-        if (input.Tools != null)
-        {
-            foreach (var tool in input.Tools)
-            {
-                requestToken += TokenHelper.GetTotalTokens(tool.name, tool.Description);
-                requestToken += TokenHelper.GetTotalTokens(tool?.InputSchema?.Required ?? []);
-                requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(tool?.InputSchema?.Properties));
-            }
-        }
-
-        if (input.Messages.Any(x => x.Contents != null) && rate.QuotaType == ModelQuotaType.OnDemand)
-        {
-            foreach (var content in input?.Messages.Where(x => x.Contents != null)
-                         .SelectMany(x => x.Contents))
-            {
-                requestToken += TokenHelper.GetTotalTokens(content.Text ?? string.Empty);
-                if (content.Content != null)
-                {
-                    requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(content.Content));
-                }
-
-                if (content.Input != null)
-                {
-                    requestToken += TokenHelper.GetTotalTokens(JsonSerializer.Serialize(content.Input));
-                }
-            }
-
-            requestToken += TokenHelper.GetTotalTokens(input.Messages.Where(x => x.Contents == null)
-                .Select(x => x.Content).ToArray());
-
-            requestToken += TokenHelper.GetTotalTokens(input.Messages.Where(x => x.Contents == null)
-                .Select(x => x.Content).ToArray());
-
-            foreach (var message in input.Messages.Where(x => x is { Contents: not null }).SelectMany(x => x.Contents)
-                         .Where(x => x.Type is "image" or "image_url"))
-            {
-                var imageUrl = message.Source;
-                if (imageUrl == null) continue;
-                var url = imageUrl.MediaType;
-                var detail = "";
-                try
-                {
-                    var imageTokens = await CountImageTokens(url, detail);
-                    requestToken += imageTokens.Item1;
-                }
-                catch (Exception ex)
-                {
-                    GetLogger<ChatService>().LogError("Error counting image tokens: " + ex.Message);
-                }
-            }
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
-            if (!quotaSuccess)
-            {
-                throw new InsufficientQuotaException(quotaErrorMessage!);
-            }
-
-            usedSubscription = quotaUsedSubscription;
-        }
-        else if (rate.QuotaType == ModelQuotaType.OnDemand)
-        {
-            requestToken = TokenHelper.GetTotalTokens(input?.Messages.Select(x => x.Content).ToArray());
-
-
-            var quota = requestToken * rate.PromptRate;
-
-            // 检查额度（优先使用套餐额度）
-            var (quotaSuccess, quotaUsedSubscription, quotaErrorMessage, subscriptionGroups) =
-                await CheckAndValidateQuotaAsync(user, input.Model, (long)quota);
-            if (!quotaSuccess)
-            {
-                throw new InsufficientQuotaException(quotaErrorMessage!);
-            }
-
-            usedSubscription = quotaUsedSubscription;
-        }
 
         // 是否第一次输出
-        bool isFirst = true;
-        int responseToken = 0;
+        var isFirst = true;
+        var responseToken = 0;
 
         await foreach (var (@eventName, item) in openService.StreamChatCompletionsAsync(input, platformOptions))
         {
@@ -770,12 +560,6 @@ public class AnthropicChatService(
             {
                 responseToken = item.Usage?.OutputTokens ?? item.Message?.Usage?.OutputTokens ?? 0;
             }
-            else
-            {
-                responseToken +=
-                    TokenHelper.GetTotalTokens(item?.Message?.content.Select(x => x.Thinking ?? x.text ?? x.PartialJson)
-                        .ToArray() ?? []);
-            }
 
             if (item?.Usage is { InputTokens: > 0 } || item?.Message?.Usage?.InputTokens > 0)
             {
@@ -785,16 +569,7 @@ public class AnthropicChatService(
             await context.WriteAsEventStreamDataAsync(eventName.Trim(), item);
         }
 
-        responseToken = rate.QuotaType switch
-        {
-            ModelQuotaType.OnDemand when responseToken == 0 => TokenHelper.GetTokens(responseMessage.ToString()),
-            ModelQuotaType.ByCount => rate.QuotaType == ModelQuotaType.OnDemand
-                ? TokenHelper.GetTokens(responseMessage.ToString())
-                : 0,
-            _ => responseToken
-        };
-
-        return (requestToken, responseToken, cachedTokens, cacheWriteTokens, usedSubscription);
+        return (requestToken, responseToken, cachedTokens, cacheWriteTokens);
     }
 
     private static void AddSubscriptionUsageHeaders(HttpContext context, UserSubscription userSubscription)
@@ -810,7 +585,7 @@ public class AnthropicChatService(
             Math.Min(dailyRemaining, weeklyRemaining).ToString();
 
         // 计算重置时间 (基于SubscriptionService的重置算法)
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var tomorrowUtc = now.Date.AddDays(1); // 下一天UTC零点
         var dailyResetSeconds = (long)(tomorrowUtc - now).TotalSeconds;
 
@@ -820,7 +595,7 @@ public class AnthropicChatService(
 
         // 使用较短的重置时间
         var resetSeconds = Math.Min(dailyResetSeconds, weeklyResetSeconds);
-        var resetTime = DateTimeOffset.UtcNow.AddSeconds(resetSeconds);
+        var resetTime = DateTimeOffset.Now.AddSeconds(resetSeconds);
 
         context.Response.Headers["anthropic-ratelimit-requests-reset"] = resetTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
         context.Response.Headers["retry-after"] = resetSeconds.ToString();

@@ -74,23 +74,12 @@ public class UserSubscription : Entity<string>
     public User? User { get; set; }
 
     /// <summary>
-    /// 检查套餐是否有效
-    /// </summary>
-    /// <returns></returns>
-    public bool IsValid()
-    {
-        return Status == SubscriptionStatus.Active &&
-               DateTime.UtcNow >= StartDate &&
-               DateTime.UtcNow <= EndDate;
-    }
-
-    /// <summary>
     /// 检查套餐是否过期
     /// </summary>
     /// <returns></returns>
     public bool IsExpired()
     {
-        return DateTime.UtcNow > EndDate;
+        return DateTime.Now > EndDate;
     }
 
     /// <summary>
@@ -131,7 +120,7 @@ public class UserSubscription : Entity<string>
     public void ResetDailyQuota()
     {
         DailyUsedQuota = 0;
-        LastDailyResetDate = DateTime.UtcNow.Date;
+        LastDailyResetDate = DateTime.Now.Date;
     }
 
     /// <summary>
@@ -140,7 +129,7 @@ public class UserSubscription : Entity<string>
     public void ResetWeeklyQuota()
     {
         WeeklyUsedQuota = 0;
-        LastWeeklyResetDate = GetWeekStart(DateTime.UtcNow);
+        LastWeeklyResetDate = GetWeekStart(DateTime.Now);
     }
 
     /// <summary>
@@ -149,7 +138,7 @@ public class UserSubscription : Entity<string>
     public void Activate()
     {
         Status = SubscriptionStatus.Active;
-        StartDate = DateTime.UtcNow;
+        StartDate = DateTime.Now;
     }
 
     /// <summary>

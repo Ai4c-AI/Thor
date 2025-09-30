@@ -53,7 +53,7 @@ public class SubscriptionService(
             .Include(x => x.Plan)
             .FirstOrDefaultAsync(x => x.UserId == userId
                                       && x.Status == SubscriptionStatus.Active
-                                      && x.EndDate > DateTime.UtcNow);
+                                      && x.EndDate > DateTime.Now);
     }
 
     /// <summary>
@@ -97,7 +97,7 @@ public class SubscriptionService(
     /// <returns></returns>
     private async Task CheckAndResetQuotasAsync(UserSubscription subscription)
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var needsUpdate = false;
 
         // 检查是否需要重置日额度
@@ -209,7 +209,7 @@ public class SubscriptionService(
         // 更新订阅的使用量
         await DbContext.UserSubscriptions.Where(x => x.UserId == userId
                                                      && x.Status == SubscriptionStatus.Active
-                                                     && x.EndDate > DateTime.UtcNow)
+                                                     && x.EndDate > DateTime.Now)
             .ExecuteUpdateAsync(x => x
                 .SetProperty(s => s.DailyUsedQuota, s => s.DailyUsedQuota + quotaUsed)
                 .SetProperty(s => s.UserId, userId)
@@ -219,7 +219,7 @@ public class SubscriptionService(
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.UserId == userId
                                       && x.Status == SubscriptionStatus.Active
-                                      && x.EndDate > DateTime.UtcNow);
+                                      && x.EndDate > DateTime.Now);
 
         if (subscription == null)
         {
@@ -280,7 +280,7 @@ public class SubscriptionService(
         if (record?.Plan == null || record.PaymentStatus == PaymentStatus.Paid)
             return false;
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var validFrom = now;
         var validTo = now.AddDays(record.Plan.GetValidityDays());
 
@@ -348,7 +348,7 @@ public class SubscriptionService(
     /// <returns></returns>
     public async Task<List<SubscriptionQuotaUsage>> GetUserQuotaUsageAsync(string userId, int days = 7)
     {
-        var startDate = DateTime.UtcNow.AddDays(-days);
+        var startDate = DateTime.Now.AddDays(-days);
 
         return await DbContext.SubscriptionQuotaUsages
             .Where(x => x.UserId == userId && x.UsageTime >= startDate)
@@ -363,7 +363,7 @@ public class SubscriptionService(
     public async Task<int> MarkExpiredSubscriptionsAsync()
     {
         var expiredCount = await DbContext.UserSubscriptions
-            .Where(x => x.Status == SubscriptionStatus.Active && x.EndDate <= DateTime.UtcNow)
+            .Where(x => x.Status == SubscriptionStatus.Active && x.EndDate <= DateTime.Now)
             .ExecuteUpdateAsync(x => x.SetProperty(s => s.Status, SubscriptionStatus.Expired));
 
         return expiredCount;
@@ -375,7 +375,7 @@ public class SubscriptionService(
     /// <returns></returns>
     public async Task<int> ResetAllDailyQuotasAsync()
     {
-        var today = DateTime.UtcNow.Date;
+        var today = DateTime.Now.Date;
         var affectedCount = await DbContext.UserSubscriptions
             .Where(x => x.Status == SubscriptionStatus.Active
                         && x.LastDailyResetDate.Date < today)
@@ -392,7 +392,7 @@ public class SubscriptionService(
     /// <returns></returns>
     public async Task<int> ResetAllWeeklyQuotasAsync()
     {
-        var currentWeekStart = GetWeekStart(DateTime.UtcNow);
+        var currentWeekStart = GetWeekStart(DateTime.Now);
         var affectedCount = await DbContext.UserSubscriptions
             .Where(x => x.Status == SubscriptionStatus.Active
                         && x.LastWeeklyResetDate.Date < currentWeekStart)
@@ -416,7 +416,7 @@ public class SubscriptionService(
         if (plan == null)
             return false;
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var validFrom = now;
         var validTo = now.AddDays(plan.GetValidityDays());
 

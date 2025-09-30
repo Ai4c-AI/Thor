@@ -129,7 +129,7 @@ public class SubscriptionUpgrade : Entity<string>
         decimal remainingValue,
         decimal actualPayAmount)
     {
-        var remainingDays = (int)(fromSubscription.EndDate - DateTime.UtcNow).TotalDays;
+        var remainingDays = (int)(fromSubscription.EndDate - DateTime.Now).TotalDays;
 
         return new SubscriptionUpgrade
         {
@@ -142,11 +142,11 @@ public class SubscriptionUpgrade : Entity<string>
             RemainingValue = remainingValue,
             TargetPrice = targetPlan.Price,
             ActualPayAmount = actualPayAmount,
-            UpgradeTime = DateTime.UtcNow,
+            UpgradeTime = DateTime.Now,
             Status = UpgradeStatus.Pending,
-            NewStartDate = DateTime.UtcNow,
-            NewEndDate = DateTime.UtcNow.AddDays(targetPlan.GetValidityDays()),
-            CreatedAt = DateTime.UtcNow
+            NewStartDate = DateTime.Now,
+            NewEndDate = DateTime.Now.AddDays(targetPlan.GetValidityDays()),
+            CreatedAt = DateTime.Now
         };
     }
 
@@ -160,7 +160,7 @@ public class SubscriptionUpgrade : Entity<string>
         Status = UpgradeStatus.Completed;
         NewSubscriptionId = newSubscriptionId;
         PaymentRecordId = paymentRecordId;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 
     /// <summary>
@@ -171,7 +171,7 @@ public class SubscriptionUpgrade : Entity<string>
     {
         Status = UpgradeStatus.Failed;
         Remarks = reason;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 
     /// <summary>
@@ -182,6 +182,6 @@ public class SubscriptionUpgrade : Entity<string>
     {
         Status = UpgradeStatus.Cancelled;
         Remarks = reason;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.Now;
     }
 }

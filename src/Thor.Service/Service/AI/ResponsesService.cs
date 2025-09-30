@@ -292,10 +292,14 @@ public sealed class ResponsesService(
                         // 将quota 四舍五入
                         quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
+                        // 计算节省百分比
+                        var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                        var savingsPercent = Math.Round((1 - cacheHitRate) * 100, 2);
+
                         // 准备内容，记录是否使用套餐
                         var content = string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio,
                             userGroup.Rate,
-                            cachedTokens, rate.CacheRate);
+                            cachedTokens, cacheHitRate, savingsPercent);
                         if (hasValidSubscription)
                         {
                             var userSubscription = await subscriptionService.GetUserActiveSubscriptionAsync(user!.Id);

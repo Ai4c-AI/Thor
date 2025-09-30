@@ -281,7 +281,7 @@ public static class SubscriptionEndpointExtensions
                     plan.Icon = input.Icon;
                     plan.Tag = input.Tag;
                     plan.Sort = input.Sort;
-                    plan.UpdatedAt = DateTime.UtcNow;
+                    plan.UpdatedAt = DateTime.Now;
 
                     dbContext.SubscriptionPlans.Update(plan);
                     await dbContext.SaveChangesAsync();

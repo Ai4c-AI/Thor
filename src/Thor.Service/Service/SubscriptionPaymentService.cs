@@ -195,7 +195,7 @@ public class SubscriptionPaymentService(
                 }
 
                 // 标记支付记录为已支付
-                paymentRecord.MarkPaid(tradeNo, DateTime.UtcNow, DateTime.UtcNow.AddDays(30)); // 临时的有效期
+                paymentRecord.MarkPaid(tradeNo, DateTime.Now, DateTime.Now.AddDays(30)); // 临时的有效期
                 DbContext.SubscriptionPurchaseRecords.Update(paymentRecord);
 
                 // 执行升级

@@ -12,7 +12,7 @@ public class CircuitBreaker(int failureThreshold, TimeSpan openTimeSpan)
     public async ValueTask<Exception?> ExecuteAsync(Func<Task> action, int maxAttempts, int delay = 500,
         Action<Exception>? errorAction = null)
     {
-        if (_state == CircuitBreakerState.Open && DateTime.UtcNow >= _nextRetryTime)
+        if (_state == CircuitBreakerState.Open && DateTime.Now >= _nextRetryTime)
         {
             _state = CircuitBreakerState.HalfOpen;
         }

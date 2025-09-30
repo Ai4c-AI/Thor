@@ -176,7 +176,6 @@ try
         .AddScoped<SubscriptionUpgradeService>()
         .AddHostedService<StatisticBackgroundTask>()
         .AddHostedService<LoggerBackgroundTask>()
-        .AddHostedService<TrackerBackgroundTask>()
         .AddHostedService<AutoChannelDetectionBackgroundTask>()
         .AddHostedService<SubscriptionMaintenanceBackgroundTask>()
         .AddOpenAIService()

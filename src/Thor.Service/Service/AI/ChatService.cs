@@ -471,9 +471,12 @@ public sealed partial class ChatService(
                         // 将quota 四舍五入
                         quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
+                        var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                        var savingsPercent = Math.Round((1 - cacheHitRate) * 100, 2);
+
                         await loggerService.CreateConsumeAsync("/v1/chat/completions",
                             string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
-                                cachedTokens, rate.CacheRate),
+                                cachedTokens, cacheHitRate, savingsPercent),
                             model,
                             requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id, channel.Id,
                             channel.Name, context.GetIpAddress(), context.GetUserAgent(),
@@ -1884,9 +1887,12 @@ public sealed partial class ChatService(
                 quota = (decimal)userGroup!.Rate * quota;
                 quota = Math.Round(quota, 0, MidpointRounding.AwayFromZero);
 
+                var cacheHitRate = rate.CacheHitRate ?? 0.25m;
+                var savingsPercent = Math.Round((1 - cacheHitRate) * 100, 2);
+
                 await loggerService.CreateConsumeAsync("/v1/chat/completions",
                     string.Format(ConsumerTemplateCache, rate.PromptRate, completionRatio, userGroup.Rate,
-                        cachedTokens, rate.CacheRate),
+                        cachedTokens, cacheHitRate, savingsPercent),
                     model, requestToken, responseToken, (int)quota, token?.Key, user?.UserName, user?.Id,
                     channel.Id, channel.Name, context.GetIpAddress(), context.GetUserAgent(),
                     isStream, (int)elapsedMilliseconds, organizationId);

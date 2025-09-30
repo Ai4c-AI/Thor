@@ -21,7 +21,7 @@ public class OpenTelemetryMiddlewares : IMiddleware
         consume?.SetTag("RequestHost", context.Request.Host);
         consume?.SetTag("RequestScheme", context.Request.Scheme);
         consume?.SetTag("RequestQueryString", context.Request.QueryString);
-        consume?.SetStartTime(DateTime.UtcNow);
+        consume?.SetStartTime(DateTime.Now);
 
         await next(context);
 
@@ -29,6 +29,6 @@ public class OpenTelemetryMiddlewares : IMiddleware
 
         consume?.SetTag("Request End", "End");
 
-        consume?.SetEndTime(DateTime.UtcNow);
+        consume?.SetEndTime(DateTime.Now);
     }
 }

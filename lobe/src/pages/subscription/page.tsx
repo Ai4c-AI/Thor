@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Separator } from "../../components/ui/separator";
+import { Progress } from "../../components/ui/progress";
 import {
   Crown,
   Calendar,
@@ -17,7 +18,10 @@ import {
   AlertCircle,
   Smartphone,
   CreditCard,
-  LogIn
+  LogIn,
+  Check,
+  Sparkles,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -156,10 +160,10 @@ export default function SubscriptionPage() {
 
   function getPlanIcon(level: number) {
     switch (level) {
-      case 1: return <Users className="h-6 w-6" />;
-      case 2: return <Star className="h-6 w-6" />;
-      case 3: return <Crown className="h-6 w-6" />;
-      default: return <Zap className="h-6 w-6" />;
+      case 1: return <Users className="h-5 w-5" />;
+      case 2: return <Star className="h-5 w-5" />;
+      case 3: return <Crown className="h-5 w-5" />;
+      default: return <Zap className="h-5 w-5" />;
     }
   }
 
@@ -169,6 +173,23 @@ export default function SubscriptionPage() {
     const diffTime = end.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(0, diffDays);
+  }
+
+  function formatPrice(price: number): string {
+    return `¥${price}`;
+  }
+
+  function getPlanLevelText(level: number): string {
+    switch (level) {
+      case 1: return '基础版';
+      case 2: return '专业版';
+      case 3: return '企业版';
+      default: return '标准版';
+    }
+  }
+
+  function getUsagePercentage(used: number, limit: number): number {
+    return Math.min(100, (used / limit) * 100);
   }
 
   // 检查登录状态
@@ -199,184 +220,252 @@ export default function SubscriptionPage() {
   }, [qrCode, countdown]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">套餐购买</h1>
-          <p className="text-muted-foreground">选择适合您的AI模型访问套餐</p>
-        </div>
+    <div className="p-4 space-y-4 max-w-7xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          订阅套餐
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">选择适合您的 AI 模型访问方案</p>
       </div>
 
       {/* 当前套餐状态 */}
       {currentSubscription && (
-        <Card className="border-green-200 bg-green-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              当前套餐
-            </CardTitle>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  当前套餐
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  {currentSubscription.plan.name} • {getTypeText(currentSubscription.plan.type)}
+                </CardDescription>
+              </div>
+              <Badge variant={currentSubscription.status === 1 ? 'default' : 'secondary'} className="text-xs">
+                {currentSubscription.status === 1 ? '有效' : '已过期'}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">套餐名称</div>
-                <div className="font-semibold">{currentSubscription.plan.name}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">套餐类型</div>
-                <div className="font-semibold">{getTypeText(currentSubscription.plan.type)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">剩余天数</div>
-                <div className="font-semibold flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {getRemainingDays(currentSubscription.endDate)} 天
+
+          <CardContent className="space-y-3 pt-0">
+            {/* 核心信息网格 */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground">剩余</div>
+                  <div className="text-sm font-bold truncate">{getRemainingDays(currentSubscription.endDate)}天</div>
                 </div>
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">状态</div>
-                <Badge variant={currentSubscription.status === 1? 'default' : 'secondary'}>
-                  {currentSubscription.status === 1 ? '有效' : '已过期'}
-                </Badge>
+
+              <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                <Zap className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground">日额度</div>
+                  <div className="text-sm font-bold truncate">{renderQuota(currentSubscription.plan.dailyQuotaLimit)}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground">周额度</div>
+                  <div className="text-sm font-bold truncate">{renderQuota(currentSubscription.plan.weeklyQuotaLimit)}</div>
+                </div>
               </div>
             </div>
 
-            <Separator className="my-4" />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 使用进度 */}
+            <div className="space-y-2">
               <div>
-                <div className="text-sm text-muted-foreground">今日额度使用</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{
-                        width: `${Math.min(100, (currentSubscription.dailyUsedQuota / currentSubscription.plan.dailyQuotaLimit) * 100)}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span>今日使用</span>
+                  <span className="text-muted-foreground">
                     {renderQuota(currentSubscription.dailyUsedQuota)} / {renderQuota(currentSubscription.plan.dailyQuotaLimit)}
                   </span>
                 </div>
+                <Progress
+                  value={getUsagePercentage(currentSubscription.dailyUsedQuota, currentSubscription.plan.dailyQuotaLimit)}
+                  className="h-1.5"
+                />
               </div>
+
               <div>
-                <div className="text-sm text-muted-foreground">本周额度使用</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full"
-                      style={{
-                        width: `${Math.min(100, (currentSubscription.weeklyUsedQuota / currentSubscription.plan.weeklyQuotaLimit) * 100)}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span>本周使用</span>
+                  <span className="text-muted-foreground">
                     {renderQuota(currentSubscription.weeklyUsedQuota)} / {renderQuota(currentSubscription.plan.weeklyQuotaLimit)}
                   </span>
                 </div>
+                <Progress
+                  value={getUsagePercentage(currentSubscription.weeklyUsedQuota, currentSubscription.plan.weeklyQuotaLimit)}
+                  className="h-1.5"
+                />
               </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => loadCurrentSubscription()}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                刷新
+              </Button>
+              {currentSubscription.status === 1 && getRemainingDays(currentSubscription.endDate) < 7 && (
+                <Button size="sm" className="flex-1 h-8 text-xs">
+                  <Clock className="h-3 w-3 mr-1" />
+                  续费
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* 套餐列表 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plans.map((plan) => (
-          <Card
-            key={plan.id}
-            className={`relative transition-all hover:shadow-lg ${
-              plan.tag ? 'border-orange-200 shadow-md' : ''
-            }`}
-          >
-            {plan.tag && (
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-orange-500 text-white">
-                  {plan.tag}
-                </Badge>
-              </div>
-            )}
+      <div>
+        <div className="text-center mb-4">
+          <h2 className="text-xl font-bold mb-1">选择您的方案</h2>
+          <p className="text-xs text-muted-foreground">灵活的定价，满足不同需求</p>
+        </div>
 
-            <CardHeader className="text-center pb-4">
-              <div className="flex justify-center mb-2">
-                {getPlanIcon(plan.level)}
-              </div>
-              <CardTitle className="text-xl">{plan.name}</CardTitle>
-              <div className="text-3xl font-bold">
-                ¥{plan.price}
-                <span className="text-sm font-normal text-muted-foreground">
-                  /{getTypeText(plan.type)}
-                </span>
-              </div>
-            </CardHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {plans.map((plan) => {
+            const isPopular = !!plan.tag;
+            const isCurrentPlan = currentSubscription?.planId === plan.id;
+            const hasHigherPlan = (currentSubscription?.plan.level || 0) >= plan.level;
 
-            <CardContent className="pt-0">
-              <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    日额度: {renderQuota(plan.dailyQuotaLimit)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    周额度: {renderQuota(plan.weeklyQuotaLimit)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {plan.allowedModels.length} 个AI模型
-                  </span>
-                </div>
-              </div>
-
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <div className="text-sm font-medium">支持的模型:</div>
-                <div className="flex flex-wrap gap-1">
-                  {plan.allowedModels.slice(0, 3).map((model) => (
-                    <Badge key={model} variant="outline" className="text-xs">
-                      {model}
-                    </Badge>
-                  ))}
-                  {plan.allowedModels.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{plan.allowedModels.length - 3} 更多
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              <Button
-                className="w-full mt-4"
-                onClick={() => handlePurchase(plan.id)}
-                disabled={loading || (currentSubscription?.plan.level || 0) >= plan.level}
-                variant={plan.tag ? "default" : "outline"}
+            return (
+              <Card
+                key={plan.id}
+                className={`relative ${
+                  isPopular ? 'border-primary' : ''
+                } ${isCurrentPlan ? 'ring-2 ring-primary' : ''}`}
               >
-                {!isAuthenticated ? (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    登录后购买套餐
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    {currentSubscription?.plan.level && currentSubscription.plan.level >= plan.level
-                      ? '已拥有更高级套餐'
-                      : `购买 ${getTypeText(plan.type)}套餐`
-                    }
-                  </>
+                {/* Popular Badge */}
+                {isPopular && (
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 z-20">
+                    <Badge className="bg-primary text-white px-2 py-0.5 text-xs">
+                      <Star className="h-3 w-3 mr-1 inline" />
+                      {plan.tag}
+                    </Badge>
+                  </div>
                 )}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+
+                {/* Current Plan Badge */}
+                {isCurrentPlan && (
+                  <div className="absolute top-2 right-2 z-20">
+                    <Badge variant="default" className="gap-1 text-xs px-2 py-0.5">
+                      <CheckCircle className="h-3 w-3" />
+                      当前套餐
+                    </Badge>
+                  </div>
+                )}
+
+                <CardHeader className="text-center pb-3 pt-4">
+                  {/* Icon */}
+                  <div className="flex justify-center mb-2">
+                    <div className={`p-2 rounded-lg ${
+                      plan.level === 3 ? 'bg-yellow-500/10 text-yellow-600' :
+                      plan.level === 2 ? 'bg-blue-500/10 text-blue-600' :
+                      'bg-gray-500/10 text-gray-600'
+                    }`}>
+                      {getPlanIcon(plan.level)}
+                    </div>
+                  </div>
+
+                  {/* Plan Name & Level */}
+                  <div>
+                    <Badge variant="outline" className="mb-1 text-xs">{getPlanLevelText(plan.level)}</Badge>
+                    <CardTitle className="text-lg mb-1">{plan.name}</CardTitle>
+                    <CardDescription className="text-xs">{plan.description}</CardDescription>
+                  </div>
+
+                  {/* Price */}
+                  <div className="mt-3">
+                    <div className="text-2xl font-bold text-primary">
+                      {formatPrice(plan.price)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {getTypeText(plan.type)}
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-3 pt-0">
+                  {/* Features */}
+                  <div className="space-y-2">
+                    {[
+                      { icon: Clock, label: '每日额度', value: renderQuota(plan.dailyQuotaLimit) },
+                      { icon: TrendingUp, label: '每周额度', value: renderQuota(plan.weeklyQuotaLimit) },
+                      { icon: Zap, label: 'AI 模型', value: `${plan.allowedModels.length} 个` },
+                    ].map((feature, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <feature.icon className="h-3 w-3 text-primary" />
+                          <span className="text-xs font-medium">{feature.label}</span>
+                        </div>
+                        <span className="text-xs font-bold">{feature.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Model List */}
+                  <div>
+                    <div className="text-xs font-medium mb-1 flex items-center gap-1">
+                      <Check className="h-3 w-3 text-primary" />
+                      支持模型
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {plan.allowedModels.slice(0, 4).map((model) => (
+                        <Badge key={model} variant="secondary" className="text-xs px-1.5 py-0">
+                          {model}
+                        </Badge>
+                      ))}
+                      {plan.allowedModels.length > 4 && (
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                          +{plan.allowedModels.length - 4}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <Button
+                    className="w-full h-9 text-sm"
+                    onClick={() => handlePurchase(plan.id)}
+                    disabled={loading || hasHigherPlan}
+                    variant={isPopular ? "default" : "outline"}
+                  >
+                    {!isAuthenticated ? (
+                      <>
+                        <LogIn className="mr-1 h-4 w-4" />
+                        登录购买
+                      </>
+                    ) : hasHigherPlan && !isCurrentPlan ? (
+                      <>
+                        <CheckCircle className="mr-1 h-4 w-4" />
+                        已有更高套餐
+                      </>
+                    ) : isCurrentPlan ? (
+                      <>
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                        续费套餐
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="mr-1 h-4 w-4" />
+                        立即购买
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       {plans.length === 0 && (
@@ -397,79 +486,117 @@ export default function SubscriptionPage() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              购买套餐 - {selectedPlan?.name}
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="h-4 w-4 text-primary" />
+              支付订单
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col items-center space-y-4 py-4">
-            {/* 倒计时显示 */}
-            <Badge variant="secondary" className="gap-1">
-              <Clock className="h-3 w-3" />
-              {formatTime(countdown)}
-            </Badge>
-
-            {/* 套餐信息 */}
+          <div className="flex flex-col items-center space-y-3 py-3">
+            {/* 套餐信息卡片 */}
             {selectedPlan && (
-              <div className="w-full text-center border rounded-lg p-4">
-                <div className="text-2xl font-bold text-primary mb-2">
-                  ¥{selectedPlan.price}
+              <div className="w-full p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="text-xs text-muted-foreground">订阅套餐</div>
+                    <div className="text-sm font-bold">{selectedPlan.name}</div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">{getPlanLevelText(selectedPlan.level)}</Badge>
                 </div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  {getTypeText(selectedPlan.type)}套餐
+
+                <Separator className="my-2" />
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <div className="text-muted-foreground mb-0.5">套餐类型</div>
+                    <div className="font-semibold">{getTypeText(selectedPlan.type)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground mb-0.5">支付金额</div>
+                    <div className="text-lg font-bold text-primary">
+                      {formatPrice(selectedPlan.price)}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  日额度: {renderQuota(selectedPlan.dailyQuotaLimit)} • 周额度: {renderQuota(selectedPlan.weeklyQuotaLimit)}
+
+                <div className="mt-2 pt-2 border-t grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div>
+                    <Zap className="h-3 w-3 inline mr-1" />
+                    日额度: {renderQuota(selectedPlan.dailyQuotaLimit)}
+                  </div>
+                  <div>
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    周额度: {renderQuota(selectedPlan.weeklyQuotaLimit)}
+                  </div>
                 </div>
               </div>
             )}
 
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>请在5分钟内完成支付</strong><br />
-                使用支付宝扫描下方二维码完成支付
-              </AlertDescription>
-            </Alert>
+            {/* 倒计时 */}
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">剩余时间:</span>
+              <Badge variant="secondary" className="text-sm font-mono">
+                {formatTime(countdown)}
+              </Badge>
+            </div>
 
             {/* 二维码 */}
-            <div className="p-4 border rounded-lg bg-white">
-              <QRCode
-                value={qrCode}
-                size={200}
-              />
+            <div className="relative">
+              <div className="p-4 rounded-lg bg-white border">
+                <QRCode
+                  value={qrCode}
+                  size={180}
+                  level="H"
+                  includeMargin
+                />
+              </div>
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-primary text-white px-3 py-0.5 text-xs">
+                  <Smartphone className="h-3 w-3 mr-1" />
+                  支付宝扫码
+                </Badge>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Smartphone className="h-4 w-4" />
-              请使用手机支付宝扫码
-            </div>
+            {/* 提示信息 */}
+            <Alert className="bg-blue-50/50 border-blue-200">
+              <AlertCircle className="h-3 w-3 text-blue-600" />
+              <AlertDescription className="text-xs">
+                <div className="font-medium text-blue-900 mb-0.5">支付说明</div>
+                <ul className="text-blue-800 space-y-0.5 text-xs">
+                  <li>• 请在 5 分钟内使用支付宝扫码完成支付</li>
+                  <li>• 支付成功后订阅将在 1-3 分钟内自动生效</li>
+                  <li>• 如有问题请联系客服</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
           </div>
 
-          <DialogFooter className="flex gap-2">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
               variant="outline"
+              className="flex-1 h-8 text-xs"
               onClick={() => {
                 setQrCode('');
                 setCountdown(300);
                 setSelectedPlan(null);
               }}
             >
-              取消
+              取消支付
             </Button>
             <Button
-              className="gap-2"
+              className="flex-1 gap-1 h-8 text-xs"
               onClick={() => {
                 setQrCode('');
                 setCountdown(300);
                 setSelectedPlan(null);
                 loadCurrentSubscription();
-                toast.success('如果支付成功，订阅将在几分钟内生效');
+                toast.success('正在确认支付状态，请稍候...');
               }}
             >
-              <CheckCircle className="h-4 w-4" />
-              支付完成
+              <CheckCircle className="h-3 w-3" />
+              我已支付
             </Button>
           </DialogFooter>
         </DialogContent>

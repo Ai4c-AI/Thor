@@ -44,14 +44,10 @@ public class SubscriptionMaintenanceBackgroundTask(
         using var scope = serviceProvider.CreateScope();
         var subscriptionService = scope.ServiceProvider.GetRequiredService<SubscriptionService>();
 
-        var tasks = new List<Task>
-        {
-            MarkExpiredSubscriptionsAsync(subscriptionService),
-            ResetDailyQuotasAsync(subscriptionService),
-            ResetWeeklyQuotasAsync(subscriptionService)
-        };
-
-        await Task.WhenAll(tasks);
+        
+        await MarkExpiredSubscriptionsAsync(subscriptionService);
+        await ResetDailyQuotasAsync(subscriptionService);
+        await ResetWeeklyQuotasAsync(subscriptionService);
     }
 
     /// <summary>

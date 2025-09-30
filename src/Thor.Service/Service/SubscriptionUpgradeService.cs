@@ -54,7 +54,7 @@ public class SubscriptionUpgradeService(
             CurrentPlan = currentSubscription.Plan,
             TargetPlan = targetPlan,
             CurrentSubscription = currentSubscription,
-            RemainingDays = (int)Math.Max(0, (currentSubscription.EndDate - DateTime.UtcNow).TotalDays),
+            RemainingDays = (int)Math.Max(0, (currentSubscription.EndDate - DateTime.Now).TotalDays),
             RemainingValue = remainingValue,
             TargetPrice = targetPlan.Price,
             ActualPayAmount = actualPayAmount,
@@ -130,7 +130,7 @@ public class SubscriptionUpgradeService(
                 PurchaseRecordId = paymentRecordId,
                 LastDailyResetDate = upgradeRecord.NewStartDate.Date,
                 LastWeeklyResetDate = GetWeekStart(upgradeRecord.NewStartDate),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             DbContext.UserSubscriptions.Add(newSubscription);
@@ -247,7 +247,7 @@ public class SubscriptionUpgradeService(
             return 0;
 
         var totalDays = subscription.Plan.GetValidityDays();
-        var remainingDays = Math.Max(0, (subscription.EndDate - DateTime.UtcNow).TotalDays);
+        var remainingDays = Math.Max(0, (subscription.EndDate - DateTime.Now).TotalDays);
 
         if (totalDays <= 0 || remainingDays <= 0)
             return 0;

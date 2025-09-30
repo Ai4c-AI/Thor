@@ -162,7 +162,7 @@ public class SubscriptionRateLimitService(IServiceProvider serviceProvider, Subs
             WeeklyQuotaUsed = subscription.WeeklyUsedQuota,
             WeeklyQuotaRemaining = subscription.Plan.WeeklyQuotaLimit - subscription.WeeklyUsedQuota,
             AllowedModels = subscription.Plan.AllowedModels,
-            DaysRemaining = (int)(subscription.EndDate - DateTime.UtcNow).TotalDays
+            DaysRemaining = (int)(subscription.EndDate - DateTime.Now).TotalDays
         };
     }
 }

@@ -33,7 +33,7 @@ public sealed class ChannelGroupFailoverService(
         public DateTime LastFailureTime { get; set; } = DateTime.MinValue;
         public TimeSpan FailureWindow { get; set; } = TimeSpan.FromMinutes(5);
         public bool IsHealthy => FailureCount < 3 ||
-                                DateTime.UtcNow - LastFailureTime > FailureWindow;
+                                DateTime.Now - LastFailureTime > FailureWindow;
     }
 
     /// <summary>
@@ -255,7 +255,7 @@ public sealed class ChannelGroupFailoverService(
         var healthInfo = await GetChannelHealthInfoAsync(channelId);
 
         healthInfo.FailureCount++;
-        healthInfo.LastFailureTime = DateTime.UtcNow;
+        healthInfo.LastFailureTime = DateTime.Now;
 
         var cacheKey = ChannelHealthCacheKey + channelId;
         await cache.CreateAsync(cacheKey, healthInfo, TimeSpan.FromMinutes(10));

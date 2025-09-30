@@ -117,11 +117,11 @@ public class SubscriptionQuotaUsage : Entity<string>
             RequestTokens = requestTokens,
             ResponseTokens = responseTokens,
             TotalTokens = requestTokens + responseTokens,
-            UsageTime = DateTime.UtcNow,
+            UsageTime = DateTime.Now,
             RequestIp = requestIp,
             UserAgent = userAgent,
             RequestId = requestId,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
     }
 

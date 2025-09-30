@@ -104,7 +104,7 @@ public class FalAIService(
         if (!string.IsNullOrEmpty(taskId) || imageUrls?.Length > 0)
         {
             // 如果没有taskId，生成一个基于时间戳的ID
-            taskId ??= $"fal-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            taskId ??= $"fal-{DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
 
             await imageTaskLoggerService.CreateTaskAsync(
                 taskId: taskId,
