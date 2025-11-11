@@ -16,9 +16,8 @@ public class ThorChatCompletionsRequest : IOpenAiModels.ITemperature, IOpenAiMod
     {
         Messages = new List<ThorChatMessage>();
     }
-    
-    [JsonPropertyName("store")]
-    public bool? Store { get; set; }
+
+    [JsonPropertyName("store")] public bool? Store { get; set; }
 
     /// <summary>
     /// 表示对话中支持的模态类型数组。可以为 null。
@@ -29,14 +28,15 @@ public class ThorChatCompletionsRequest : IOpenAiModels.ITemperature, IOpenAiMod
     /// <summary>
     /// 表示对话中的音频请求参数。可以为 null。
     /// </summary>
-    [JsonPropertyName("audio")] public ThorChatAudioRequest? Audio { get; set; }
+    [JsonPropertyName("audio")]
+    public ThorChatAudioRequest? Audio { get; set; }
 
     /// <summary>
     /// 包含迄今为止对话的消息列表
     /// </summary>
     [JsonPropertyName("messages")]
     public List<ThorChatMessage> Messages { get; set; }
-    
+
     /// <summary>
     /// 模型唯一编码值，如 gpt-4，gpt-3.5-turbo,moonshot-v1-8k，看底层具体平台定义
     /// </summary>
@@ -232,17 +232,24 @@ public class ThorChatCompletionsRequest : IOpenAiModels.ITemperature, IOpenAiMod
         {
             if (value is JsonElement jsonElement)
             {
-                if (jsonElement.ValueKind == JsonValueKind.String)
-                {
-                    ToolChoice = new ThorToolChoice
-                    {
-                        Type = jsonElement.GetString()
-                    };
-                }
-                else if (jsonElement.ValueKind == JsonValueKind.Object)
+                // if (jsonElement.ValueKind == JsonValueKind.String)
+                // {
+                //     ToolChoice = new ThorToolChoice
+                //     {
+                //         Type = jsonElement.GetString()
+                //     };
+                // }
+                if (jsonElement.ValueKind == JsonValueKind.Object)
                 {
                     ToolChoice = jsonElement.Deserialize<ThorToolChoice>();
                 }
+            }
+            else if (value is string text)
+            {
+                ToolChoice = new ThorToolChoice
+                {
+                    Type = text
+                };
             }
             else
             {
@@ -278,15 +285,12 @@ public class ThorChatCompletionsRequest : IOpenAiModels.ITemperature, IOpenAiMod
     [JsonPropertyName("user")]
     public string User { get; set; }
 
-    [JsonPropertyName("thinking")] public ThorChatClaudeThinking Thinking { get; set; }
+    [JsonPropertyName("thinking")] public ThorChatClaudeThinking? Thinking { get; set; }
 
-    /// <summary>
-    /// 参数验证
-    /// </summary>
-    /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
-    public IEnumerable<ValidationResult> Validate()
-    {
-        throw new NotImplementedException();
-    }
+    [JsonPropertyName("enable_thinking")] public bool? EnableThinking { get; set; }
+
+    [JsonPropertyName("web_search_options")]
+    public ThorChatWebSearchOptions? WebSearchOptions { get; set; } = null;
+
+    [JsonPropertyName("reasoning_effort")] public string? ReasoningEffort { get; set; }
 }

@@ -79,6 +79,27 @@ export const downloadImportTemplate = () => {
   });
 }
 
+/**
+ * 批量删除渠道
+ */
+export const bulkRemove = (ids: string[]) => {
+  return postJson(prefix + "/bulk/delete", { ids });
+}
+
+/**
+ * 批量启用渠道
+ */
+export const bulkEnable = (ids: string[]) => {
+  return postJson(prefix + "/bulk/enable", { ids });
+}
+
+/**
+ * 批量禁用渠道
+ */
+export const bulkDisable = (ids: string[]) => {
+  return postJson(prefix + "/bulk/disable", { ids });
+}
+
 
 
 

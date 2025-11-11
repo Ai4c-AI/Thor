@@ -192,6 +192,129 @@ namespace Thor.Provider.Logger
                     b.ToTable("Tracings");
                 });
 
+            modelBuilder.Entity("Thor.Domain.Images.ImageTaskLogger", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChannelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChannelName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Creator")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IP")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImageUrls")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Modifier")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrganizationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Quota")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("TaskCompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("TaskCreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TaskParameters")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TaskStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TokenName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Creator");
+
+                    b.HasIndex("ModelName");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("TaskStatus");
+
+                    b.HasIndex("TaskType");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserName");
+
+                    b.ToTable("ImageTaskLoggers");
+                });
+
             modelBuilder.Entity("Thor.Service.Domain.ModelStatisticsNumber", b =>
                 {
                     b.Property<string>("Id")

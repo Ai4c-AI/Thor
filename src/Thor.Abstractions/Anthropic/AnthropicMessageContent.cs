@@ -18,6 +18,8 @@ public class AnthropicMessageContent
 
     [JsonPropertyName("id")] public string? Id { get; set; }
 
+    [JsonPropertyName("thinking")] public string? Thinking { get; set; }
+    
     [JsonPropertyName("input")] public object? Input { get; set; }
 
     [JsonPropertyName("content")]
@@ -35,7 +37,7 @@ public class AnthropicMessageContent
                 return _content;
             }
 
-            return _contents!;
+            return _contents;
         }
         set
         {
@@ -59,7 +61,7 @@ public class AnthropicMessageContent
 
     private string? _content;
 
-    private List<AnthropicMessageContent> _contents;
+    private List<AnthropicMessageContent>? _contents;
 
     public class AnthropicMessageContentSource
     {

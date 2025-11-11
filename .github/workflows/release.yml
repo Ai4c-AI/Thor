@@ -107,25 +107,41 @@ jobs:
           path: src/Thor.Service/wwwroot/
 
       - name: 还原NuGet包
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+        run: dotnet restore ${{ env.PROJECT_PATH }} --runtime ${{ matrix.runtime }}
 
       - name: 构建项目
-        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --runtime ${{ matrix.runtime }} --no-restore
 
       - name: 发布应用 (依赖框架)
         if: matrix.deployment == 'framework-dependent'
+        shell: bash
         run: |
+          # 为Linux和Windows启用ReadyToRun，macOS禁用
+          if [[ "${{ matrix.runtime }}" == osx-* ]]; then
+            READY_TO_RUN=false
+          else
+            READY_TO_RUN=true
+          fi
+          
           dotnet publish ${{ env.PROJECT_PATH }} \
             --configuration Release \
             --runtime ${{ matrix.runtime }} \
             --no-build \
             --output ./publish/${{ matrix.runtime }}-fd/ \
             /p:PublishSingleFile=true \
-            /p:PublishReadyToRun=true
+            /p:PublishReadyToRun=${{ matrix.runtime != 'osx-x64' && matrix.runtime != 'osx-arm64' }}
 
       - name: 发布应用 (自包含)
         if: matrix.deployment == 'self-contained'
+        shell: bash
         run: |
+          # 为Linux和Windows启用ReadyToRun，macOS禁用
+          if [[ "${{ matrix.runtime }}" == osx-* ]]; then
+            READY_TO_RUN=false
+          else
+            READY_TO_RUN=true
+          fi
+          
           dotnet publish ${{ env.PROJECT_PATH }} \
             --configuration Release \
             --runtime ${{ matrix.runtime }} \
@@ -133,7 +149,7 @@ jobs:
             --no-build \
             --output ./publish/${{ matrix.runtime }}-sc/ \
             /p:PublishSingleFile=true \
-            /p:PublishReadyToRun=true \
+            /p:PublishReadyToRun=${{ matrix.runtime != 'osx-x64' && matrix.runtime != 'osx-arm64' }} \
             /p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: 创建发布包

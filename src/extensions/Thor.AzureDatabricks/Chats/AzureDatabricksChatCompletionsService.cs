@@ -27,9 +27,8 @@ public class AzureDatabricksChatCompletionsService(ILogger<AzureDatabricksChatCo
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        
         var address = GetAddress(options, chatCompletionCreate.Model);
-        
+
         using var openai =
             Activity.Current?.Source.StartActivity("OpenAI 对话补全");
 
@@ -57,7 +56,7 @@ public class AzureDatabricksChatCompletionsService(ILogger<AzureDatabricksChatCo
             var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             logger.LogError("OpenAI对话异常 请求地址：{Address}, StatusCode: {StatusCode} Response: {Response}", options.Address,
                 response.StatusCode, error);
-            
+
             throw new BusinessException("OpenAI对话异常", response.StatusCode.ToString());
         }
 
@@ -114,10 +113,7 @@ public class AzureDatabricksChatCompletionsService(ILogger<AzureDatabricksChatCo
         using var stream = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken));
 
         using StreamReader reader = new(await response.Content.ReadAsStreamAsync(cancellationToken));
-        string? line = string.Empty;
-        var first = true;
-        var isThink = false;
-        while ((line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
+        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
             line += Environment.NewLine;
 
@@ -155,33 +151,21 @@ public class AzureDatabricksChatCompletionsService(ILogger<AzureDatabricksChatCo
                 continue;
             }
 
-            var content = result?.Choices?.FirstOrDefault()?.Delta;
-
-            if (first && content?.Content == OpenAIConstant.ThinkStart)
-            {
-                isThink = true;
-                continue;
-                // 需要将content的内容转换到其他字段
-            }
-
-            if (isThink && content?.Content?.Contains(OpenAIConstant.ThinkEnd) == true)
-            {
-                isThink = false;
-                // 需要将content的内容转换到其他字段
-                continue;
-            }
-
-            if (isThink && result?.Choices != null)
+            if (result?.Choices != null)
             {
                 // 需要将content的内容转换到其他字段
                 foreach (var choice in result.Choices)
                 {
-                    choice.Delta.ReasoningContent = choice.Delta.Content;
-                    choice.Delta.Content = string.Empty;
+                    if (choice.Delta.Contents == null || choice.Delta.Contents.All(x => x.Type != "reasoning")) continue;
+                    {
+                        choice.Delta.ReasoningContent = choice.Delta.Contents
+                            .Where(x => x is { Type: "reasoning", Summary: not null })
+                            .SelectMany(x => x.Summary!).FirstOrDefault()?.text;
+
+                        choice.Delta.Contents = null;
+                    }
                 }
             }
-
-            first = false;
 
             yield return result;
         }

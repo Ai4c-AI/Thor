@@ -291,17 +291,23 @@ public static class ModelService
     public static async Task<object> GetModelLibraryMetadataAsync(HttpContext context)
     {
         var dbContext = context.RequestServices.GetRequiredService<IThorContext>();
-        
+
         var models = await dbContext.ModelManagers
             .AsNoTracking()
             .Where(x => x.Enable) // 只获取启用的模型
             .ToListAsync();
 
-        // 获取所有标签
+        // 获取所有标签及其数量
         var allTags = models
             .SelectMany(x => x.Tags)
-            .Distinct()
-            .OrderBy(x => x)
+            .GroupBy(x => x)
+            .Select(g => new
+            {
+                tag = g.Key,
+                count = g.Count()
+            })
+            .OrderByDescending(x => x.count)
+            .ThenBy(x => x.tag)
             .ToList();
 
         // 获取所有模型类型及其数量
@@ -417,6 +423,12 @@ public static class ModelService
         // 构建图标映射（使用Icon字段作为key和value）
         var iconMapping = icons.ToDictionary(x => x, x => x);
 
+        // 获取总模型数
+        var totalModels = models.Count;
+
+        // 系统货币汇率配置（1 USD = 2 CNY）
+        var exchangeRate = 2.0m;
+
         return new
         {
             tags = allTags,
@@ -424,7 +436,9 @@ public static class ModelService
             icons = iconMapping,
             modelTypes = modelTypes,
             modelTypeCounts = modelTypeCounts,
-            providerCounts = providerCounts
+            providerCounts = providerCounts,
+            totalModels = totalModels,
+            exchangeRate = exchangeRate
         };
     }
 }

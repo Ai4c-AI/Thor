@@ -1,21 +1,63 @@
-import { useEffect, useState } from "react";
+import { Channel } from "@/types/api";
+import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { Check, ChevronsUpDown } from "lucide-react";
+
+// shadcn/ui components
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+// Services
 import { getModels, getTypes } from "../../../services/ModelService";
 import { Add } from "../../../services/ChannelService";
-import { message, Drawer, Checkbox, Space } from "antd";
-import { Button, Select, Form, Input, Typography } from "antd";
 import { getModelPrompt } from "../../../utils/render";
 import { getList } from "../../../services/UserGroupService";
-import { Flexbox } from "react-layout-kit";
-import { useTranslation } from "react-i18next";
-import { theme } from "antd";
-
-const { Option } = Select;
-const { Text } = Typography;
 
 interface ICreateChannelProps {
   onSuccess: () => void;
   visible: boolean;
   onCancel: () => void;
+}
+
+interface FormData {
+  name: string;
+  type: string;
+  address: string;
+  other: string;
+  key: string;
+  models: string[];
+  group: string;
+  cache: boolean;
+  supportsResponses: boolean;
 }
 
 export default function CreateChannel({
@@ -24,404 +66,497 @@ export default function CreateChannel({
   onCancel,
 }: ICreateChannelProps) {
   const { t } = useTranslation();
-  const { token } = theme.useToken();
-  const [groups, setGroups] = useState<any[]>([]);
-
-  useEffect(() => {
-    getList()
-      .then((res) => {
-        if (res.success) {
-          setGroups(res.data);
-        }
-      });
-  }, []);
-
-  // 字典models key, value类型
-  const [types, setTypes] = useState<any>();
-  const [models, setModels] = useState<any>();
-  const [input, setInput] = useState<any>({
+  const [groups, setGroups] = useState<Channel[]>([]);
+  const [types, setTypes] = useState<Channel | null>(null);
+  const [models, setModels] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "",
     address: "",
     other: "",
     key: "",
     models: [],
-    groups: [],
+    group: "",
     cache: false,
     supportsResponses: false
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [groupPopoverOpen, setGroupPopoverOpen] = useState(false);
 
-  type FieldType = {
-    name?: string;
-    type?: string;
-    address?: string;
-    other?: string;
-    key?: string;
-    models: string[];
-    groups: string[];
-    cache?: boolean;
-    supportsResponses?: boolean;
-  };
+  const loadData = useCallback(async () => {
+    try {
+      const [groupsRes, typesRes, modelsRes] = await Promise.all([
+        getList(),
+        getTypes(),
+        getModels()
+      ]);
 
-  function loading() {
-    getTypes().then((res) => {
-      if (res.success) {
-        setTypes(res.data);
-      } else {
-        message.error(res.message || t('common.operateFailed'));
+      if (groupsRes.success) {
+        setGroups(groupsRes.data);
       }
-    });
 
-    getModels().then((res) => {
-      if (res.success) {
-        setModels(res.data);
+      if (typesRes.success) {
+        setTypes(typesRes.data);
       } else {
-        message.error(res.message || t('common.operateFailed'));
+        toast.error(typesRes.message || t('common.operateFailed'));
       }
-    });
-  }
+
+      if (modelsRes.success) {
+        setModels(modelsRes.data);
+      } else {
+        toast.error(modelsRes.message || t('common.operateFailed'));
+      }
+    } catch (error) {
+      toast.error(t('common.operateFailed'));
+    }
+  }, [t]);
 
   useEffect(() => {
     if (visible) {
-      loading();
+      loadData();
+      // Reset form when opening
+      setFormData({
+        name: "",
+        type: "",
+        address: "",
+        other: "",
+        key: "",
+        models: [],
+        group: "",
+        cache: false,
+        supportsResponses: false
+      });
+      setErrors({});
+      setGroupPopoverOpen(false);
     }
-  }, [visible]);
+  }, [visible, loadData]);
 
-  function handleSubmit(values: any) {
-    if (input.type === "Claude" && input.cache) {
-      values.other = "true";
-    } else if (input.type === "Claude" && !input.cache) {
-      values.other = "false";
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = t('channel.channelNameRequired');
+    } else if (formData.name.length < 3) {
+      newErrors.name = t('channel.channelNameMinLength');
     }
 
-    // 判断是否选择了模型
-    if (!values.models || values.models.length === 0) {
-      message.error(t('channel.modelsRequired'));
+    if (!formData.type) {
+      newErrors.type = t('channel.platformTypeRequired');
+    }
+
+    if (formData.models.length === 0) {
+      newErrors.models = t('channel.modelsRequired');
+    }
+
+    if (!formData.group) {
+      newErrors.group = t('channel.groupsRequired');
+    }
+
+    if (formData.type === "AWSClaude" && !formData.other.trim()) {
+      newErrors.other = t('channel.region');
+    }
+
+    if (formData.type === "ErnieBot" && !formData.other.trim()) {
+      newErrors.other = t('channel.appId');
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    Add(values).then((response) => {
+    setIsSubmitting(true);
+    try {
+      const submitData = {
+        ...formData,
+        groups: formData.group ? [formData.group] : [],
+      };
+
+      // Handle Claude cache setting
+      if (formData.type === "Claude") {
+        submitData.other = formData.cache ? "true" : "false";
+      }
+
+      const response = await Add(submitData);
       if (response.success) {
-        message.success(t('common.createSuccess'));
+        toast.success(t('common.createSuccess'));
         onSuccess();
       } else {
-        message.error(response.message || t('common.operateFailed'));
+        toast.error(response.message || t('common.operateFailed'));
       }
-    });
-  }
+    } catch (error) {
+      toast.error(t('common.operateFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const updateFormData = (field: keyof FormData, value: unknown) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const renderTypeSpecificFields = () => {
+    switch (formData.type) {
+      case "CustomeOpenAI":
+        return (
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-muted-foreground">
+                {t('channel.routeDefaultFormat')}：https://api.openai.com/v1
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="supportsResponses"
+                checked={formData.supportsResponses}
+                onCheckedChange={(checked) => updateFormData('supportsResponses', checked)}
+              />
+              <Label htmlFor="supportsResponses">{t('channel.supportsResponses')}</Label>
+            </div>
+          </div>
+        );
+
+      case "AzureOpenAI":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="version">{t('channel.version')}</Label>
+            <Select value={formData.other} onValueChange={(value) => updateFormData('other', value)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('channel.version')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2024-05-01-preview">2024-05-01-preview</SelectItem>
+                <SelectItem value="2024-04-01-preview">2024-04-01-preview</SelectItem>
+                <SelectItem value="2024-06-01">2024-06-01</SelectItem>
+                <SelectItem value="2024-10-01-preview">2024-10-01-preview</SelectItem>
+                <SelectItem value="2024-10-21">2024-10-21</SelectItem>
+                <SelectItem value="2025-01-01-preview">2025-01-01-preview</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+
+      case "AWSClaude":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="region">{t('channel.region')} *</Label>
+            <Input
+              id="region"
+              value={formData.other}
+              onChange={(e) => updateFormData('other', e.target.value)}
+              placeholder={t('channel.region')}
+              className={errors.other ? "border-destructive" : ""}
+            />
+            {errors.other && (
+              <p className="text-sm text-destructive">{errors.other}</p>
+            )}
+          </div>
+        );
+
+      case "Claude":
+        return (
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="cache"
+              checked={formData.cache}
+              onCheckedChange={(checked) => updateFormData('cache', checked)}
+            />
+            <Label htmlFor="cache">{t('channel.cacheEnabled')}</Label>
+          </div>
+        );
+
+      case "Hunyuan":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="region">{t('channel.region')}</Label>
+            <Select value={formData.other} onValueChange={(value) => updateFormData('other', value)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('channel.region')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ap-beijing">北京（ap-beijing）</SelectItem>
+                <SelectItem value="ap-guangzhou">广州（ap-guangzhou）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+
+      case "ErnieBot":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="appId">{t('channel.appId')} *</Label>
+            <Input
+              id="appId"
+              value={formData.other}
+              onChange={(e) => updateFormData('other', e.target.value)}
+              placeholder={t('channel.appId')}
+              className={errors.other ? "border-destructive" : ""}
+            />
+            {errors.other && (
+              <p className="text-sm text-destructive">{errors.other}</p>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const selectedGroup = groups.find((group) => String(group.code ?? '') === formData.group);
+  const groupSearchPlaceholder = t('channel.searchGroups', { defaultValue: 'Search groups...' });
+  const groupEmptyLabel = t('channel.noGroupsFound', { defaultValue: 'No groups found.' });
 
   return (
-    <Drawer
-      open={visible}
-      width={500}
-      title={t('channel.createChannel')}
-      onClose={onCancel}
-      styles={{
-        body: {
-          paddingBottom: 80,
-        },
-      }}
-      footer={
-        <Space style={{ 
-          width: '100%', 
-          justifyContent: 'flex-end',
-          marginBottom: token.marginLG
-        }}>
-          <Button onClick={onCancel}>{t('common.cancel')}</Button>
-          <Button 
-            type="primary" 
-            form="createChannelForm" 
-            htmlType="submit"
-          >
-            {t('common.submit')}
-          </Button>
-        </Space>
-      }
-    >
-      <Form
-        id="createChannelForm"
-        onFinish={handleSubmit}
-        layout="vertical"
-        initialValues={{
-          cache: false,
-          supportsResponses: false
-        }}
-      >
-        <Form.Item<FieldType>
-          label={t('channel.channelName')}
-          name="name"
-          rules={[
-            {
-              required: true,
-              message: t('channel.channelNameRequired'),
-            },
-            {
-              min: 3,
-              message: t('channel.channelNameMinLength'),
-            },
-          ]}
-        >
-          <Input
-            value={input.name}
-            onChange={(v) => {
-              setInput({ ...input, name: v.target.value });
-            }}
-            placeholder={t('channel.enterChannelName')}
-          />
-        </Form.Item>
+    <Dialog open={visible} onOpenChange={onCancel}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('channel.createChannel')}</DialogTitle>
+          <DialogDescription>
+            Fill in the details to create a new channel
+          </DialogDescription>
+        </DialogHeader>
 
-        <Form.Item<FieldType>
-          rules={[
-            {
-              required: true,
-              message: t('channel.platformTypeRequired'),
-            },
-          ]}
-          name="type"
-          label={t('channel.channelType')}
-        >
-          <Select
-            placeholder={t('channel.selectPlatformType')}
-            value={input.type}
-            onChange={(v) => {
-              setInput({ ...input, type: v });
-            }}
-            allowClear
-          >
-            {types &&
-              Object.keys(types).map((key) => {
-                return (
-                  <Option key={key} value={types[key]}>
+        <div className="space-y-6 py-4">
+          {/* Channel Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">{t('channel.channelName')} *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => updateFormData('name', e.target.value)}
+              placeholder={t('channel.enterChannelName')}
+              className={errors.name ? "border-destructive" : ""}
+            />
+            {errors.name && (
+              <p className="text-sm text-destructive">{errors.name}</p>
+            )}
+          </div>
+
+          {/* Channel Type */}
+          <div className="space-y-2">
+            <Label htmlFor="type">{t('channel.channelType')} *</Label>
+            <Select value={formData.type} onValueChange={(value) => updateFormData('type', value)}>
+              <SelectTrigger className={errors.type ? "border-destructive" : ""}>
+                <SelectValue placeholder={t('channel.selectPlatformType')} />
+              </SelectTrigger>
+              <SelectContent>
+                {types && Object.keys(types).map((key) => (
+                  <SelectItem key={key} value={types[key] as string}>
                     {key}
-                  </Option>
-                );
-              })}
-          </Select>
-        </Form.Item>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.type && (
+              <p className="text-sm text-destructive">{errors.type}</p>
+            )}
+          </div>
 
-        <Form.Item<FieldType> 
-          label={t('channel.proxyAddress')} 
-          name="address"
-        >
-          <Input placeholder={t('channel.enterProxyAddress')} />
-        </Form.Item>
-        
-        {input.type === "CustomeOpenAI" && (
-          <>
-            <div style={{ 
-              marginBottom: 16, 
-              padding: 12, 
-              backgroundColor: token.colorInfoBg, 
-              borderRadius: token.borderRadius,
-              border: `1px solid ${token.colorInfoBorder}`
-            }}>
-              <Text type="secondary">
-                {t('channel.routeDefaultFormat')}：https://api.openai.com/v1
-              </Text>
+          {/* Proxy Address */}
+          <div className="space-y-2">
+            <Label htmlFor="address">{t('channel.proxyAddress')}</Label>
+            <Input
+              id="address"
+              value={formData.address}
+              onChange={(e) => updateFormData('address', e.target.value)}
+              placeholder={t('channel.enterProxyAddress')}
+            />
+          </div>
+
+          {/* Type-specific fields */}
+          {renderTypeSpecificFields()}
+
+          {/* API Key */}
+          <div className="space-y-2">
+            <Label htmlFor="key">{t('channel.key')}</Label>
+            <Input
+              id="key"
+              type="password"
+              value={formData.key}
+              onChange={(e) => updateFormData('key', e.target.value)}
+              placeholder={getModelPrompt(formData.type)}
+              autoComplete="new-password"
+            />
+          </div>
+
+          {/* Groups */}
+          <div className="space-y-2">
+            <Label htmlFor="group">{t('channel.groups')} *</Label>
+            <Popover open={groupPopoverOpen} onOpenChange={setGroupPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="group"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={groupPopoverOpen}
+                  className={cn(
+                    "w-full justify-between",
+                    errors.group ? "border-destructive focus-visible:ring-destructive" : "",
+                    selectedGroup ? "" : "text-muted-foreground"
+                  )}
+                >
+                  {selectedGroup ? (
+                    <div className="flex flex-col items-start text-left">
+                      <span className="font-medium">{selectedGroup.name ?? selectedGroup.code}</span>
+                      {selectedGroup.description && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {selectedGroup.description}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span>{t('channel.selectGroups')}</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0">
+                <Command>
+                  <CommandInput placeholder={groupSearchPlaceholder} />
+                  <CommandEmpty>{groupEmptyLabel}</CommandEmpty>
+                  <CommandList>
+                    <CommandGroup>
+                      {groups.map((group) => {
+                        const value = String(group.code ?? '');
+                        const isSelected = formData.group === value;
+                        return (
+                          <CommandItem
+                            key={value}
+                            value={`${group.name ?? value} ${group.description ?? ''}`}
+                            onSelect={() => {
+                              updateFormData('group', value);
+                              setGroupPopoverOpen(false);
+                            }}
+                          >
+                            <div className="flex w-full items-center justify-between">
+                              <div className="flex flex-col text-left">
+                                <span>{group.name ?? value}</span>
+                                {group.description && (
+                                  <span className="text-xs text-muted-foreground">{group.description}</span>
+                                )}
+                              </div>
+                              <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {selectedGroup && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">
+                  {`${t('channel.rate')}: ${selectedGroup.rate ?? '-'}`}
+                </Badge>
+              </div>
+            )}
+            {errors.group && (
+              <p className="text-sm text-destructive">{errors.group}</p>
+            )}
+          </div>
+
+          {/* Models */}
+          <div className="space-y-2">
+            <Label htmlFor="models">{t('channel.models')} *</Label>
+            <div className={`border rounded-md p-2 min-h-[40px] ${errors.models ? "border-destructive" : "border-input"}`}>
+              {formData.models.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {formData.models.map((model) => (
+                    <Badge
+                      key={model}
+                      variant="secondary"
+                      className="text-xs cursor-pointer"
+                      onClick={() => {
+                        const newModels = formData.models.filter(m => m !== model);
+                        updateFormData('models', newModels);
+                      }}
+                    >
+                      {model} ×
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">{t('channel.selectModels')}</p>
+              )}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select onValueChange={(value) => {
+                    if (!formData.models.includes(value)) {
+                      updateFormData('models', [...formData.models, value]);
+                    }
+                  }}>
+                    <SelectTrigger className="border-0 shadow-none p-0 h-auto">
+                      <SelectValue placeholder="Select from list..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.filter(model => !formData.models.includes(model)).map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="Or type custom model..."
+                    className="flex-1 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const value = e.currentTarget.value.trim();
+                        if (value && !formData.models.includes(value)) {
+                          updateFormData('models', [...formData.models, value]);
+                          e.currentTarget.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      const input = e.currentTarget.parentElement?.querySelector('input');
+                      const value = input?.value.trim();
+                      if (value && !formData.models.includes(value)) {
+                        updateFormData('models', [...formData.models, value]);
+                        if (input) input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
             </div>
-            <Form.Item<FieldType>
-              name="supportsResponses"
-              label={t('channel.supportsResponses')}
-              valuePropName="checked"
-            >
-              <Checkbox
-                checked={input.supportsResponses}
-                onChange={(v) => {
-                  setInput({ ...input, supportsResponses: v.target.checked });
-                }}
-              />
-            </Form.Item>
-          </>
-        )}
-        
-        {input.type === "AzureOpenAI" && (
-          <Form.Item<FieldType>
-            name="other"
-            label={t('channel.version')}
-          >
-            <Select
-              placeholder={t('channel.version')}
-              value={input.other}
-              defaultActiveFirstOption={true}
-              defaultValue={"2024-10-01-preview"}
-              onChange={(v) => {
-                setInput({ ...input, other: v });
-              }}
-              allowClear
-            >
-              <Option key={"2024-05-01-preview"} value={"2024-05-01-preview"}>
-                2024-05-01-preview
-              </Option>
-              <Option key={"2024-04-01-preview"} value={"2024-04-01-preview"}>
-                2024-04-01-preview
-              </Option>
-              <Option key={"2024-06-01"} value={"2024-06-01"}>
-                2024-06-01
-              </Option>
-              <Option key={"2024-10-01-preview"} value={"2024-10-01-preview"}>
-                2024-10-01-preview
-              </Option>
-              <Option key={"2024-10-21"} value={"2024-10-21"}>
-                2024-10-21
-              </Option>
-              <Option key={"2025-01-01-preview"} value={"2025-01-01-preview"}>
-                2025-01-01-preview
-              </Option>
-            </Select>
-          </Form.Item>
-        )}
-        
-        {input.type === "AWSClaude" && (
-          <Form.Item<FieldType>
-            name="other"
-            label={t('channel.region')}
-            rules={[
-              {
-                required: true,
-                message: t('channel.region'),
-              },
-            ]}
-          >
-            <Input
-              value={input.other}
-              onChange={(v) => {
-                setInput({ ...input, other: v.target.value });
-              }}
-              placeholder={t('channel.region')}
-            />
-          </Form.Item>
-        )}
-        
-        {input.type === "Claude" && (
-          <Form.Item<FieldType>
-            name="cache"
-            label={t('channel.cacheEnabled')}
-            valuePropName="checked"
-          >
-            <Checkbox
-              checked={input.cache}
-              onChange={(v) => {
-                setInput({ ...input, cache: v.target.checked });
-              }}
-            />
-          </Form.Item>
-        )}
-        
-        {input.type === "Hunyuan" && (
-          <Form.Item<FieldType>
-            name="other"
-            label={t('channel.region')}
-          >
-            <Select
-              placeholder={t('channel.region')}
-              value={input.other}
-              onChange={(v) => {
-                setInput({ ...input, other: v });
-              }}
-              allowClear
-            >
-              <Option key={"ap-beijing"} value={"ap-beijing"}>
-                北京（ap-beijing）
-              </Option>
-              <Option key={"ap-guangzhou"} value={"ap-guangzhou"}>
-                广州 （ap-guangzhou）
-              </Option>
-            </Select>
-          </Form.Item>
-        )}
-        
-        {input.type === "ErnieBot" && (
-          <Form.Item<FieldType>
-            name="other"
-            label={t('channel.appId')}
-            rules={[
-              {
-                required: true,
-                message: t('channel.appId'),
-              },
-            ]}
-          >
-            <Input
-              value={input.other}
-              onChange={(v) => {
-                setInput({ ...input, other: v.target.value });
-              }}
-              placeholder={t('channel.appId')}
-            />
-          </Form.Item>
-        )}
-        
-        <Form.Item<FieldType> 
-          label={t('channel.key')} 
-          name="key"
-        >
-          <Input.Password
-            placeholder={getModelPrompt(input.type)}
-            autoComplete="token"
-          />
-        </Form.Item>
-        
-        <Form.Item<FieldType>
-          name="groups"
-          label={t('channel.groups')}
-          rules={[{ required: true, message: t('channel.groupsRequired') }]}
-        >
-          <Select
-            placeholder={t('channel.selectGroups')}
-            mode="tags"
-            options={groups?.map((group: any) => {
-              return {
-                label: <Flexbox gap={8} horizontal>
-                  <span>{group.name}</span>
-                  <span style={{ fontSize: 12, color: token.colorTextSecondary }}>{group.description}</span>
-                  <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-                    <Text type="secondary">{t('channel.rate')}：</Text>
-                    {group.rate}
-                  </span>
-                </Flexbox>,
-                value: group.code
-              }
-            })}
-            value={input.groups}
-            onChange={(v) => {
-              setInput({ ...input, groups: v });
-            }}
-          />
-        </Form.Item>
-        
-        <Form.Item
-          name="models"
-          label={t('channel.models')}
-          rules={[
-            {
-              required: true,
-              message: t('channel.modelsRequired'),
-            },
-          ]}
-        >
-          <Select
-            placeholder={t('channel.selectModels')}
-            defaultActiveFirstOption={true}
-            mode="tags"
-            value={input.models}
-            onChange={(v) => {
-              setInput({ ...input, models: v });
-            }}
-            allowClear
-            optionFilterProp="children"
-            showSearch
-          >
-            {models &&
-              models.map((model: any) => {
-                return (
-                  <Option key={model} value={model}>
-                    {model}
-                  </Option>
-                );
-              })}
-          </Select>
-        </Form.Item>
-      </Form>
-    </Drawer>
+            {errors.models && (
+              <p className="text-sm text-destructive">{errors.models}</p>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : t('common.submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

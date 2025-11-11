@@ -18,7 +18,7 @@ using Thor.Abstractions.Extensions;
 
 namespace Thor.CustomOpenAI.Chats;
 
-public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsService> logger)
+public sealed class OpenAiChatCompletionsService(ILogger<OpenAiChatCompletionsService> logger)
     : IThorChatCompletionsService
 {
     public async Task<ThorChatCompletionsResponse> ChatCompletionsAsync(ThorChatCompletionsRequest chatCompletionCreate,
@@ -80,11 +80,6 @@ public sealed class OpenAIChatCompletionsService(ILogger<OpenAIChatCompletionsSe
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
             throw new UnauthorizedAccessException();
-        }
-
-        if (response.StatusCode == HttpStatusCode.PaymentRequired)
-        {
-            throw new PaymentRequiredException();
         }
 
         // 如果限流则抛出限流异常

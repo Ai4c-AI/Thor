@@ -277,6 +277,106 @@ public static class StatisticsService
                                                 x.Type == StatisticsConsumesNumberType.Tokens))
             .SumAsync(log => log.Value);
 
+        // 计算 RPM 和 TPM
+        await CalculateRpmTpm(dbContext, userContext, statisticsDto);
+
         return statisticsDto;
+    }
+
+    /// <summary>
+    /// 计算RPM (每分钟请求数) 和 TPM (每分钟Token数)
+    /// </summary>
+    private static async ValueTask CalculateRpmTpm(ILoggerDbContext dbContext, IUserContext userContext, StatisticsDto statisticsDto)
+    {
+        var sevenDaysAgo = DateTime.Now.Date.AddDays(-7);
+        var oneHourAgo = DateTime.Now.AddHours(-1);
+        var now = DateTime.Now;
+
+        // 查询ChatLogger数据
+        var loggerQuery = dbContext.Loggers.Where(x =>
+            x.Type == ThorChatLoggerType.Consume &&
+            x.CreatedAt >= sevenDaysAgo);
+
+        if (!userContext.IsAdmin)
+        {
+            loggerQuery = loggerQuery.Where(x => x.Creator == userContext.CurrentUserId);
+        }
+
+        var loggerData = await loggerQuery
+            .Select(x => new
+            {
+                x.CreatedAt,
+                x.PromptTokens,
+                x.CompletionTokens,
+                TotalTokens = x.PromptTokens + x.CompletionTokens
+            })
+            .ToListAsync();
+
+        if (loggerData.Any())
+        {
+            // 计算7天平均RPM
+            var totalMinutes = (now - sevenDaysAgo).TotalMinutes;
+            var totalRequests = loggerData.Count;
+            statisticsDto.AverageRPM = totalMinutes > 0 ? (decimal)(totalRequests / totalMinutes) : 0;
+
+            // 计算7天平均TPM
+            var totalTokens = loggerData.Sum(x => x.TotalTokens);
+            statisticsDto.AverageTPM = totalMinutes > 0 ? (decimal)(totalTokens / totalMinutes) : 0;
+
+            // 计算实时RPM和TPM（最近1小时）
+            var realtimeData = loggerData.Where(x => x.CreatedAt >= oneHourAgo).ToList();
+            var realtimeMinutes = Math.Max(1, (now - oneHourAgo).TotalMinutes); // 至少1分钟避免除零
+
+            statisticsDto.RealtimeRPM = (decimal)(realtimeData.Count / realtimeMinutes);
+            statisticsDto.RealtimeTPM = (decimal)(realtimeData.Sum(x => x.TotalTokens) / realtimeMinutes);
+
+            // 计算按小时分组的RPM和TPM历史数据（过去24小时）
+            var twentyFourHoursAgo = DateTime.Now.AddHours(-24);
+            var hourlyData = loggerData
+                .Where(x => x.CreatedAt >= twentyFourHoursAgo)
+                .GroupBy(x => new { x.CreatedAt.Year, x.CreatedAt.Month, x.CreatedAt.Day, x.CreatedAt.Hour })
+                .Select(group => new
+                {
+                    Hour = new DateTime(group.Key.Year, group.Key.Month, group.Key.Day, group.Key.Hour, 0, 0),
+                    RequestCount = group.Count(),
+                    TokenCount = group.Sum(x => x.TotalTokens)
+                })
+                .OrderBy(x => x.Hour)
+                .ToList();
+
+            // 填充RPM历史数据
+            statisticsDto.RPMHistory = new List<StatisticsNumberDto>();
+            statisticsDto.TPMHistory = new List<StatisticsNumberDto>();
+
+            // 生成过去24小时的完整小时列表
+            for (var hour = twentyFourHoursAgo.Date.AddHours(twentyFourHoursAgo.Hour); hour <= now; hour = hour.AddHours(1))
+            {
+                var hourData = hourlyData.FirstOrDefault(x => x.Hour == hour);
+
+                statisticsDto.RPMHistory.Add(new StatisticsNumberDto
+                {
+                    DateTime = hour.ToString("yyyy-MM-dd HH:00"),
+                    Name = hour.ToString("HH:00"),
+                    Value = hourData?.RequestCount ?? 0
+                });
+
+                statisticsDto.TPMHistory.Add(new StatisticsNumberDto
+                {
+                    DateTime = hour.ToString("yyyy-MM-dd HH:00"),
+                    Name = hour.ToString("HH:00"),
+                    Value = hourData?.TokenCount ?? 0
+                });
+            }
+        }
+        else
+        {
+            // 如果没有数据，初始化为0
+            statisticsDto.AverageRPM = 0;
+            statisticsDto.AverageTPM = 0;
+            statisticsDto.RealtimeRPM = 0;
+            statisticsDto.RealtimeTPM = 0;
+            statisticsDto.RPMHistory = new List<StatisticsNumberDto>();
+            statisticsDto.TPMHistory = new List<StatisticsNumberDto>();
+        }
     }
 }

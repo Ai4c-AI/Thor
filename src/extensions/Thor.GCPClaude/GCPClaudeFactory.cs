@@ -153,7 +153,7 @@ namespace Thor.GCPClaude
         private static bool IsTokenExpired(TokenInfo tokenInfo)
         {
             // 提前5分钟刷新令牌，避免边界情况
-            return DateTime.UtcNow.AddMinutes(5) >= tokenInfo.ExpiryTime;
+            return DateTime.Now.AddMinutes(5) >= tokenInfo.ExpiryTime;
         }
 
         /// <summary>

@@ -40,7 +40,7 @@ namespace Thor.Qiansail.Chats
                         parameters: x.Function.Parameters.Items.Properties.Select( 
                             y=> new FunctionParameter( 
                             y.Key,
-                            y.Value.Type,
+                            y.Value.typeStr,
                             y.Value.Description?? string.Empty, y.Value.Required.Contains(y.Key)
                             )).ToArray())).ToArray()
                     .ToArray()
@@ -111,7 +111,7 @@ namespace Thor.Qiansail.Chats
                         parameters: x.Function.Parameters.Items.Properties.Select(
                             y => new FunctionParameter(
                             y.Key,
-                            y.Value.Type,
+                            y.Value.typeStr,
                             y.Value.Description ?? string.Empty, y.Value.Required.Contains(y.Key)
                             )).ToArray())).ToArray()
                     .ToArray(),

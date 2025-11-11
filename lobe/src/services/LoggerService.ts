@@ -62,7 +62,7 @@ export const viewConsumption = async (params: any) => {
  * 下载导入模板
  */
 export const Export = (params: any) => {
-    
+
     let url = prefix + "/export?";
     if (params.type) {
         url += "type=" + params.type + "&";
@@ -86,12 +86,12 @@ export const Export = (params: any) => {
       responseType: "blob",
     });
   }
-  
-  
-  
+
+
+
 /**
  * 获取模型热度
- * @returns 
+ * @returns
  */
 export const modelHot = async () => {
     return get(prefix + "/model-hot");
@@ -100,7 +100,7 @@ export const modelHot = async () => {
 /**
  * 获取日志详情的调用链路
  * @param loggerId 日志ID
- * @returns 
+ * @returns
  */
 export const getLoggerDetail = async (loggerId: string) => {
     return get(prefix + "/detail/" + loggerId);

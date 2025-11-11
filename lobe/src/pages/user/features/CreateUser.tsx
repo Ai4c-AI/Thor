@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
-import { Button, Drawer, Form, Input, Select, message } from 'antd';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
+import { toast } from 'sonner';
 import { create } from "../../../services/UserService";
 import { getList } from "../../../services/UserGroupService";
+import { useForm } from "react-hook-form";
+import { useTranslation } from 'react-i18next';
 
 interface CreateUserProps {
     visible: boolean;
@@ -9,124 +18,215 @@ interface CreateUserProps {
     onSuccess: () => void;
 }
 
+interface FormData {
+    userName: string;
+    email: string;
+    password: string;
+    role: string;
+    groups: string[];
+}
+
 export default function CreateUser({
     visible,
     onCancel,
     onSuccess
 }: CreateUserProps) {
-    const [input, setInput] = useState({
-        userName: '',
-        email: '',
-        password: '',
-        role: 'user',
-        groups: []
-    });
+    const { t } = useTranslation();
     const [groupOptions, setGroupOptions] = useState<any[]>([]);
+    const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
-    // 获取用户分组列表
+    const form = useForm<FormData>({
+        defaultValues: {
+            userName: '',
+            email: '',
+            password: '',
+            role: 'user',
+            groups: []
+        }
+    });
+
     useEffect(() => {
         if (visible) {
             getList().then(res => {
                 if (res.success) {
                     setGroupOptions(res.data || []);
                 } else {
-                    message.error('获取用户分组失败');
+                    toast.error(t('user.getGroupsFailed') || '获取用户分组失败');
                 }
             });
         }
-    }, [visible]);
+    }, [visible, t]);
 
-    function handleSubmit() {
-        create(input)
+    function handleSubmit(data: FormData) {
+        const submitData = {
+            ...data,
+            groups: selectedGroups
+        };
+
+        create(submitData)
             .then((res) => {
                 if (res.success) {
-                    message.success('创建成功');
+                    toast.success(t('common.createSuccess') || '创建成功');
                     onSuccess();
+                    handleClose();
                 } else {
-                    message.error({
-                        content: res.message
-                    } as any);
+                    toast.error(res.message || t('common.createFailed') || '创建失败');
                 }
             })
+            .catch(() => {
+                toast.error(t('common.operationFailed') || '操作失败');
+            });
     }
 
-    useEffect(() => {
-        if (!visible) {
-            setInput({
-                userName: '',
-                email: '',
-                password: '',
-                role: 'user',
-                groups: []
-            });
+    function handleClose() {
+        form.reset();
+        setSelectedGroups([]);
+        onCancel();
+    }
+
+    function addGroup(groupCode: string) {
+        if (!selectedGroups.includes(groupCode)) {
+            setSelectedGroups([...selectedGroups, groupCode]);
         }
-    }, [visible]);
+    }
+
+    function removeGroup(groupCode: string) {
+        setSelectedGroups(selectedGroups.filter(g => g !== groupCode));
+    }
 
     return (
-        <Drawer
-            open={visible}
-            width={500}
-            title="创建用户"
-            onClose={onCancel}
-        >
-            <Form onFinish={handleSubmit} style={{ width: 400 }}>
+        <Dialog open={visible} onOpenChange={handleClose}>
+            <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle>{t('user.createUser') || '创建用户'}</DialogTitle>
+                </DialogHeader>
 
-                <Form.Item
-                    label="用户名"
-                    name="userName"
-                    rules={[{ required: true, message: '请输入用户名' }]}
-                >
-                    <Input value={input.userName} onChange={(e) => setInput({ ...input, userName: e.target.value })} />
-                </Form.Item>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="userName"
+                            rules={{ required: t('user.userNameRequired') || '请输入用户名' }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('user.userName') || '用户名'}</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    label="邮箱"
-                    name="email"
-                    rules={[{ required: true, message: '请输入邮箱' }]}
-                >
-                    <Input value={input.email} onChange={(e) => setInput({ ...input, email: e.target.value })} />
-                </Form.Item>
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            rules={{
+                                required: t('user.emailRequired') || '请输入邮箱',
+                                pattern: {
+                                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                    message: t('user.emailInvalid') || '请输入有效的邮箱地址'
+                                }
+                            }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('user.email') || '邮箱'}</FormLabel>
+                                    <FormControl>
+                                        <Input type="email" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    label="密码"
-                    name="password"
-                    rules={[{ required: true, message: '请输入密码' }]}
-                >
-                    <Input.Password value={input.password} onChange={(e) => setInput({ ...input, password: e.target.value })} />
-                </Form.Item>
+                        <FormField
+                            control={form.control}
+                            name="password"
+                            rules={{ required: t('user.passwordRequired') || '请输入密码' }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('user.password') || '密码'}</FormLabel>
+                                    <FormControl>
+                                        <Input type="password" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    label="角色"
-                    name="role"
-                    rules={[{ required: true, message: '请选择角色' }]}
-                >
-                    <Select
-                        value={input.role}
-                        onChange={(value) => setInput({ ...input, role: value })}
-                    >
-                        <Select.Option value="user">用户</Select.Option>
-                        <Select.Option value="admin">管理员</Select.Option>
-                    </Select>
-                </Form.Item>
+                        <FormField
+                            control={form.control}
+                            name="role"
+                            rules={{ required: t('user.roleRequired') || '请选择角色' }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('user.role') || '角色'}</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={t('user.selectRole') || '请选择角色'} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="user">{t('user.roleUser') || '用户'}</SelectItem>
+                                            <SelectItem value="admin">{t('user.roleAdmin') || '管理员'}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <Form.Item
-                    label="组"
-                    name="groups"
-                    rules={[{ required: true, message: '请选择组' }]}
-                >
-                    <Select
-                        mode="multiple"
-                        value={input.groups}
-                        onChange={(value) => setInput({ ...input, groups: value })}
-                        placeholder="请选择用户组"
-                        options={groupOptions.map(group => ({
-                            label: group.name,
-                            value: group.code
-                        }))}
-                    />
-                </Form.Item>
-                <Button type='primary' block htmlType='submit'>提交</Button>
-            </Form>
-        </Drawer>
-    )
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                {t('user.groups') || '分组'}
+                            </label>
+                            <Select onValueChange={addGroup}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('user.selectGroups') || '请选择用户组'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {groupOptions.map(group => (
+                                        <SelectItem
+                                            key={group.code}
+                                            value={group.code}
+                                            disabled={selectedGroups.includes(group.code)}
+                                        >
+                                            {group.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {selectedGroups.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {selectedGroups.map(groupCode => {
+                                        const group = groupOptions.find(g => g.code === groupCode);
+                                        return (
+                                            <Badge key={groupCode} variant="secondary" className="flex items-center gap-1">
+                                                {group?.name || groupCode}
+                                                <X
+                                                    className="h-3 w-3 cursor-pointer"
+                                                    onClick={() => removeGroup(groupCode)}
+                                                />
+                                            </Badge>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button type="button" variant="outline" onClick={handleClose}>
+                                {t('common.cancel') || '取消'}
+                            </Button>
+                            <Button type="submit">
+                                {t('common.submit') || '提交'}
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
 }

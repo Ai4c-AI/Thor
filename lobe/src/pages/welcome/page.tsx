@@ -1,3 +1,3 @@
-import Desktop from './Desktop';
+import ShadcnWelcomePage from './shadcn-page';
 
-export default Desktop;
+export default ShadcnWelcomePage;

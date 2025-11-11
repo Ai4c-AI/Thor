@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Thor.Abstractions;
 using Thor.Abstractions.Audios;
 using Thor.Abstractions.Chats;
@@ -8,6 +9,7 @@ using Thor.Abstractions.Embeddings;
 using Thor.Abstractions.Images;
 using Thor.Abstractions.Realtime;
 using Thor.Abstractions.Responses;
+using Thor.Abstractions.Anthropic;
 using Thor.OpenAI;
 using Thor.OpenAI.Audios;
 using Thor.OpenAI.Chats;
@@ -54,8 +56,14 @@ public static class OpenAIServiceCollectionExtensions
             "text-search-ada-doc-001"
         ]);
 
-        services.AddKeyedSingleton<IThorChatCompletionsService, OpenAIChatCompletionsService>(OpenAIPlatformOptions
+        services.AddKeyedSingleton<IThorChatCompletionsService, OpenAiChatCompletionsService>(OpenAIPlatformOptions
             .PlatformCode);
+
+        // 注册OpenAI到Claude适配器服务
+        services.AddKeyedSingleton<IAnthropicChatCompletionsService>(OpenAIPlatformOptions.PlatformCode, 
+            (provider, key) => new OpenAIAnthropicChatCompletionsService(
+                provider.GetRequiredKeyedService<IThorChatCompletionsService>(key),
+                provider.GetRequiredService<ILogger<OpenAIAnthropicChatCompletionsService>>()));
 
         services.AddKeyedSingleton<IThorTextEmbeddingService, OpenAITextEmbeddingService>(
             OpenAIPlatformOptions.PlatformCode);

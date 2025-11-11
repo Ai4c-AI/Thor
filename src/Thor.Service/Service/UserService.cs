@@ -135,6 +135,19 @@ public partial class UserService(
         return user;
     }
 
+    /// <summary>
+    /// 根据用户名获取用户信息（管理员专用）
+    /// </summary>
+    /// <param name="userName">用户名</param>
+    /// <returns></returns>
+    [Authorize(Roles = RoleConstant.Admin)]
+    public async Task<User?> GetByUserNameAsync(string userName)
+    {
+        return await DbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserName == userName);
+    }
+
     public async ValueTask<bool> RemoveAsync(string id)
     {
         if (UserContext.CurrentUserId == id)

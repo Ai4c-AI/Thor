@@ -36,6 +36,9 @@ public class ThorChatMessageContent
     /// </summary>
     [JsonPropertyName("input_audio")]
     public ThorChatMessageAudioContent? InputAudio { get; set; }
+    
+    [JsonPropertyName("summary")]
+    public ThorChatMessageContentReasoningSummary[]? Summary { get; set; }
 
     /// <summary>
     /// 创建文本类消息
@@ -97,3 +100,11 @@ public class ThorChatMessageContent
         };
     }
 }
+
+public class ThorChatMessageContentReasoningSummary
+{
+    public string type { get; set; }
+    public string text { get; set; }
+    public string signature { get; set; }
+}
+

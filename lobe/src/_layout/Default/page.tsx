@@ -1,9 +1,16 @@
-import ServerLayout from '../../components/server/ServerLayout';
-import Desktop from './Desktop';
-import Mobile from './Mobile';
 
-const DefaultLayout = ServerLayout({ Desktop, Mobile });
+import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { HeaderNavigation } from '../../components/layouts/header-navigation';
 
-DefaultLayout.displayName = 'MainLayout';
-
-export default DefaultLayout;
+export default function DefaultLayout() {
+  return (
+    <div className="min-h-screen bg-background">
+      <HeaderNavigation />
+      {/* 添加顶部间距以避免内容被固定头部遮挡 */}
+      <main className="pt-16">
+        <Outlet />
+      </main>
+    </div>
+  );
+}

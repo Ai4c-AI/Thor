@@ -62,7 +62,7 @@ public sealed class MetaGLMChatCompletionsService : IThorChatCompletionsService
                 var function = new FunctionParameters()
                 {
                     required = tool.Function?.Parameters?.Required?.ToArray(),
-                    type = tool.Function?.Parameters?.Type,
+                    type = tool.Function?.Parameters?.typeStr,
                 };
 
                 if (tool.Function?.Parameters?.Properties != null)
@@ -70,7 +70,7 @@ public sealed class MetaGLMChatCompletionsService : IThorChatCompletionsService
                     foreach (var definition in tool.Function.Parameters.Properties)
                     {
                         function.properties.Add(definition.Key,
-                            new FunctionParameterDescriptor(definition.Value.Type, definition.Value.Description));
+                            new FunctionParameterDescriptor(definition.Value.typeStr, definition.Value.Description));
                     }
                 }
 
@@ -170,7 +170,7 @@ public sealed class MetaGLMChatCompletionsService : IThorChatCompletionsService
                 var function = new FunctionParameters()
                 {
                     required = tool.Function?.Parameters?.Required?.ToArray() ?? [],
-                    type = tool.Function?.Parameters?.Type ?? string.Empty,
+                    type = tool.Function?.Parameters?.typeStr ?? string.Empty,
                 };
 
                 if (tool.Function?.Parameters?.Properties != null)
@@ -178,7 +178,7 @@ public sealed class MetaGLMChatCompletionsService : IThorChatCompletionsService
                     foreach (var definition in tool.Function.Parameters.Properties)
                     {
                         function.properties.Add(definition.Key,
-                            new FunctionParameterDescriptor(definition.Value.Type,
+                            new FunctionParameterDescriptor(definition.Value.typeStr,
                                 definition.Value?.Description ?? string.Empty));
                     }
                 }

@@ -1,4 +1,5 @@
 ﻿using Thor.Abstractions.Responses.Dto;
+using Thor.Abstractions.Responses.Input;
 
 namespace Thor.Abstractions.Responses;
 

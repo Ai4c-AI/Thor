@@ -9,7 +9,7 @@ public interface IAnthropicChatCompletionsService
     /// <param name="options">平台参数对象</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns></returns>
-    Task<ClaudeChatCompletionDto> ChatCompletionsAsync(AnthropicInput request,
+    Task<AnthropicChatCompletionDto> ChatCompletionsAsync(AnthropicInput request,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default);
 
@@ -20,7 +20,7 @@ public interface IAnthropicChatCompletionsService
     /// <param name="options">平台参数对象</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns></returns>
-    IAsyncEnumerable<(string?, ClaudeStreamDto?)> StreamChatCompletionsAsync(AnthropicInput request,
+    IAsyncEnumerable<(string, AnthropicStreamDto?)> StreamChatCompletionsAsync(AnthropicInput request,
         ThorPlatformOptions? options = null,
         CancellationToken cancellationToken = default);
 }

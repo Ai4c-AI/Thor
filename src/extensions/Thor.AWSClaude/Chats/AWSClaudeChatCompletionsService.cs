@@ -98,7 +98,7 @@ namespace Thor.AWSClaude.Chats
                         {
                             var propertyValue = new Document
                             {
-                                { "type", property.Value.Type }
+                                { "type", property.Value.typeStr }
                             };
 
                             if (!string.IsNullOrEmpty(property.Value.Description))
@@ -137,7 +137,7 @@ namespace Thor.AWSClaude.Chats
                             {
                                 Json = new Document
                                 {
-                                    { "type", tool.Function?.Parameters?.Type },
+                                    { "type", tool.Function?.Parameters?.typeStr },
                                     {
                                         "properties", properties
                                     },
@@ -510,7 +510,7 @@ namespace Thor.AWSClaude.Chats
                         {
                             var propertyValue = new Document
                             {
-                                { "type", property.Value.Type }
+                                { "type", property.Value.typeStr }
                             };
 
                             if (!string.IsNullOrEmpty(property.Value.Description))
@@ -549,7 +549,7 @@ namespace Thor.AWSClaude.Chats
                             {
                                 Json = new Document
                                 {
-                                    { "type", tool.Function?.Parameters?.Type },
+                                    { "type", tool.Function?.Parameters?.typeStr },
                                     {
                                         "properties", properties
                                     },

@@ -9,6 +9,7 @@ using Thor.Abstractions.Exceptions;
 using Thor.Abstractions.Extensions;
 using Thor.Abstractions.Responses;
 using Thor.Abstractions.Responses.Dto;
+using Thor.Abstractions.Responses.Input;
 
 namespace Thor.OpenAI.Responses;
 

@@ -1,8 +1,7 @@
-import { ActionIcon } from '@lobehub/ui';
-import { Tooltip } from 'antd';
-import { LucideX } from 'lucide-react';
+import { X } from 'lucide-react';
 import { memo, useState } from 'react';
-import { Flexbox } from 'react-layout-kit';
+import { Button } from '../../../ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../ui/tooltip';
 import UserPanel from '../../../User/UserPanel';
 import UserAvatar from '../../../User/UserAvatar';
 import { useActiveUser } from '../../../../hooks/useActiveTabKey';
@@ -19,26 +18,24 @@ const Avatar = memo(() => {
     return hideSettingsMoveGuide ? (
         content
     ) : (
-        <Tooltip
-            color={'blue'}
-            open
-            placement={'right'}
-            prefixCls={'guide'}
-            title={
-                <Flexbox align={'center'} gap={8} horizontal>
-                    <ActionIcon
-                        icon={LucideX}
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {content}
+            </TooltipTrigger>
+            <TooltipContent side="right">
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
-                            
+
                         }}
-                        role={'close-guide'}
-                        size={'small'}
-                        style={{ color: 'inherit' }}
-                    />
-                </Flexbox>
-            }
-        >
-            {content}
+                        className="h-auto p-1"
+                    >
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
+            </TooltipContent>
         </Tooltip>
     );
 });

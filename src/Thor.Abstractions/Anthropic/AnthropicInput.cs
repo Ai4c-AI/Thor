@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Thor.Abstractions.Anthropic;
@@ -42,7 +43,7 @@ public sealed class AnthropicInput
                 }
                 else if (jsonElement.ValueKind == JsonValueKind.Object)
                 {
-                    ToolChoice = jsonElement.Deserialize<AnthropicTooChoiceInput>();
+                    ToolChoice = jsonElement.Deserialize<AnthropicTooChoiceInput>(ThorJsonSerializer.DefaultOptions);
                 }
             }
             else
@@ -56,7 +57,60 @@ public sealed class AnthropicInput
 
     [JsonIgnore] public AnthropicTooChoiceInput? ToolChoice { get; set; }
 
-    [JsonPropertyName("system")] public List<AnthropicMessageContent>? System { get; set; }
+    [JsonIgnore] public IList<AnthropicMessageContent>? Systems { get; set; }
+
+    [JsonIgnore] public string System { get; set; }
+
+    [JsonPropertyName("system")]
+    public object SystemCalculated
+    {
+        get
+        {
+            if (System is not null && Systems is not null)
+            {
+                throw new ValidationException("System 和 Systems 字段不能同时有值");
+            }
+
+            if (System is not null)
+            {
+                return System;
+            }
+
+            return Systems!;
+        }
+        set
+        {
+            if (value is JsonElement str)
+            {
+                if (str.ValueKind == JsonValueKind.String)
+                {
+                    System = value?.ToString();
+                }
+                else if (str.ValueKind == JsonValueKind.Array)
+                {
+                    Systems = JsonSerializer.Deserialize<IList<AnthropicMessageContent>>(value?.ToString(),
+                        ThorJsonSerializer.DefaultOptions);
+                }
+            }
+            else
+            {
+                System = value?.ToString();
+            }
+        }
+    }
+    
+    [JsonPropertyName("thinking")] public AnthropicThinkingInput? Thinking { get; set; }
+
+    [JsonPropertyName("temperature")] public double? Temperature { get; set; }
+
+    [JsonPropertyName("metadata")] public Dictionary<string, object>? Metadata { get; set; }
+}
+
+public class AnthropicThinkingInput
+{
+    [JsonPropertyName("type")] public string Type { get; set; }
+
+    [JsonPropertyName("budget_tokens")] public int BudgetTokens { get; set; }
 }
 
 public class AnthropicTooChoiceInput
@@ -79,7 +133,21 @@ public class Input_schema
 {
     [JsonPropertyName("type")] public string Type { get; set; }
 
-    [JsonPropertyName("properties")] public Dictionary<string, object>? Properties { get; set; }
+    [JsonPropertyName("properties")] public Dictionary<string, InputSchemaValue>? Properties { get; set; }
 
     [JsonPropertyName("required")] public string[]? Required { get; set; }
+}
+
+public class InputSchemaValue
+{
+    public string type { get; set; }
+
+    public string description { get; set; }
+
+    public InputSchemaValueItems? items { get; set; }
+}
+
+public class InputSchemaValueItems
+{
+    public string? type { get; set; }
 }

@@ -34,8 +34,8 @@ namespace Thor.MetaGLM
             var payload = new JwtPayload
             {
                 { "api_key", id },
-                { "exp", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + expSeconds },
-                { "timestamp", DateTimeOffset.UtcNow.ToUnixTimeSeconds() }
+                { "exp", DateTimeOffset.Now.ToUnixTimeSeconds() + expSeconds },
+                { "timestamp", DateTimeOffset.Now.ToUnixTimeSeconds() }
             };
 
             var token = new JwtSecurityToken(header, payload);

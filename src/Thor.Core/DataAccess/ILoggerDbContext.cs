@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Thor.Domain.Chats;
+using Thor.Domain.Images;
 using Thor.Service.Domain;
 
 namespace Thor.Core.DataAccess;
@@ -14,6 +15,11 @@ public interface ILoggerDbContext
     DbSet<StatisticsConsumesNumber> StatisticsConsumesNumbers { get; set; }
 
     DbSet<ModelStatisticsNumber> ModelStatisticsNumbers { get; set; }
+
+    /// <summary>
+    /// 图片任务日志
+    /// </summary>
+    DbSet<ImageTaskLogger> ImageTaskLoggers { get; set; }
 
     /// <summary>
     /// 链路追踪

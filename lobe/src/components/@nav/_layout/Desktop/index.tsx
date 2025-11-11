@@ -20,21 +20,27 @@ import {
   ChevronRight,
   Bug,
   PieChart,
-  Megaphone
+  Megaphone,
+  Cherry,
+  FileClock,
+  Database,
+  ChevronDown
 } from "lucide-react";
-import './index.css'
 import { SidebarTabKey } from "../../../../store/global/initialState";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Menu, Typography, Badge, Divider } from "antd";
 import {
   GeneralSetting,
   InitSetting,
 } from "../../../../services/SettingService";
-import { SlidersOutlined } from "@ant-design/icons";
 import { info } from "../../../../services/UserService";
 import { useTranslation } from "react-i18next";
+import { getTokens } from "../../../../services/TokenService";
 
-const { Text } = Typography;
+import { Button } from "../../../../components/ui/button";
+import { Separator } from "../../../../components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../../components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../../components/ui/dialog";
+import { cn } from "../../../../lib/utils";
 
 // Define type for menu items to match expected structure
 interface MenuItem {
@@ -45,7 +51,10 @@ interface MenuItem {
   role?: string;
   onClick?: () => void;
   disabled?: boolean;
+  hidden?: boolean;
   children?: MenuItem[];
+  badge?: boolean;
+  badgeColor?: string;
 }
 
 const Nav = memo(() => {
@@ -59,13 +68,15 @@ const Nav = memo(() => {
   const [userRole, setUserRole] = useState<string | null>(null);
   // 管理导航菜单展开状态
   const [openKeys, setOpenKeys] = useState<string[]>([]);
+  const [isTokenModalVisible, setIsTokenModalVisible] = useState(false);
+  const [userTokens, setUserTokens] = useState<any[]>([]);
 
   // 使用 useMemo 并依赖 i18n.language，这样语言变化时菜单会重新生成
   const getMenuItems = useMemo((): MenuItem[] => {
     const items: MenuItem[] = [
       {
         icon: <Home />,
-        label: <Badge dot={false}>{t('sidebar.panel')}</Badge>,
+        label: t('sidebar.panel'),
         enable: true,
         key: SidebarTabKey.Panel,
         role: "user,admin",
@@ -75,7 +86,7 @@ const Nav = memo(() => {
       },
       {
         key: SidebarTabKey.AI,
-        label: <Text strong>{t('sidebar.ai')}</Text>,
+        label: t('sidebar.ai'),
         enable: true,
         icon: <Brain />,
         role: "user,admin",
@@ -93,7 +104,9 @@ const Nav = memo(() => {
           {
             disabled: chatDisabled.value === undefined || chatDisabled.value === "",
             icon: <BotMessageSquare />,
-            label: <Badge dot={true} color="blue">{t('sidebar.chat')}</Badge>,
+            label: t('sidebar.chat'),
+            badge: true,
+            badgeColor: "blue",
             enable: false,
             key: SidebarTabKey.Chat,
             onClick: () => {
@@ -123,6 +136,16 @@ const Nav = memo(() => {
               navigate("/model-map");
             },
             role: "admin",
+          },
+          {
+            icon: <Cherry />,
+            enable: true,
+            label: "Cherry Studio",
+            key: "cherry-studio",
+            onClick: () => {
+              handleCherryStudioClick();
+            },
+            role: "user,admin",
           }
         ]
       },
@@ -159,7 +182,7 @@ const Nav = memo(() => {
       // Business section
       {
         key: SidebarTabKey.Business,
-        label: <Text strong>{t('sidebar.business')}</Text>,
+        label: t('sidebar.business'),
         icon: <Handshake />,
         enable: true,
         role: "admin",
@@ -202,7 +225,7 @@ const Nav = memo(() => {
       // System settings
       {
         icon: <Settings />,
-        label: <Text strong>{t('sidebar.setting')}</Text>,
+        label: t('sidebar.setting'),
         enable: true,
         key: SidebarTabKey.Setting,
         children: [
@@ -227,7 +250,7 @@ const Nav = memo(() => {
             role: "user,admin",
           },
           {
-            icon: <SlidersOutlined />,
+            icon: <Settings />,
             enable: true,
             label: t('sidebar.rateLimit'),
             key: SidebarTabKey.RateLimit,
@@ -271,8 +294,13 @@ const Nav = memo(() => {
     ];
     if (userRole) {
       return items.filter((item) => {
+        // 过滤隐藏的顶级菜单项
+        if (item.hidden) return false;
+
         if (item.children) {
           item.children = item.children.filter((child) => {
+            // 过滤隐藏的子菜单项
+            if (child.hidden) return false;
             if (!child.role) return true;
             return child.role.split(",").includes(userRole);
           });
@@ -283,8 +311,8 @@ const Nav = memo(() => {
         return item.role.split(",").includes(userRole);
       });
     }
-    
-    return items;
+
+    return items.filter(item => !item.hidden);
   }, [t, i18n.language, navigate, chatDisabled, userRole]); // 依赖 i18n.language 确保语言变化时重新计算
 
   const [items, setItems] = useState<MenuItem[]>(getMenuItems);
@@ -306,6 +334,106 @@ const Nav = memo(() => {
       setUserRole(role);
     });
   }
+
+
+  const handleCherryStudioClick = () => {
+    // Fetch user tokens
+    fetchUserTokens();
+    setIsTokenModalVisible(true);
+  };
+
+  const fetchUserTokens = () => {
+    // Use the actual token service to get user tokens
+    getTokens(1, 100)
+      .then(res => {
+        if (res.success) {
+          const tokens = res.data.items || [];
+          if (tokens.length === 0) {
+            // Create default token if no tokens exist
+            createDefaultToken();
+          } else {
+            setUserTokens(tokens);
+          }
+        } else {
+          console.error("Failed to fetch tokens:", res.message);
+          setUserTokens([]);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch tokens:", err);
+        setUserTokens([]);
+      });
+  };
+
+  const createDefaultToken = () => {
+    const defaultTokenData = {
+      name: "默认Token",
+      key: "sk-default-token-" + Math.random().toString(36).substring(2, 15),
+      type: "openai",
+      expiredTime: null,
+      unlimitedExpired: true,
+      remainQuota: 1000000,
+      unlimitedQuota: false,
+      modelRateLimits: []
+    };
+
+    // Use the Add service to create default token
+    fetch("/api/v1/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify(defaultTokenData)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // Refresh token list after creating default token
+        getTokens(1, 100).then(res => {
+          if (res.success) {
+            setUserTokens(res.data.items || []);
+          }
+        });
+      } else {
+        console.error("Failed to create default token:", data.message);
+        setUserTokens([]);
+      }
+    })
+    .catch(err => {
+      console.error("Failed to create default token:", err);
+      setUserTokens([]);
+    });
+  };
+
+  const handleTokenSelect = (token: any) => {
+    const currentDomain = window.location.origin;
+    const tokenData = {
+      id: "token-api-openai-tokennb",
+      baseUrl: currentDomain,
+      apiKey: token.key,
+      name: "Token AI (OpenAI 老格式)",
+      type: "openai"
+    };
+    
+    // Fix btoa encoding error for non-Latin1 characters
+    const jsonString = JSON.stringify(tokenData);
+    const base64Data = btoa(encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g, 
+      function toSolidBytes(match, p1) {
+        return String.fromCharCode(parseInt(p1, 16));
+    }));
+    
+    const cherryStudioUrl = `cherrystudio://providers/api-keys?v=1&data=${base64Data}`;
+    
+    // Open the cherrystudio protocol URL
+    window.location.href = cherryStudioUrl;
+    
+    setIsTokenModalVisible(false);
+  };
+
+  const handleTokenModalCancel = () => {
+    setIsTokenModalVisible(false);
+  };
 
   useEffect(() => {
     const path = location.pathname;
@@ -337,42 +465,113 @@ const Nav = memo(() => {
     setOpenKeys(keys);
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-      }}
-    >
-      <Divider style={{ margin: "0 0 8px 0" }} />
-      <div
-        style={{
-          flex: 1,
-          overflow: "auto",
-        }}
-      >
-        <Menu
-          mode="inline"
-          style={{
-            border: "none",
-            padding: "0 4px",
-            backgroundColor: 'transparent',
+  // Custom navigation item component
+  const NavigationItem = ({ item, isActive }: { item: MenuItem; isActive: boolean }) => {
+    if (item.children && item.children.length > 0) {
+      const [isOpen, setIsOpen] = useState(openKeys.includes(item.key));
+
+      useEffect(() => {
+        setIsOpen(openKeys.includes(item.key));
+      }, [openKeys, item.key]);
+
+      return (
+        <Collapsible
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setOpenKeys([...openKeys, item.key]);
+            } else {
+              setOpenKeys(openKeys.filter(key => key !== item.key));
+            }
           }}
-          items={items}
-          selectedKeys={[sidebarKey]}
-          openKeys={openKeys}
-          onOpenChange={handleOpenChange}
-          expandIcon={({ isOpen }) => <ChevronRight 
-          size={16} style={{
-            transform: isOpen ? 'rotate(90deg)' : 'none',
-            transition: 'transform 0.2s',
-            color: 'inherit',
-          }} />}
-        />
+        >
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start px-3 py-2 h-auto font-medium text-sm",
+                "hover:bg-accent hover:text-accent-foreground",
+                "data-[state=open]:bg-accent/50"
+              )}
+            >
+              <span className="mr-3 text-muted-foreground">{item.icon}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                isOpen && "rotate-180"
+              )} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 pl-6">
+            {item.children.map((child) => (
+              <NavigationItem key={child.key} item={child} isActive={sidebarKey === child.key} />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    }
+
+    return (
+      <Button
+        variant="ghost"
+        disabled={item.disabled}
+        onClick={item.onClick}
+        className={cn(
+          "w-full justify-start px-3 py-2 h-auto font-normal text-sm",
+          "hover:bg-accent hover:text-accent-foreground",
+          isActive && "bg-accent text-accent-foreground font-medium",
+          item.disabled && "opacity-50 cursor-not-allowed"
+        )}
+      >
+        <span className="mr-3 text-muted-foreground">{item.icon}</span>
+        <span className="flex-1 text-left">
+          {item.label}
+          {item.badge && (
+            <span className={cn(
+              "ml-2 h-2 w-2 rounded-full",
+              item.badgeColor === "blue" ? "bg-blue-500" : "bg-primary"
+            )} />
+          )}
+        </span>
+      </Button>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full border-r bg-card">
+      <Separator className="my-2" />
+
+      <div className="flex-1 overflow-auto px-2 space-y-1">
+        {items.map((item) => (
+          <NavigationItem key={item.key} item={item} isActive={sidebarKey === item.key} />
+        ))}
       </div>
-      <Divider style={{ margin: "8px 0 0 0" }} />
+
+      <Separator className="my-2" />
+
+      <Dialog open={isTokenModalVisible} onOpenChange={setIsTokenModalVisible}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>选择 Token</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {userTokens.map((token) => (
+              <div key={token.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <div className="font-medium">{token.name}</div>
+                  <div className="text-sm text-muted-foreground">{token.type}</div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleTokenSelect(token)}
+                >
+                  选择
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

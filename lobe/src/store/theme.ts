@@ -1,4 +1,4 @@
-import create from 'zustand';
+import { create } from 'zustand';
 
 interface ThemeState {
     themeMode: 'light' | 'dark' | 'auto';
@@ -6,9 +6,11 @@ interface ThemeState {
 }
 
 const useThemeStore = create<ThemeState>((set) => ({
-    themeMode: localStorage.getItem('themeMode') as 'light' | 'dark' | 'auto' || 'auto',
+    themeMode: (typeof window !== 'undefined' ? localStorage.getItem('themeMode') : null) as 'light' | 'dark' | 'auto' || 'auto',
     toggleTheme: (model: 'light' | 'dark' | 'auto') => {
-        localStorage.setItem('themeMode', model);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('themeMode', model);
+        }
         set({ themeMode: model });
     },
 }));

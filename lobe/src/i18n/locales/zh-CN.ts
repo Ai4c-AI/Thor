@@ -75,8 +75,8 @@ const zhCN = {
       download: '下载',
       import: '导入',
       export: '导出',
-      next: '下一步',
-      previous: '上一步',
+      next: '下一页',
+      previous: '上一页',
       continue: '继续',
       complete: '完成',
       documentation: '文档',
@@ -88,7 +88,6 @@ const zhCN = {
       forbidden: '禁止访问',
       error404: '404 - 页面不存在',
       error500: '500 - 服务器错误',
-      welcome: '欢迎',
       offline: '离线',
       online: '在线',
       failed: '加载失败',
@@ -115,6 +114,28 @@ const zhCN = {
       select: '选择',
       you: '您',
       saveSuccess: '保存成功',
+      submitting: '提交中...',
+      refreshSuccess: '刷新成功',
+      loadError: '加载错误',
+      // 分页相关
+      previousPage: '上一页',
+      nextPage: '下一页',
+      page: '页',
+      totalPages: '总页数',
+      pageSize: '每页条数',
+      operationSuccess: '操作成功',
+      operationFailed: '操作失败',
+      loadFailed: '加载失败',
+      createdAt: '创建时间',
+      operations: '操作',
+      selectDate: '选择日期',
+      actionMenu: '操作菜单',
+      unsavedChanges: '未保存的更改',
+      unsavedChangesWarning: '您有未保存的更改，是否确定要离开？',
+      updating: '更新中',
+      creating: '创建中',
+      upToDate: '已是最新',
+      tips: '提示',
     },
 
     // 导航
@@ -124,7 +145,6 @@ const zhCN = {
       token: 'Token管理',
       modelManager: '模型管理',
       product: '产品',
-      logger: '日志',
       redeemCode: '兑换码',
       user: '用户',
       current: '当前',
@@ -155,7 +175,6 @@ const zhCN = {
       token: 'API 密钥',
       modelManager: '模型管理',
       product: '产品',
-      logger: '日志',
       redeemCode: '兑换码',
       user: '用户管理',
       current: '钱包/个人',
@@ -166,9 +185,10 @@ const zhCN = {
       ai: 'AI服务',
       chat: '对话',
       business: '运营服务',
-      playground: '操场',
+      playground: '测试区',
       usage: '使用情况',
-      announcement: '公告管理'
+      announcement: '公告管理',
+      logger: '日志',
     },
 
     // 页面标题
@@ -179,7 +199,6 @@ const zhCN = {
         token: '加载Token管理中',
         modelManager: '加载模型管理中',
         product: '加载产品页面中',
-        logger: '加载日志页面中',
         redeemCode: '加载兑换码页面中',
         user: '加载用户页面中',
         current: '加载当前页面中',
@@ -195,14 +214,18 @@ const zhCN = {
         doc: '加载文档页面中',
         model: '加载模型页面中',
         usage: '加载使用情况页面中',
-        announcement: '加载公告管理页面中'
+        announcement: '加载公告管理页面中',
+        logger: '加载日志页面中',
+        tracing: '加载链路跟踪页面中'
       }
     },
 
     // 使用情况页面
     usage: {
       title: '使用情况',
+      subtitle: '监控您的 API 使用情况和支出',
       totalSpend: '总支出',
+      totalSpendDescription: '日常支出明细',
       budget: '预算',
       budgetReset: '天后重置',
       totalTokens: '总令牌数',
@@ -218,6 +241,7 @@ const zhCN = {
       outputTokens: '输出令牌数',
       images: '图像数',
       chatCompletions: '聊天完成',
+      chatCompletion: '聊天完成',
       webSearches: '网络搜索',
       fileSearches: '文件搜索',
       moderation: '审核',
@@ -279,7 +303,7 @@ const zhCN = {
       usernameLabel: '用户名',
       usernamePlaceholder: '请输入用户名',
       usernameRequired: '请输入用户名',
-      emailLabel: '电子邮箱',
+      emailLabel: '电子邮箱或账户',
       emailPlaceholder: '请输入电子邮箱',
       emailRequired: '请输入电子邮箱',
       emailInvalid: '请输入有效的电子邮箱',
@@ -310,86 +334,198 @@ const zhCN = {
       nextStep: '下一步',
       prevStep: '上一步',
       feature1Title: '智能转发',
-      feature1Desc: '一键式使用，轻松接入多渠道AI'
+      feature1Desc: '一键式使用，轻松接入多渠道AI',
+      step1Desc: '输入基本账户信息',
+      step2Desc: '设置您的密码和可选的邀请码',
+      registering: '注册中...',
+      description: '输入您的详细信息以创建账户',
+      brandSlogan: '开源的 AI 代理转发服务'
     },
 
     // 首页
     welcome: {
-      title: 'Thor 雷神托尔',
-      subtitle: '使用标准的OpenAI接口协议访问多种模型',
-      description: '使用标准的OpenAI接口协议访问68+模型，不限时间、按量计费、拒绝逆向、极速对话、明细透明，无隐藏消费。',
-      tagline: '为您提供最好的AI服务！',
-      startNow: '立即开始使用',
-      giveStar: '给项目 Star',
-      features: {
-        title: '我们的优势',
-        description: 'Thor雷神托尔为开发者提供一站式AI模型调用服务，简化您的AI应用开发流程',
-        multiModel: {
-          title: '多模型支持',
-          description: '支持200+模型，包括主流的大型语言模型和专业领域模型，满足各种AI应用场景。',
-          action: '了解支持的模型'
+      hero: {
+        badge: '企业级AI网关',
+        title: 'Thor AI Gateway',
+        subtitle: '专业的AI网关管理平台',
+        description: '统一管理20+AI模型，提供企业级用户管理、渠道管理、计费和监控功能。',
+        primaryButton: '立即开始',
+        secondaryButton: '查看文档',
+        starButton: '在 GitHub 上 Star'
+      },
+      stats: {
+        models: {
+          title: '支持模型',
+          description: '集成多家AI提供商'
         },
-        fastResponse: {
-          title: '高速响应',
-          description: '优化的服务架构，确保极速对话体验，减少等待时间，提高工作效率。',
-          action: '查看性能测试'
+        users: {
+          title: '企业用户',
+          description: '全球企业信赖之选'
+        },
+        requests: {
+          title: '日请求量',
+          description: '高性能请求处理'
+        },
+        uptime: {
+          title: '系统正常运行时间',
+          description: '可靠的服务保障'
+        }
+      },
+      features: {
+        title: '核心功能',
+        subtitle: 'Thor 提供全面的AI网关管理解决方案',
+        unified: {
+          title: '统一API接口',
+          description: '标准的OpenAI兼容接口，支持多个AI提供商的无缝集成，简化开发复杂度。'
+        },
+        intelligent: {
+          title: '智能负载均衡',
+          description: '基于模型性能和成本优化的智能请求分发，确保最佳用户体验。'
+        },
+        enterprise: {
+          title: '企业级管理',
+          description: '完整的用户管理、权限控制、配额管理和计费系统，满足企业级安全要求。'
+        },
+        monitoring: {
+          title: '实时监控',
+          description: '全面的请求监控、性能分析和成本统计，提供透明的运营洞察。'
+        },
+        scalable: {
+          title: '高度可扩展',
+          description: '微服务架构设计，支持水平扩展，轻松应对高并发场景。'
+        },
+        security: {
+          title: '安全保障',
+          description: '多层次安全防护，包括API密钥管理、请求限流和数据加密传输。'
+        }
+      },
+      footer: {
+        product: {
+          title: '产品',
+          home: '首页',
+          pricing: '模型定价',
+          docs: '文档',
+          console: '控制台'
         },
         community: {
-          title: '社区驱动',
-          description: '由AIDotNet社区维护，持续更新，提供专业的技术支持和丰富的资源分享。',
-          action: '加入我们的社区'
-        }
-      },
-      community: {
-        title: '强大的社区',
-        description: 'Thor由AIDotNet社区维护，社区拥有丰富的AI资源，包括模型、数据集、工具等。',
-        payPerUse: {
-          title: '按量付费',
-          description: '支持用户额度管理，用户可自定义Token 管理，按量计费。'
+          title: '社区',
+          github: 'GitHub',
+          discord: 'Discord',
+          support: '支持',
+          feedback: '反馈'
         },
-        appSupport: {
-          title: '应用支持',
-          description: '支持OpenAi官方库、大部分开源聊天应用、Utools GPT插件'
+        company: {
+          title: '公司',
+          about: '关于我们',
+          blog: '博客',
+          careers: '招聘',
+          contact: '联系我们'
         },
-        transparency: {
-          title: '明细可查',
-          description: '统计每次请求消耗明细，价格透明，无隐藏消费，用的放心'
-        }
-      },
-      statistics: {
-        models: '支持模型',
-        users: '社区用户',
-        requests: '每日请求量',
-        contributors: '代码贡献者'
-      },
-      modelHot: {
-        title: '模型热度排行',
-        description: '了解用户最喜爱的AI模型，选择最适合您需求的模型',
-        distribution: '模型使用分布',
-        distributionDesc: '基于用户实际使用情况的模型热度分布图',
-        ranking: '热门模型排行',
-        rankingDesc: '最受欢迎的AI模型排名'
-      },
-      callToAction: {
-        title: '准备好开始使用Thor雷神托尔了吗？',
-        description: '立即注册并获取免费额度，开始您的AI开发之旅',
-        register: '免费注册账号',
-        docs: '查看开发文档'
-      },
-      projects: {
-        title: '相关开源项目',
-        description: 'AIDotNet社区维护的多个开源项目，旨在推动AI技术的发展，为AI开发者提供更好的学习和交流平台。',
-        aidotnet: {
-          title: 'AIDotNet',
-          description: 'AIDotNet社区是一个热衷于AI开发者组成的社区，旨在推动AI技术的发展，为AI开发者提供更好的学习和交流平台。',
-          action: '了解更多'
+        legal: {
+          title: '法律',
+          privacy: '隐私政策',
+          terms: '服务条款',
+          security: '安全',
+          compliance: '合规'
         },
-        koala: {
-          title: 'KoalaAI',
-          description: '一个智能知识库的开源项目，可用于开发企业级智能客服管理系统。支持多种知识库格式，提供高效的检索和答案生成能力。',
-          action: '了解更多'
-        }
+        copyright: '© 2024 Thor AI Gateway. 保留所有权利。'
       }
+    },
+
+    // 公告管理页面
+    announcement: {
+      title: '公告管理',
+      create: '创建公告',
+      edit: '编辑公告',
+      delete: '删除公告',
+      searchPlaceholder: '搜索公告...',
+
+      // 表头
+      titleColumn: '标题',
+      typeColumn: '类型',
+      statusColumn: '状态',
+      priorityColumn: '优先级',
+      orderColumn: '排序',
+      expireTimeColumn: '过期时间',
+      createdAtColumn: '创建时间',
+      actionsColumn: '操作',
+
+      // 公告字段
+      titleField: '标题',
+      contentField: '内容',
+      typeField: '类型',
+      enabledField: '启用状态',
+      pinnedField: '置顶状态',
+      orderField: '排序',
+      expireTimeField: '过期时间',
+
+      // 公告类型
+      typeInfo: '信息',
+      typeSuccess: '成功',
+      typeWarning: '警告',
+      typeError: '错误',
+
+      // 状态
+      enabled: '已启用',
+      disabled: '已禁用',
+      pinned: '置顶',
+      normal: '普通',
+      neverExpires: '永不过期',
+
+      // 表单
+      titlePlaceholder: '请输入公告标题',
+      contentPlaceholder: '请输入公告内容...',
+      titleRequired: '请输入公告标题',
+      contentRequired: '请输入公告内容',
+      typeRequired: '请选择公告类型',
+      selectType: '请选择公告类型',
+      orderHint: '数值越大越靠前',
+      expireTimeHint: '可选 - 留空表示永不过期',
+      markdownSupport: '支持 Markdown',
+      charactersCount: '个字符',
+      charactersLimit: '/2000 个字符',
+
+      // 对话框
+      createTitle: '创建公告',
+      createDescription: '创建新公告通知用户。支持 Markdown 格式。',
+      editTitle: '编辑公告',
+      editDescription: '更新公告详情。支持 Markdown 格式。',
+
+      // 标签页
+      editTab: '编辑',
+      previewTab: '预览',
+      previewEmpty: '在编辑标签页中输入内容以查看预览',
+
+      // 操作
+      enable: '启用',
+      disable: '禁用',
+      creating: '创建中...',
+      updating: '更新中...',
+
+      // 消息
+      createSuccess: '公告创建成功',
+      updateSuccess: '公告更新成功',
+      deleteSuccess: '公告删除成功',
+      statusUpdateSuccess: '状态更新成功',
+      createFailed: '创建公告失败',
+      updateFailed: '更新公告失败',
+      deleteFailed: '删除公告失败',
+      statusUpdateFailed: '状态更新失败',
+      loadFailed: '加载公告失败',
+
+      // 空状态
+      noAnnouncements: '暂无公告',
+      loading: '加载中...',
+
+      // 分页
+      totalAnnouncements: '共 {total} 条公告',
+      previous: '上一页',
+      next: '下一页',
+
+      // 确认对话框
+      confirmDelete: '确定要删除此公告吗？',
+      confirmDisable: '确定要禁用此公告吗？',
+      confirmEnable: '确定要启用此公告吗？'
     },
 
     // 兑换码页面
@@ -413,20 +549,39 @@ const zhCN = {
       unlimited: '不限制',
       customQuantity: '自定义数量',
       createSuccess: '创建成功',
-      createFailed: '创建失败'
+      createFailed: '创建失败',
+      nameRequired: '名称不能为空',
+      nameMinLength: '名称长度不能小于3个字符',
+      quotaRequired: '额度不能为空',
+      countRequired: '生成数量不能小于1',
+      namePlaceholder: '请输入名称',
+      quotaPlaceholder: '请输入额度',
+      countPlaceholder: '请输入生成数量',
+      unlimitedQuota: '无限额度',
+      expiredTime: '过期时间',
+      neverExpired: '永不过期',
+      selectDate: '选择日期',
+      createDescription: '创建新的兑换码用于用户充值',
+      updateDescription: '修改兑换码的配置信息',
+      count: '生成数量'
     },
 
     // 用户页面
     user: {
       title: '用户管理',
+      userName: '用户名',
       username: '用户名',
-      email: '电子邮箱',
+      email: '邮箱',
+      role: '角色',
       roles: '角色',
+      groups: '分组',
       status: '状态',
+      statistics: '统计',
       createdAt: '创建时间',
       lastLogin: '最后登录',
       action: '操作',
       addUser: '添加用户',
+      createUser: '创建用户',
       editUser: '编辑用户',
       deleteUser: '删除用户',
       resetPassword: '重置密码',
@@ -437,7 +592,10 @@ const zhCN = {
       deleteSuccess: '用户已删除',
       resetPasswordSuccess: '密码已重置',
       confirmDelete: '确定要删除该用户吗？',
-      confirmResetPassword: '确定要重置该用户的密码吗？'
+      confirmResetPassword: '确定要重置该用户的密码吗？',
+      consumedTokens: '消耗的token',
+      requestCount: '请求总数',
+      remainingCredit: '剩余额度'
     },
 
     // Token管理页面
@@ -450,6 +608,7 @@ const zhCN = {
       status: '状态',
       createToken: '创建Token',
       editToken: '编辑Token',
+      updateToken: '修改Token',
       deleteToken: '删除Token',
       regenerateToken: '重新生成Token',
       copyToken: '复制Token',
@@ -457,7 +616,41 @@ const zhCN = {
       expired: '已过期',
       active: '活跃',
       inactive: '未激活',
-      remaining: '剩余'
+      remaining: '剩余',
+      // Token页面专用翻译
+      usedQuota: '已用额度',
+      remainingQuota: '剩余额度',
+      lastAccessTime: '最近使用时间',
+      expiredTime: '过期时间',
+      unlimited: '不限制',
+      copySuccess: '复制成功',
+      copyFailed: '复制失败',
+      copyKey: '复制Key',
+      viewKey: '查看',
+      searchToken: '搜索Token',
+      bindLobeChat: '绑定LobeChat',
+      bindCherryStudio: '绑定CherryStudio',
+      // Create/Edit Token form
+      namePlaceholder: '请输入Token名称',
+      unlimitedQuota: '无限额度',
+      quota: '额度',
+      groups: '组',
+      limitModels: '限制使用模型（不填则不限制）',
+      selectModels: '选择模型',
+      whiteIpList: 'IP白名单',
+      addIp: '输入IP地址后按Enter添加',
+      rate: '倍率',
+      // Form descriptions and labels
+      unlimitedQuotaDesc: '启用后Token将不受额度限制',
+      neverExpireDesc: '启用后Token将永不过期',
+      userGroupDesc: '选择Token所属的用户组',
+      selectUserGroup: '请选择用户组',
+      advancedSettings: '高级设置',
+      advancedSettingsDesc: '可选配置，用于限制Token的使用范围',
+      modelLimitLabel: '模型限制',
+      modelLimitDesc: '限制该Token可以使用的模型，不选择则无限制',
+      selectAvailableModels: '选择可用模型',
+      ipWhitelistDesc: '限制该Token只能从指定IP地址使用，不设置则无限制'
     },
 
     // 模型管理页面
@@ -509,6 +702,30 @@ const zhCN = {
       enterCacheHitRate: '请输入缓存命中倍率',
       enterAudioCacheRate: '请输入Audio缓存倍率',
       enterMaxContext: '请输入最大上文',
+      defaultContextLength: '默认上下文长度',
+      enterDefaultContextLength: '请输入默认上下文长度',
+      contextPricingTiers: '上下文定价层级',
+      minContextLength: '最小上下文长度',
+      maxContextLength: '最大上下文长度',
+      enterMinContextLength: '请输入最小上下文长度',
+      enterMaxContextLength: '请输入最大上下文长度',
+      tierDescription: '层级描述',
+      enterTierDescription: '请输入层级描述',
+      promptRateMultiplier: '提示倍率乘数',
+      enterPromptRateMultiplier: '请输入提示倍率乘数',
+      completionRateMultiplier: '完成倍率乘数',
+      enterCompletionRateMultiplier: '请输入完成倍率乘数',
+      fixedAdditionalCost: '固定额外费用',
+      enterFixedAdditionalCost: '请输入固定额外费用',
+      addPricingTier: '添加定价层级',
+      advancedSettings: '高级设置',
+      minContextLengthRequired: '请输入最小上下文长度',
+      maxContextLengthRequired: '请输入最大上下文长度',
+      tierDescriptionRequired: '请输入层级描述',
+      promptRateMultiplierRequired: '请输入提示倍率乘数',
+      completionRateMultiplierRequired: '请输入完成倍率乘数',
+      promptRateRequired: '请输入提示倍率',
+      promptRatePositive: '提示倍率必须大于0',
       selectIcon: '选择图标',
       enterTags: '输入标签',
       priceUnit: '价格单位',
@@ -529,7 +746,38 @@ const zhCN = {
       iconRequired: '请选择图标',
       confirm: '确认',
       no: '否',
-      yes: '是'
+      yes: '是',
+      basicInfoDesc: '配置模型的基本信息，包括名称、类型和描述',
+      rateConfigDesc: '设置模型的计费参数和价格信息',
+      billingType: '计费类型',
+      selectBillingType: '请选择计费类型',
+      inputRate: '输入费率',
+      inputRateDesc: '每1M tokens的输入费用',
+      outputRate: '输出费率',
+      outputRateDesc: '每1M tokens的输出费用',
+      perUsageRate: '每次使用费率',
+      perUsageRateDesc: '每次API调用的费用',
+      audioInputRate: '音频输入费率',
+      audioInputRateDesc: '音频输入的费用',
+      audioOutputRate: '音频输出费率',
+      audioOutputRateDesc: '音频输出的费用',
+      maxContext: '最大上下文',
+      maxContextDesc: '模型支持的最大上下文长度',
+      defaultContext: '默认上下文',
+      defaultContextDesc: '模型的默认上下文长度',
+      advancedSettingsDesc: '配置高级参数（可选）',
+      realTimeModelDesc: '是否为实时模型（如GPT-4o等）',
+      tagsDesc: '添加模型标签以便分类和筛选',
+      livePreview: '实时预览',
+      billingInfo: '计费信息',
+      input: '输入',
+      output: '输出',
+      perRequest: '每次请求',
+      createTips: '实时预览可以帮助您查看模型的实际效果',
+      updateModelDesc: '修改现有模型的配置信息',
+      updateTips: '请谨慎修改配置，保存后将立即生效',
+      noChanges: '模型配置已是最新状态',
+      contextPricingTiersDesc: '根据上下文长度设置不同的计费倍率'
     },
 
     // 模型库页面
@@ -719,7 +967,22 @@ const zhCN = {
       importSuccess: '导入成功',
       importFailed: '导入失败',
       routeDefaultFormat: '路由默认格式',
-      supportsResponses: '支持Responses'
+      supportsResponses: '支持Responses',
+      bulkEnable: '批量启用',
+      bulkDisable: '批量禁用',
+      bulkDelete: '批量删除',
+      confirmBulkEnable: '确认批量启用',
+      confirmBulkDisable: '确认批量禁用',
+      confirmBulkDelete: '确认批量删除',
+      confirmBulkEnableDescription: '您确定要启用选中的 {{count}} 个渠道吗？',
+      confirmBulkDisableDescription: '您确定要禁用选中的 {{count}} 个渠道吗？',
+      confirmBulkDeleteDescription: '您确定要删除选中的 {{count}} 个渠道吗？此操作不可撤销。',
+      bulkEnableSuccess: '批量启用成功',
+      bulkDisableSuccess: '批量禁用成功',
+      bulkDeleteSuccess: '批量删除成功',
+      bulkEnableFailed: '批量启用失败',
+      bulkDisableFailed: '批量禁用失败',
+      bulkDeleteFailed: '批量删除失败'
     },
 
     // 支付页面
@@ -752,11 +1015,14 @@ const zhCN = {
       paymentCompleted: '我已完成支付',
       cancel: '取消',
       mobilePayment: '手机支付宝扫一扫，立即完成支付',
-      save: '省'
+      save: '省',
+      redeemCodePlaceholder: '请输入兑换码'
     },
 
     // User profile page
     userProfile: {
+      title: '用户资料',
+      subtitle: '管理您的账户和偏好设置',
       userInfo: '用户信息',
       balance: '充值余额',
       basicInfo: '基本信息',
@@ -783,7 +1049,33 @@ const zhCN = {
       inviteLink: '邀请链接',
       copyInvite: '复制邀请链接',
       inviteCopied: '邀请链接已复制到剪贴板',
-      accountStatus: '账户状态'
+      accountStatus: '账户状态',
+      personalInformation: '个人信息',
+      balanceManagement: '余额管理',
+      dataRefreshed: '数据刷新成功',
+      noDataDescription: '无法加载用户数据',
+      info: '信息',
+      wallet: '钱包',
+      // Form validation
+      usernameRequired: '请输入用户名',
+      emailRequired: '请输入有效的电子邮箱地址',
+      currentPasswordRequired: '请输入当前密码',
+      newPasswordRequired: '请输入新密码',
+      confirmPasswordRequired: '请确认新密码',
+      passwordMismatch: '两次输入的密码不一致',
+      unknown: '未知',
+      // Form placeholders
+      usernamePlaceholder: '请输入用户名',
+      emailPlaceholder: '请输入电子邮箱',
+      currentPasswordPlaceholder: '请输入当前密码',
+      newPasswordPlaceholder: '请输入新密码',
+      confirmPasswordPlaceholder: '请确认新密码',
+      status: {
+        active: '活跃',
+        inactive: '非活跃',
+        suspended: '已暂停',
+        pending: '待处理'
+      }
     },
 
     // 模型映射页面
@@ -890,9 +1182,16 @@ const zhCN = {
         indexContent: '首页内容'
       }
     },
+
+    // 日志页面
+    logger: {
+      title: '系统日志',
+    },
+
     // 操场页面
     playground: {
       title: 'AI 助手',
+      modelConfig: '模型配置',
       selectToken: '选择 Token',
       selectModel: '选择模型',
       inputMessage: '输入消息...',
@@ -901,6 +1200,7 @@ const zhCN = {
       saveChat: '保存对话',
       chatHistory: '对话历史',
       systemPrompt: '系统提示词',
+      defaultSystemPrompt: '你是一个有用的AI助手。',
       temperature: '随机性',
       precise: '精确',
       lowCreativity: '创意低',
@@ -926,8 +1226,9 @@ const zhCN = {
       emptyChat: {
         title: 'AI 助手',
         description: '选择一个Token和模型，开始与AI助手对话。AI助手可以帮助你回答问题、创作内容等。',
-        suggestion1: '写一个短故事',
-        suggestion2: '解释量子计算'
+        suggestion1: '解释一下人工智能的工作原理',
+        suggestion2: '写一个Python快速排序算法',
+        suggestion3: '推荐一些学习编程的资源'
       },
       pinned: '置顶对话',
       allChats: '所有对话',
@@ -1026,17 +1327,66 @@ const zhCN = {
         quotaDistribution: '额度分布',
         consumedQuota: '消费额度',
         remainingQuota: '剩余额度',
+        averageRPM: '平均每分钟请求数',
+        averageTPM: '平均每分钟Token数',
+        realtime: '实时',
+        quickStats: '快速统计',
+        balanceOverview: '余额概览',
+        remainingBalance: '剩余余额',
+        consumed: '已消费',
       },
 
       // 图表标题
       charts: {
         consumptionTrend: '消费趋势',
-        requestTrend: '请求趋势',
-        tokenTrend: 'Token趋势',
+        requestsTrend: '请求趋势',
+        tokensTrend: 'Token趋势',
         modelDistribution: '模型消耗分布（最近七天）',
+        modelDistributionDesc: '展示各AI模型的使用情况和消费分布',
         newUserRegistration: '新用户注册（最近七天）',
+        userGrowthAnalysis: '用户增长趋势分析',
         recentRechargeData: '最近充值数据',
+        revenueAnalysis: '收入来源分析',
         quotaDistributionChart: '额度分布图',
+        modelStats: '模型统计',
+        totalModels: '模型总数',
+        topModels: '热门模型',
+        modelLegend: '模型图例',
+      },
+
+      // 标签页
+      tabs: {
+        trends: '趋势',
+        models: '模型',
+        users: '用户',
+        revenue: '收入',
+      },
+
+      // 时间范围选择
+      timeRange: {
+        '1d': '最近1天',
+        '7d': '最近7天',
+        '30d': '最近30天',
+        '90d': '最近90天',
+      },
+
+      // 无数据提示
+      noData: {
+        users: '暂无用户注册数据',
+        revenue: '暂无充值收入数据',
+      },
+
+      // 健康状态
+      health: {
+        healthy: '系统健康',
+        warning: '使用率偏高',
+        critical: '使用率过高',
+      },
+
+      // 警告信息
+      alerts: {
+        criticalUsage: '额度使用率过高！',
+        criticalUsageDesc: '当前额度使用率已超过90%，建议及时充值以避免服务中断。',
       },
 
       // 图表数据标签
@@ -1079,17 +1429,6 @@ const zhCN = {
         fullscreen: '全屏显示',
       },
 
-      // 时间范围
-      timeRange: {
-        today: '今天',
-        yesterday: '昨天',
-        last7Days: '最近7天',
-        last30Days: '最近30天',
-        thisMonth: '本月',
-        lastMonth: '上月',
-        custom: '自定义',
-      },
-
       // 数据单位
       units: {
         quota: '额度',
@@ -1109,7 +1448,160 @@ const zhCN = {
         empty: '暂无数据',
         success: '成功',
       },
+
+      // 主题
+      theme: {
+        auto: '自动',
+        light: '浅色',
+        dark: '深色',
+      },
     },
+
+    // 用户分组管理
+    userGroup: {
+      title: '用户分组管理',
+      create: '新增分组',
+      createTitle: '创建用户分组',
+      createDescription: '填写下面的信息来创建新的用户分组',
+      updateTitle: '更新用户分组',
+      updateDescription: '修改用户分组的信息',
+      searchPlaceholder: '请输入名称或编码搜索',
+      getListFailed: '获取用户分组列表失败',
+      name: '分组名称',
+      code: '唯一编码',
+      rate: '分组倍率',
+      order: '排序',
+      namePlaceholder: '请输入分组名称',
+      nameRequired: '请输入分组名称',
+      codePlaceholder: '请输入唯一编码',
+      codeRequired: '请输入唯一编码',
+      descriptionPlaceholder: '请输入描述',
+      descriptionRequired: '请输入描述',
+      rateRequired: '请输入分组倍率',
+      rateMinError: '倍率不能小于0',
+      orderRequired: '请输入排序',
+      orderMinError: '排序不能小于0',
+      enableLabel: '是否启用',
+      enableDescription: '启用后该分组将生效'
+    },
+
+    // 授权页面
+    auth: {
+      thirdPartyTitle: '第三方登录授权',
+      processing: '正在处理授权请求...',
+      success: '授权成功',
+      waiting: '等待处理授权...',
+      backToLogin: '返回登录',
+      secureService: '安全可靠的第三方授权服务'
+    },
+
+    // 离线指示器
+    offline: {
+      message: '您当前处于离线状态，部分功能可能不可用',
+      syncNote: '您的更改将在网络恢复后自动同步'
+    },
+
+    // Fal AI 工作区
+    fal: {
+      title: 'Fal AI Studio',
+      subtitle: '强大的AI图像生成与编辑工具',
+      generation: '生成',
+      edit: '编辑',
+
+      // 表单标签
+      prompt: '提示词',
+      promptRequired: '提示词',
+      promptPlaceholder: '描述你想要生成的图片...',
+      editPrompt: '编辑提示词',
+      editPromptPlaceholder: '描述你想要的编辑效果...',
+      sourceImage: '源图片',
+      sourceImageRequired: '源图片',
+      maskImage: '蒙版图片',
+      maskImageOptional: '蒙版图片 (可选)',
+      maskImageHint: '黑色区域将被编辑',
+
+      // 参数设置
+      numImages: '生成数量',
+      guidanceScale: '引导强度',
+      inferenceSteps: '推理步数',
+      seed: '随机种子',
+      seedOptional: '随机种子 (可选)',
+      seedPlaceholder: '留空为随机',
+      editStrength: '编辑强度',
+      editStrengthHint: '0.1 = 轻微编辑, 1.0 = 完全重绘',
+
+      // 按钮
+      selectFile: '选择文件',
+      uploadMask: '上传蒙版',
+      generateImage: '生成图片',
+      editImage: '编辑图片',
+      generating: '生成中...',
+      editing: '编辑中...',
+
+      // 任务管理
+      taskHistory: '任务历史',
+      noTasks: '暂无任务',
+      noTasksHint: '开始你的第一个AI图像生成或编辑任务，结果将在这里显示。',
+      imageGeneration: '图片生成',
+      imageEdit: '图片编辑',
+
+      // 任务状态
+      pending: '等待中',
+      processing: '处理中',
+      completed: '完成',
+      failed: '失败',
+      progress: '处理进度',
+
+      // 操作
+      preview: '预览',
+      download: '下载',
+      delete: '删除',
+      clear: '清空',
+      clearAll: '确认清空',
+      clearConfirm: '这将删除所有任务记录，此操作无法撤销。',
+      taskDeleted: '任务已删除',
+      allTasksCleared: '已清空所有任务',
+      downloadStarted: '下载开始',
+
+      // 时间和性能
+      createdAt: '创建时间',
+      completedIn: '耗时',
+      seconds: '秒',
+
+      // 错误消息
+      errors: {
+        promptRequired: '请输入提示词',
+        tokenRequired: '请选择令牌',
+        sourceImageRequired: '请上传源图片',
+        invalidImageFile: '请选择图片文件',
+        generationFailed: '生成失败: {{error}}',
+        editFailed: '编辑失败: {{error}}',
+        taskTimeout: '任务超时',
+        taskFailed: '处理失败',
+        downloadFailed: '下载失败',
+        compressionFailed: '图片压缩失败'
+      },
+
+      // 成功消息
+      success: {
+        generationComplete: '图片生成完成',
+        editComplete: '图片编辑完成',
+        taskComplete: '图片处理完成'
+      },
+
+      // 文件处理
+      characterCount: '个字符',
+      characterLimit: '/1000 字符',
+      imageCount: {
+        one: '1张',
+        two: '2张',
+        four: '4张'
+      },
+
+      // 上传提示
+      uploadHint: '点击上传图片',
+      dragUploadHint: '点击或拖拽图片到此区域上传'
+    }
   }
 };
 

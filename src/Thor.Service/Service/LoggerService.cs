@@ -17,25 +17,14 @@ public sealed class LoggerService(
 {
     public async ValueTask CreateAsync(ChatLogger logger)
     {
-        var tracing = TracingExtensions.GetCurrentRootTracing();
-
-        if (string.IsNullOrEmpty(logger.Id))
-        {
-            logger.Id = Guid.NewGuid().ToString("N") + Random.Shared.Next(1000, 9999);
-        }
-
         logger.CreatedAt = DateTime.Now;
         await eventBus.PublishAsync(logger);
-        if (tracing != null)
-        {
-            tracing.ChatLoggerId = logger.Id;
-            await tracingEventBus.PublishAsync(tracing);
-        }
     }
 
     /// <summary>
     /// 创建消费日志
     /// </summary>
+    /// <param name="url"></param>
     /// <param name="content"></param>
     /// <param name="model"></param>
     /// <param name="promptTokens"></param>

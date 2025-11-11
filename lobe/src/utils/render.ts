@@ -1,10 +1,8 @@
 
-export function renderQuota(quota: number, digits = 2) {
+export function renderQuota(quota: number, digits = 2): string {
     let quotaPerUnit = localStorage.getItem('quota_per_unit') ?? '500000';
     let displayInCurrency = localStorage.getItem('display_in_currency') ?? "true";
     if (displayInCurrency === 'true') {
-        console.log((quota / parseFloat(quotaPerUnit as string)));
-        
         return '$' + (quota / parseFloat(quotaPerUnit as string)).toFixed(digits);
     }
     return renderNumber(quota);
@@ -19,7 +17,7 @@ export function renderQuotaWithPrompt(quota: any, digits: number | undefined) {
 }
 
 
-export function renderNumber(num: number) {
+export function renderNumber(num: number): string {
     if (num >= 1000000000) {
         return (num / 1000000000).toFixed(1) + 'B';
     } else if (num >= 1000000) {
@@ -27,7 +25,7 @@ export function renderNumber(num: number) {
     } else if (num >= 10000) {
         return (num / 1000).toFixed(1) + 'k';
     } else {
-        return num;
+        return num.toString();
     }
 }
 

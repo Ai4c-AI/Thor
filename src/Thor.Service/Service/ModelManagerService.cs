@@ -21,7 +21,7 @@ public sealed class ModelManagerService(
     {
         var models = await context.ModelManagers.Where(x => x.Enable).ToListAsync();
 
-        // PromptRate.Clear();
+        PromptRate.Clear();
 
         foreach (var setting in models)
         {
@@ -99,7 +99,7 @@ public sealed class ModelManagerService(
     }
 
     public async ValueTask<PagingDto<ModelManager>> GetListAsync(string? model, int page, int pageSize, bool isPublic,
-        string? type, string[]? tags, bool? enabled = null)
+        string? type, string? modelType, string[]? tags, bool? enabled = null)
     {
         var query = DbContext.ModelManagers.AsQueryable();
 
@@ -119,30 +119,16 @@ public sealed class ModelManagerService(
             query = query.Where(x => x.Enable == enabled.Value);
         }
 
-        if (!string.IsNullOrEmpty(type))
-        {
-            // 支持按模型类型筛选
-            if (type.Equals("all", StringComparison.OrdinalIgnoreCase))
-            {
-                // 不添加过滤条件，显示所有类型
-            }
-            else
-            {
-                query = query.Where(x => x.Type == type);
-            }
-        }
-
-        // 如果是通过图标进行筛选（兼容旧代码）
+        // 按供应商图标筛选
         if (!string.IsNullOrEmpty(type) && !type.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
-            // 检查是否是按图标筛选
-            var isIconFilter = await DbContext.ModelManagers
-                .AnyAsync(x => x.Icon == type);
+            query = query.Where(x => x.Icon == type);
+        }
 
-            if (isIconFilter)
-            {
-                query = query.Where(x => x.Icon == type);
-            }
+        // 按模型类型筛选
+        if (!string.IsNullOrEmpty(modelType) && !modelType.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(x => x.Type == modelType);
         }
 
         if (tags != null && tags.Length > 0)

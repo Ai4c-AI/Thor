@@ -6,13 +6,6 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-FROM node:20.18-alpine3.21 as lobe
-WORKDIR /src
-COPY lobe .
-RUN yarn
-RUN npm i  --force
-RUN yarn run build
-
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -62,10 +55,11 @@ RUN dotnet build "./Thor.Service.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
+ARG TARGETARCH
 RUN dotnet publish "./Thor.Service.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-COPY --from=lobe /src/dist ./wwwroot
+COPY lobe/dist ./wwwroot
 ENTRYPOINT ["dotnet", "Thor.Service.dll"]

@@ -1,18 +1,13 @@
-import { Badge, ConfigProvider } from 'antd';
 import { PropsWithChildren, memo } from 'react';
-import { Flexbox } from 'react-layout-kit';
 
 const UpgradeBadge = memo(({ children, showBadge }: PropsWithChildren<{ showBadge?: boolean }>) => {
   if (!showBadge) return children;
 
   return (
-    <Flexbox>
-      <ConfigProvider theme={{ components: { Badge: { dotSize: 8 } } }}>
-        <Badge dot offset={[-4, 4]}>
-          {children}
-        </Badge>
-      </ConfigProvider>
-    </Flexbox>
+    <div className="relative">
+      <span className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full border-2 border-background z-10"></span>
+      {children}
+    </div>
   );
 });
 
